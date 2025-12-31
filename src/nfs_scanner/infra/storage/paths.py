@@ -25,6 +25,9 @@ def ensure_dirs(app_home: Path) -> dict[str, Path]:
         "logs": app_home / "logs",
         "data": app_home / "data",
         "exports": app_home / "exports",
+        # 新增
+        "db": app_home / "data" / "db",
+        "scans": app_home / "data" / "scans",
     }
     for p in paths.values():
         p.mkdir(parents=True, exist_ok=True)

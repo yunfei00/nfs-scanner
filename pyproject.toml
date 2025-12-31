@@ -21,3 +21,5 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "nfs_scanner.infra.config" = ["*.yaml"]
+"nfs_scanner.infra.storage" = ["*.sql"]
+

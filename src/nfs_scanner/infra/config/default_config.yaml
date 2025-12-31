@@ -47,3 +47,7 @@ visualization:
   lut: "viridis"
   opacity: 0.7
   autoscale: true
+
+debug:
+  auto_create_fake_task: false
+
