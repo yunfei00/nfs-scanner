@@ -7,8 +7,10 @@ name = "nfs-scanner"
 version = "0.0.1"
 description = "Near-Field Scanning System (PySide6) - commercial-grade skeleton"
 requires-python = ">=3.10"
+
 dependencies = [
   "PySide6>=6.6",
+  "PyYAML>=6.0",
 ]
 
 [tool.setuptools]
@@ -16,3 +18,6 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"nfs_scanner.infra.config" = ["*.yaml"]

@@ -1,0 +1,49 @@
+app:
+  name: "NFSScanner"
+  language: "zh_CN"
+  log_level: "INFO"
+
+paths:
+  # 为空表示使用 APP_HOME（paths.py 逻辑）
+  app_home: ""
+
+motion:
+  enabled: false
+  port: "COM3"
+  baudrate: 115200
+  timeout_ms: 500
+  soft_limits:
+    x_min: -100.0
+    x_max: 100.0
+    y_min: -100.0
+    y_max: 100.0
+    z_min: 0.0
+    z_max: 50.0
+
+spectrum:
+  enabled: false
+  driver: "config"     # config / rs / keysight / plugin
+  address: "TCPIP0::192.168.1.100::inst0::INSTR"
+  timeout_ms: 5000
+
+camera:
+  enabled: false
+  index: 0
+  width: 1280
+  height: 720
+  fps: 30
+
+scan:
+  step_mm: 1.0
+  feed_mm_s: 10.0
+  z_height_mm: 1.0
+  area:
+    x_min: -5.0
+    x_max: 5.0
+    y_min: -5.0
+    y_max: 5.0
+
+visualization:
+  lut: "viridis"
+  opacity: 0.7
+  autoscale: true
