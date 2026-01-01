@@ -167,6 +167,11 @@ class TaskDetailDialog(QDialog):
         pix = QPixmap.fromImage(qimg)
         self.lbl_preview.setPixmap(pix)
 
+        # 关键：让 QLabel 尺寸 = 图片尺寸，ScrollArea 才能正确滚动显示完整内容
+        self.lbl_preview.setFixedSize(pix.size())
+        self.lbl_preview.setScaledContents(False)
+
+
 
 
 
