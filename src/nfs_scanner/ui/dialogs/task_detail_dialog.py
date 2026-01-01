@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QMessageBox
 )
 
+from nfs_scanner.core.visualization.heatmap_export import export_heatmap_png
 from nfs_scanner.infra.storage.sqlite_store import SQLiteStore
 
 
@@ -30,9 +31,12 @@ class TaskDetailDialog(QDialog):
         btns = QHBoxLayout()
         self.btn_export = QPushButton("导出点位 CSV")
         self.btn_close = QPushButton("关闭")
+        self.btn_export_png = QPushButton("导出热力图 PNG")
+
         btns.addStretch(1)
         btns.addWidget(self.btn_export)
         btns.addWidget(self.btn_close)
+        btns.addWidget(self.btn_export_png)
 
         layout.addWidget(self.lbl_title)
         layout.addWidget(self.lbl_meta)
@@ -41,6 +45,7 @@ class TaskDetailDialog(QDialog):
 
         self.btn_close.clicked.connect(self.close)
         self.btn_export.clicked.connect(self.export_csv)
+        self.btn_export_png.clicked.connect(self.export_png)
 
         self.load_task()
 
@@ -73,3 +78,16 @@ class TaskDetailDialog(QDialog):
         out = self._export_dir / f"{self._task_id}.csv"
         n = self._store.export_points_csv(self._task_id, out)
         QMessageBox.information(self, "导出完成", f"已导出 {n} 行：\n{out}")
+
+    def export_png(self) -> None:
+        points = self._store.fetch_points(self._task_id)
+        out = self._export_dir / f"{self._task_id}.png"
+        meta = export_heatmap_png(points, out)
+        QMessageBox.information(
+            self,
+            "导出完成",
+            f"热力图已导出：\n{meta['out']}\n"
+            f"网格：{meta['nx']} x {meta['ny']}\n"
+            f"范围：[{meta['vmin']:.6g}, {meta['vmax']:.6g}]"
+        )
+

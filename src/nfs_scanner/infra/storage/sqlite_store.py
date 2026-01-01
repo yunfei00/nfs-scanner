@@ -107,3 +107,15 @@ class SQLiteStore:
                     w.writerow(r)
                     n += 1
         return n
+
+    def fetch_points(self, task_id: str) -> list[tuple[float, float, float, float]]:
+        """
+        返回 [(x,y,z,value), ...]
+        """
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT x, y, z, value FROM scan_point WHERE task_id=? ORDER BY id ASC",
+                (task_id,),
+            ).fetchall()
+        return [(float(x), float(y), float(z), float(v) if v is not None else 0.0) for (x, y, z, v) in rows]
+
