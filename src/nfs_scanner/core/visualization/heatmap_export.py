@@ -152,6 +152,46 @@ def export_heatmap_png(
         "autoscale": bool(autoscale),
     }
 
+def render_heatmap_image(
+    points,
+    *,
+    lut_name: str = "viridis",
+    opacity: float = 1.0,
+    autoscale: bool = True,
+    vmin: float | None = None,
+    vmax: float | None = None,
+    min_size: int = 600,
+    scale: int = 20,
+    smooth: bool = True,
+    with_colorbar: bool = True,
+) -> Image.Image:
+    xs, ys, grid = build_grid(points)
+    hm = apply_lut(
+        grid,
+        lut_name=lut_name,
+        opacity=opacity,
+        autoscale=autoscale,
+        vmin=vmin,
+        vmax=vmax,
+    )
+
+    w0, h0 = hm.image.size
+    target_w = w0 * max(1, int(scale))
+    target_h = h0 * max(1, int(scale))
+    shortest = min(target_w, target_h)
+    if shortest < min_size:
+        k = int(np.ceil(min_size / max(1, shortest)))
+        target_w *= k
+        target_h *= k
+
+    resample = Image.Resampling.BILINEAR if smooth else Image.Resampling.NEAREST
+    hm_big = hm.image.resize((target_w, target_h), resample=resample)
+
+    if with_colorbar:
+        return draw_colorbar(hm_big, hm.vmin, hm.vmax)
+    return hm_big
+
+
 def apply_lut(grid: np.ndarray, *, lut_name: str = "viridis", opacity: float = 1.0,
               autoscale: bool = True, vmin: float | None = None, vmax: float | None = None) -> HeatmapImage:
     if autoscale or vmin is None or vmax is None:

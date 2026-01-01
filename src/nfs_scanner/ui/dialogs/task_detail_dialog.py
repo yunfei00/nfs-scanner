@@ -3,11 +3,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QMessageBox
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QMessageBox, QScrollArea
 )
 
-from nfs_scanner.core.visualization.heatmap_export import export_heatmap_png
+from nfs_scanner.core.visualization.heatmap_export import export_heatmap_png, render_heatmap_image
 from nfs_scanner.infra.storage.sqlite_store import SQLiteStore
 
 
@@ -34,14 +36,27 @@ class TaskDetailDialog(QDialog):
         self.btn_close = QPushButton("关闭")
         self.btn_export_png = QPushButton("导出热力图 PNG")
 
+        self.btn_preview = QPushButton("预览热力图")
+        btns.addWidget(self.btn_preview)
+        self.btn_preview.clicked.connect(self.preview_png)
+
         btns.addStretch(1)
         btns.addWidget(self.btn_export)
         btns.addWidget(self.btn_close)
         btns.addWidget(self.btn_export_png)
 
+        self.lbl_preview = QLabel("预览区（点击下方“预览热力图”生成）")
+        self.lbl_preview.setMinimumHeight(300)
+        self.lbl_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setWidget(self.lbl_preview)
+
         layout.addWidget(self.lbl_title)
         layout.addWidget(self.lbl_meta)
         layout.addWidget(self.txt_config)
+        layout.addWidget(self.scroll)
         layout.addLayout(btns)
 
         self.btn_close.clicked.connect(self.close)
@@ -116,6 +131,42 @@ class TaskDetailDialog(QDialog):
             f"网格：{meta['nx']} x {meta['ny']}\n"
             f"范围：[{meta['vmin']:.6g}, {meta['vmax']:.6g}]"
         )
+
+    def preview_png(self) -> None:
+        points = self._store.fetch_points(self._task_id)
+
+        viz = (self._cfg.get("visualization") or {})
+        exp = (viz.get("export") or {})
+        min_size = int(exp.get("min_size", 800))
+        scale = int(exp.get("scale", 20))
+        smooth = bool(exp.get("smooth", True))
+
+        lut_name = str(viz.get("lut", "viridis"))
+        opacity = float(viz.get("opacity", 1.0))
+        autoscale = bool(viz.get("autoscale", True))
+        vmin = viz.get("vmin", None)
+        vmax = viz.get("vmax", None)
+
+        pil_img = render_heatmap_image(
+            points,
+            lut_name=lut_name,
+            opacity=opacity,
+            autoscale=autoscale,
+            vmin=vmin,
+            vmax=vmax,
+            min_size=min_size,
+            scale=scale,
+            smooth=smooth,
+            with_colorbar=True,
+        )
+
+        # PIL -> QImage -> QLabel
+        rgba = pil_img.convert("RGBA")
+        data = rgba.tobytes("raw", "RGBA")
+        qimg = QImage(data, rgba.width, rgba.height, QImage.Format.Format_RGBA8888)
+        pix = QPixmap.fromImage(qimg)
+        self.lbl_preview.setPixmap(pix)
+
 
 
 
