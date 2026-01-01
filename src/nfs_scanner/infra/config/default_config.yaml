@@ -44,13 +44,15 @@ scan:
     y_max: 5.0
 
 visualization:
-  lut: "viridis"
-  opacity: 0.7
-  autoscale: true
+  lut: "turbo"     # viridis / turbo / gray / jet(后续加)
+  opacity: 1.0       # 0~1
+  autoscale: true    # true=每张图自适应；false=用 vmin/vmax
+  vmin: 0.0
+  vmax: 10.0
   export:
     min_size: 800
     scale: 20
-    smooth: true
+    smooth: false
 
 debug:
   auto_create_fake_task: false

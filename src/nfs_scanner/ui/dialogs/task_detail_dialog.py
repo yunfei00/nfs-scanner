@@ -87,12 +87,27 @@ class TaskDetailDialog(QDialog):
         viz = (self._cfg.get("visualization") or {})
         exp = (viz.get("export") or {})
 
+        lut_name = str(viz.get("lut", "viridis"))
+        opacity = float(viz.get("opacity", 1.0))
+        autoscale = bool(viz.get("autoscale", True))
+        vmin = viz.get("vmin", None)
+        vmax = viz.get("vmax", None)
+
         min_size = int(exp.get("min_size", 800))
         scale = int(exp.get("scale", 20))
         smooth = bool(exp.get("smooth", True))
 
-        meta = export_heatmap_png(points, out, min_size=min_size, scale=scale, smooth=smooth)
-
+        meta = export_heatmap_png(
+            points, out,
+            lut_name=lut_name,
+            opacity=opacity,
+            autoscale=autoscale,
+            vmin=vmin,
+            vmax=vmax,
+            min_size=min_size,
+            scale=scale,
+            smooth=smooth,
+        )
 
         QMessageBox.information(
             self,

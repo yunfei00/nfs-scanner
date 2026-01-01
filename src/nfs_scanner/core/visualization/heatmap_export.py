@@ -5,6 +5,9 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+from nfs_scanner.core.visualization.lut_manager import get_lut
+
+
 @dataclass(frozen=True)
 class HeatmapImage:
     image: Image.Image
@@ -85,6 +88,11 @@ def export_heatmap_png(
     points: list[tuple[float, float, float, float]],
     out_png: Path,
     *,
+    lut_name: str = "viridis",
+    opacity: float = 1.0,
+    autoscale: bool = True,
+    vmin: float | None = None,
+    vmax: float | None = None,
     min_size: int = 600,
     scale: int = 20,
     smooth: bool = True,
@@ -98,7 +106,14 @@ def export_heatmap_png(
     out_png.parent.mkdir(parents=True, exist_ok=True)
 
     xs, ys, grid = build_grid(points)
-    hm = apply_lut_gray(grid)
+    hm = apply_lut(
+        grid,
+        lut_name=lut_name,
+        opacity=opacity,
+        autoscale=autoscale,
+        vmin=vmin,
+        vmax=vmax,
+    )
 
     # 计算目标尺寸：优先让最短边 >= min_size
     w0, h0 = hm.image.size  # 网格像素（nx, ny）
@@ -132,5 +147,34 @@ def export_heatmap_png(
         "vmin": hm.vmin,
         "vmax": hm.vmax,
         "smooth": bool(smooth),
+        "lut": lut_name,
+        "opacity": float(opacity),
+        "autoscale": bool(autoscale),
     }
+
+def apply_lut(grid: np.ndarray, *, lut_name: str = "viridis", opacity: float = 1.0,
+              autoscale: bool = True, vmin: float | None = None, vmax: float | None = None) -> HeatmapImage:
+    if autoscale or vmin is None or vmax is None:
+        vmin = float(grid.min())
+        vmax = float(grid.max())
+    else:
+        vmin = float(vmin)
+        vmax = float(vmax)
+
+    if vmax - vmin < 1e-12:
+        norm = np.zeros_like(grid, dtype=np.float32)
+    else:
+        norm = (grid - vmin) / (vmax - vmin)
+    norm = norm.clip(0.0, 1.0)
+
+    lut = get_lut(lut_name).table  # (256,3)
+    idx = (norm * 255.0).round().astype(np.uint8)  # (H,W)
+
+    rgb = lut[idx]  # (H,W,3)
+    a = int(max(0.0, min(1.0, float(opacity))) * 255)
+    alpha = np.full((rgb.shape[0], rgb.shape[1], 1), a, dtype=np.uint8)
+    rgba = np.concatenate([rgb.astype(np.uint8), alpha], axis=2)
+
+    im = Image.fromarray(rgba, mode="RGBA")
+    return HeatmapImage(im, vmin=vmin, vmax=vmax, width=im.width, height=im.height)
 
