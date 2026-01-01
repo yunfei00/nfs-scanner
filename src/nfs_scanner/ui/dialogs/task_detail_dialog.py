@@ -12,7 +12,7 @@ from nfs_scanner.infra.storage.sqlite_store import SQLiteStore
 
 
 class TaskDetailDialog(QDialog):
-    def __init__(self, store: SQLiteStore, task_id: str, export_dir: Path, parent=None):
+    def __init__(self, store: SQLiteStore, task_id: str, export_dir: Path, cfg: dict, parent=None):
         super().__init__(parent)
         self.setWindowTitle("任务详情")
         self.resize(900, 600)
@@ -20,6 +20,7 @@ class TaskDetailDialog(QDialog):
         self._store = store
         self._task_id = task_id
         self._export_dir = export_dir
+        self._cfg = cfg
 
         layout = QVBoxLayout(self)
 
@@ -82,7 +83,17 @@ class TaskDetailDialog(QDialog):
     def export_png(self) -> None:
         points = self._store.fetch_points(self._task_id)
         out = self._export_dir / f"{self._task_id}.png"
-        meta = export_heatmap_png(points, out)
+
+        viz = (self._cfg.get("visualization") or {})
+        exp = (viz.get("export") or {})
+
+        min_size = int(exp.get("min_size", 800))
+        scale = int(exp.get("scale", 20))
+        smooth = bool(exp.get("smooth", True))
+
+        meta = export_heatmap_png(points, out, min_size=min_size, scale=scale, smooth=smooth)
+
+
         QMessageBox.information(
             self,
             "导出完成",
@@ -90,4 +101,6 @@ class TaskDetailDialog(QDialog):
             f"网格：{meta['nx']} x {meta['ny']}\n"
             f"范围：[{meta['vmin']:.6g}, {meta['vmax']:.6g}]"
         )
+
+
 

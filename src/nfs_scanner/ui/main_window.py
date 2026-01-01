@@ -98,6 +98,7 @@ class MainWindow(QMainWindow):
         if not item:
             return
         task_id = item.text().strip()
-        dlg = TaskDetailDialog(self._store, task_id, export_dir=self._export_dir, parent=self)
+        dlg = TaskDetailDialog(self._store, task_id, export_dir=self._export_dir, cfg=self._cfg, parent=self)
+
         dlg.exec()
 

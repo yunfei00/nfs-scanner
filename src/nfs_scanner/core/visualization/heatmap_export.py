@@ -81,20 +81,56 @@ def draw_colorbar(im: Image.Image, vmin: float, vmax: float, bar_width: int = 40
     draw.text((bar_x1 + 10, h - 15), f"min: {vmin:.6g}", fill=(0, 0, 0, 255), font=font)
     return out
 
-def export_heatmap_png(points: list[tuple[float, float, float, float]], out_png: Path) -> dict:
+def export_heatmap_png(
+    points: list[tuple[float, float, float, float]],
+    out_png: Path,
+    *,
+    min_size: int = 600,
+    scale: int = 20,
+    smooth: bool = True,
+) -> dict:
     """
     points -> heatmap.png (带色条)
-    返回 meta 信息
+    - min_size: 最小可读尺寸（热力图主体最短边至少达到该像素）
+    - scale: 基础放大倍数（每个网格点对应多少像素）
+    - smooth: True 用双线性插值，False 用最近邻像素块
     """
     out_png.parent.mkdir(parents=True, exist_ok=True)
+
     xs, ys, grid = build_grid(points)
     hm = apply_lut_gray(grid)
-    out = draw_colorbar(hm.image, hm.vmin, hm.vmax)
+
+    # 计算目标尺寸：优先让最短边 >= min_size
+    w0, h0 = hm.image.size  # 网格像素（nx, ny）
+    if w0 <= 0 or h0 <= 0:
+        raise ValueError("Empty heatmap grid")
+
+    # 基础放大
+    target_w = w0 * max(1, int(scale))
+    target_h = h0 * max(1, int(scale))
+
+    # 兜底：如果还太小，再提高倍数
+    shortest = min(target_w, target_h)
+    if shortest < min_size:
+        k = int(np.ceil(min_size / max(1, shortest)))
+        target_w *= k
+        target_h *= k
+
+    resample = Image.Resampling.BILINEAR if smooth else Image.Resampling.NEAREST
+    hm_big = hm.image.resize((target_w, target_h), resample=resample)
+
+    # 加色条
+    out = draw_colorbar(hm_big, hm.vmin, hm.vmax)
     out.save(out_png, "PNG")
+
     return {
         "out": str(out_png),
         "nx": int(len(xs)),
         "ny": int(len(ys)),
+        "render_w": int(target_w),
+        "render_h": int(target_h),
         "vmin": hm.vmin,
         "vmax": hm.vmax,
+        "smooth": bool(smooth),
     }
+
