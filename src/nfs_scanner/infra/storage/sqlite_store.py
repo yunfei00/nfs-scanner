@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 import sqlite3
 import logging
@@ -59,3 +60,50 @@ class SQLiteStore:
                 (limit,),
             ).fetchall()
         return [ScanTaskRow(*r) for r in rows]
+
+
+    def get_task(self, task_id: str) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT id, name, created_at, status, config_json, COALESCE(note,'') "
+                "FROM scan_task WHERE id=?",
+                (task_id,),
+            ).fetchone()
+        if not row:
+            return None
+        return {
+            "id": row[0],
+            "name": row[1],
+            "created_at": row[2],
+            "status": row[3],
+            "config_json": row[4],
+            "note": row[5],
+        }
+
+    def count_points(self, task_id: str) -> int:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT COUNT(1) FROM scan_point WHERE task_id=?",
+                (task_id,),
+            ).fetchone()
+        return int(row[0] if row else 0)
+
+    def export_points_csv(self, task_id: str, out_path: Path) -> int:
+        """
+        导出点位到 CSV：x,y,z,value
+        返回导出行数
+        """
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT x, y, z, value FROM scan_point WHERE task_id=? ORDER BY id ASC",
+                (task_id,),
+            )
+            with out_path.open("w", newline="", encoding="utf-8") as f:
+                w = csv.writer(f)
+                w.writerow(["x", "y", "z", "value"])
+                n = 0
+                for r in rows:
+                    w.writerow(r)
+                    n += 1
+        return n
