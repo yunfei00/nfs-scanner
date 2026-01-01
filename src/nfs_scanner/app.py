@@ -56,7 +56,7 @@ def main() -> int:
 
     # 5) 启动 UI
     app = QApplication(sys.argv)
-    w = MainWindow()
+    w = MainWindow(store=store, cfg=cfg)
     w.show()
 
     rc = app.exec()
