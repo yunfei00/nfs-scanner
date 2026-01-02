@@ -27,6 +27,7 @@ class HeatmapMeta:
 class HeatmapView(QGraphicsView):
     # 鼠标移动时发出：x, y, value(如果能算), 以及像素坐标
     hover_info = Signal(float, float, float, int, int)
+    pick_changed = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -53,6 +54,9 @@ class HeatmapView(QGraphicsView):
         self._colorbar_items = []
         self._colorbar_width = 20
         self._colorbar_margin = 10
+
+        self._pick_items = []
+        self._picked = []  # [(gx, gy, x, y, value)]
 
     def set_heatmap(self, pixmap: QPixmap, meta: HeatmapMeta, grid_values=None) -> None:
         self.scene().clear()
@@ -156,7 +160,7 @@ class HeatmapView(QGraphicsView):
         for _ in range(1000):
             if x > end + 1e-12:
                 break
-            if x >= vmin - 1e-12 and x <= vmax + 1e-12:
+            if vmin - 1e-12 <= x <= vmax + 1e-12:
                 ticks.append(float(x))
             x += step
         if not ticks:
@@ -309,6 +313,60 @@ class HeatmapView(QGraphicsView):
             img_w + self._axis_margin * 2 + self._colorbar_width + 60,
             img_h + self._axis_margin * 2,
         )
+
+    def _clear_picks(self):
+        for it in self._pick_items:
+            self.scene().removeItem(it)
+        self._pick_items.clear()
+        self._picked.clear()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and self._meta and self._grid_values is not None:
+            scene_pos = self.mapToScene(event.pos())
+            br = self._pixmap_item.boundingRect()
+
+            x_pix = int(scene_pos.x())
+            y_pix = int(scene_pos.y())
+            if x_pix < 0 or y_pix < 0 or x_pix >= br.width() or y_pix >= br.height():
+                return
+
+            nx, ny = self._meta.nx, self._meta.ny
+            gx = int(x_pix * nx / br.width())
+            gy = int(y_pix * ny / br.height())
+            gx = max(0, min(nx - 1, gx))
+            gy = max(0, min(ny - 1, gy))
+
+            x = self._meta.x_min + (self._meta.x_max - self._meta.x_min) * gx / max(1, nx - 1)
+            y = self._meta.y_max - (self._meta.y_max - self._meta.y_min) * gy / max(1, ny - 1)
+            v = float(self._grid_values[gy, gx])
+
+            if len(self._picked) >= 2:
+                self._clear_picks()
+
+            self._picked.append((gx, gy, x, y, v))
+            self._draw_crosshair(x_pix, y_pix)
+
+            self.pick_changed.emit()
+            return
+
+        super().mousePressEvent(event)
+
+    def _draw_crosshair(self, x, y):
+        pen = QPen(Qt.GlobalColor.red)
+        pen.setWidth(1)
+
+        br = self._pixmap_item.boundingRect()
+        h = QGraphicsLineItem(0, y, br.width(), y)
+        v = QGraphicsLineItem(x, 0, x, br.height())
+        h.setPen(pen)
+        v.setPen(pen)
+        h.setZValue(30)
+        v.setZValue(30)
+
+        self.scene().addItem(h)
+        self.scene().addItem(v)
+        self._pick_items.extend([h, v])
+
 
 
 

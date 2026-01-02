@@ -104,6 +104,11 @@ class TaskDetailDialog(QDialog):
 
         self.load_task()
 
+        self.lbl_pick = QLabel("取点：单击选择两个点")
+        layout.addWidget(self.lbl_pick)
+
+        self.view.pick_changed.connect(self.on_pick_changed)
+
     def load_task(self) -> None:
         task = self._store.get_task(self._task_id)
         if not task:
@@ -213,6 +218,7 @@ class TaskDetailDialog(QDialog):
             y_max=float(ys.max()) if len(ys) else 1.0,
             vmin=float(vmin2),
             vmax=float(vmax2),
+            lut=lut_name,
         )
 
         self.view.set_heatmap(pix, meta, grid_values=grid)
@@ -264,7 +270,18 @@ class TaskDetailDialog(QDialog):
     def on_hover_info(self, x: float, y: float, val: float, gx: int, gy: int) -> None:
         self.lbl_hover.setText(f"鼠标悬停：x={x:.3f}, y={y:.3f}, value={val:.6g} (ix={gx}, iy={gy})")
 
-
+    def on_pick_changed(self):
+        p = self.view._picked
+        if len(p) == 1:
+            _, _, x, y, v = p[0]
+            self.lbl_pick.setText(f"P1: x={x:.3f}, y={y:.3f}, v={v:.6g}")
+        elif len(p) == 2:
+            (_, _, x1, y1, v1), (_, _, x2, y2, v2) = p
+            self.lbl_pick.setText(
+                f"P1: ({x1:.3f},{y1:.3f}) v={v1:.6g}   "
+                f"P2: ({x2:.3f},{y2:.3f}) v={v2:.6g}   "
+                f"Δx={x2 - x1:.3f}, Δy={y2 - y1:.3f}, Δv={v2 - v1:.6g}"
+            )
 
 
 
