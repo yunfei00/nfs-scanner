@@ -6,7 +6,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QMessageBox, QScrollArea
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QMessageBox, QScrollArea, QSlider
 )
 
 from nfs_scanner.core.visualization.heatmap_export import export_heatmap_png, render_heatmap_image
@@ -48,6 +48,37 @@ class TaskDetailDialog(QDialog):
         self.lbl_preview = QLabel("预览区（点击下方“预览热力图”生成）")
         self.lbl_preview.setMinimumHeight(300)
         self.lbl_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        # --- Zoom state ---
+        self._base_pixmap: QPixmap | None = None
+        self._zoom_percent = 100
+
+        # --- Zoom controls ---
+        zoom_bar = QHBoxLayout()
+        zoom_bar.addWidget(QLabel("缩放"))
+
+        self.sld_zoom = QSlider(Qt.Orientation.Horizontal)
+        self.sld_zoom.setMinimum(50)
+        self.sld_zoom.setMaximum(400)
+        self.sld_zoom.setValue(100)
+        self.sld_zoom.setSingleStep(10)
+        self.sld_zoom.setPageStep(25)
+
+        self.lbl_zoom = QLabel("100%")
+        self.btn_fit = QPushButton("适配宽度")
+        self.btn_100 = QPushButton("100%")
+
+        zoom_bar.addWidget(self.sld_zoom, 1)
+        zoom_bar.addWidget(self.lbl_zoom)
+        zoom_bar.addWidget(self.btn_fit)
+        zoom_bar.addWidget(self.btn_100)
+
+        layout.addLayout(zoom_bar)
+
+        # signals
+        self.sld_zoom.valueChanged.connect(self.on_zoom_changed)
+        self.btn_100.clicked.connect(lambda: self.sld_zoom.setValue(100))
+        self.btn_fit.clicked.connect(self.fit_width)
 
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
@@ -165,11 +196,59 @@ class TaskDetailDialog(QDialog):
         data = rgba.tobytes("raw", "RGBA")
         qimg = QImage(data, rgba.width, rgba.height, QImage.Format.Format_RGBA8888)
         pix = QPixmap.fromImage(qimg)
-        self.lbl_preview.setPixmap(pix)
+        self._base_pixmap = pix
+        self.apply_zoom()
+
+        # self.lbl_preview.setPixmap(pix)
 
         # 关键：让 QLabel 尺寸 = 图片尺寸，ScrollArea 才能正确滚动显示完整内容
-        self.lbl_preview.setFixedSize(pix.size())
+        # self.lbl_preview.setFixedSize(pix.size())
+        # self.lbl_preview.setScaledContents(False)
+
+    def on_zoom_changed(self, val: int) -> None:
+        self._zoom_percent = int(val)
+        self.lbl_zoom.setText(f"{self._zoom_percent}%")
+        self.apply_zoom()
+
+    def apply_zoom(self) -> None:
+        if self._base_pixmap is None:
+            return
+
+        z = max(10, self._zoom_percent) / 100.0
+        target_w = max(1, int(self._base_pixmap.width() * z))
+        target_h = max(1, int(self._base_pixmap.height() * z))
+
+        # 缩放质量：如果导出/预览配置 smooth=true，用平滑；否则用最近邻保持像素块
+        viz = (self._cfg.get("visualization") or {})
+        exp = (viz.get("export") or {})
+        smooth = bool(exp.get("smooth", True))
+        mode = Qt.SmoothTransformation if smooth else Qt.FastTransformation
+
+        scaled = self._base_pixmap.scaled(target_w, target_h, Qt.IgnoreAspectRatio, mode)
+        self.lbl_preview.setPixmap(scaled)
+        self.lbl_preview.setFixedSize(scaled.size())
         self.lbl_preview.setScaledContents(False)
+
+    def fit_width(self) -> None:
+        """
+        将图片缩放到刚好适配 scroll area 的可视宽度（保留纵向滚动）。
+        """
+        if self._base_pixmap is None:
+            return
+
+        # scroll viewport 可用宽度
+        viewport_w = self.scroll.viewport().width()
+        if viewport_w <= 10:
+            return
+
+        # 留一点边距
+        viewport_w = max(10, viewport_w - 10)
+
+        z = viewport_w / max(1, self._base_pixmap.width())
+        val = int(z * 100)
+        val = max(50, min(400, val))
+        self.sld_zoom.setValue(val)
+
 
 
 
