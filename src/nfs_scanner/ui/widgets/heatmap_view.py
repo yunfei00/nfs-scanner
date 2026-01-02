@@ -4,8 +4,9 @@ from dataclasses import dataclass
 from typing import Optional
 
 from PySide6.QtCore import Qt, Signal, QPointF
-from PySide6.QtGui import QPixmap, QPen, QColor
-from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QGraphicsLineItem, QGraphicsTextItem
+from PySide6.QtGui import QPixmap, QPen, QColor, QLinearGradient, QBrush
+from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QGraphicsLineItem, QGraphicsTextItem, \
+    QGraphicsRectItem
 
 
 @dataclass(frozen=True)
@@ -20,6 +21,7 @@ class HeatmapMeta:
     y_max: float
     vmin: float
     vmax: float
+    lut: str
 
 
 class HeatmapView(QGraphicsView):
@@ -48,6 +50,10 @@ class HeatmapView(QGraphicsView):
         self._axis_items = []  # 存放刻度线和文字，刷新时清掉重画
         self._axis_margin = 40  # 给坐标文字留空间（像素）
 
+        self._colorbar_items = []
+        self._colorbar_width = 20
+        self._colorbar_margin = 10
+
     def set_heatmap(self, pixmap: QPixmap, meta: HeatmapMeta, grid_values=None) -> None:
         self.scene().clear()
         self._pixmap_item = self.scene().addPixmap(pixmap)
@@ -56,11 +62,12 @@ class HeatmapView(QGraphicsView):
         self._meta = meta
         self._grid_values = grid_values
 
-        # scene 大小适配图片
-        self.setSceneRect(self._pixmap_item.boundingRect())
         self.resetTransform()
+        self.setSceneRect(self._pixmap_item.boundingRect())
         self.fitInView(self.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
+
         self.update_axes()
+        self.update_colorbar()
 
     def wheelEvent(self, event):
         # 滚轮缩放
@@ -70,6 +77,7 @@ class HeatmapView(QGraphicsView):
             factor = 1 / 1.15
         self.scale(factor, factor)
         self.update_axes()
+        self.update_colorbar()
 
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
@@ -233,5 +241,74 @@ class HeatmapView(QGraphicsView):
     def mouseReleaseEvent(self, event):
         super().mouseReleaseEvent(event)
         self.update_axes()
+        self.update_colorbar()
+
+    def _clear_colorbar_items(self) -> None:
+        for it in self._colorbar_items:
+            self.scene().removeItem(it)
+        self._colorbar_items.clear()
+
+    def update_colorbar(self) -> None:
+        if not self._pixmap_item or not self._meta:
+            return
+
+        self._clear_colorbar_items()
+
+        br = self._pixmap_item.boundingRect()
+        img_w = float(br.width())
+        img_h = float(br.height())
+
+        # 色条位置（贴右）
+        x0 = img_w + self._colorbar_margin
+        y0 = 0.0
+        x1 = x0 + self._colorbar_width
+        y1 = img_h
+
+        # 颜色渐变（从 vmax 到 vmin）
+        grad = QLinearGradient(0, y0, 0, y1)
+        grad.setColorAt(0.0, QColor(255, 0, 0))  # placeholder
+        grad.setColorAt(1.0, QColor(0, 0, 255))
+
+        # 用 LUT 生成真正的渐变
+        try:
+            from nfs_scanner.core.visualization.lut_manager import get_lut
+            lut = get_lut(getattr(self._meta, "lut", "viridis")).table
+            for i in range(256):
+                t = i / 255.0
+                r, g, b = lut[255 - i]
+                grad.setColorAt(t, QColor(int(r), int(g), int(b)))
+        except Exception:
+            pass
+
+        rect = QGraphicsRectItem(x0, y0, self._colorbar_width, img_h)
+        rect.setBrush(QBrush(grad))
+        rect.setPen(QPen(Qt.PenStyle.NoPen))
+        rect.setZValue(20)
+        self.scene().addItem(rect)
+        self._colorbar_items.append(rect)
+
+        # vmax / vmin 文本
+        txt_max = QGraphicsTextItem(f"{self._meta.vmax:.3g}")
+        txt_max.setDefaultTextColor(QColor(20, 20, 20))
+        txt_max.setZValue(20)
+        txt_max.setPos(x1 + 5, y0 - 8)
+
+        txt_min = QGraphicsTextItem(f"{self._meta.vmin:.3g}")
+        txt_min.setDefaultTextColor(QColor(20, 20, 20))
+        txt_min.setZValue(20)
+        txt_min.setPos(x1 + 5, y1 - 12)
+
+        self.scene().addItem(txt_max)
+        self.scene().addItem(txt_min)
+        self._colorbar_items.extend([txt_max, txt_min])
+
+        # 扩展 scene rect，容纳色条
+        self.setSceneRect(
+            -self._axis_margin,
+            -self._axis_margin,
+            img_w + self._axis_margin * 2 + self._colorbar_width + 60,
+            img_h + self._axis_margin * 2,
+        )
+
 
 
