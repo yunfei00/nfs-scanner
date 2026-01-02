@@ -9,8 +9,10 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QMessageBox, QScrollArea, QSlider
 )
 
-from nfs_scanner.core.visualization.heatmap_export import export_heatmap_png, render_heatmap_image
+from nfs_scanner.core.visualization.heatmap_export import export_heatmap_png, \
+    render_heatmap_for_ui
 from nfs_scanner.infra.storage.sqlite_store import SQLiteStore
+from nfs_scanner.ui.widgets.heatmap_view import HeatmapView, HeatmapMeta
 
 
 class TaskDetailDialog(QDialog):
@@ -84,15 +86,21 @@ class TaskDetailDialog(QDialog):
         self.scroll.setWidgetResizable(True)
         self.scroll.setWidget(self.lbl_preview)
 
+        self.view = HeatmapView()
+        self.lbl_hover = QLabel("鼠标悬停：x=, y=, value=")
+
         layout.addWidget(self.lbl_title)
         layout.addWidget(self.lbl_meta)
         layout.addWidget(self.txt_config)
-        layout.addWidget(self.scroll)
+        layout.addWidget(self.view)
+        layout.addWidget(self.lbl_hover)
+
         layout.addLayout(btns)
 
         self.btn_close.clicked.connect(self.close)
         self.btn_export.clicked.connect(self.export_csv)
         self.btn_export_png.clicked.connect(self.export_png)
+        self.view.hover_info.connect(self.on_hover_info)
 
         self.load_task()
 
@@ -178,7 +186,7 @@ class TaskDetailDialog(QDialog):
         vmin = viz.get("vmin", None)
         vmax = viz.get("vmax", None)
 
-        pil_img = render_heatmap_image(
+        xs, ys, grid, pil_img, vmin2, vmax2 = render_heatmap_for_ui(
             points,
             lut_name=lut_name,
             opacity=opacity,
@@ -188,22 +196,26 @@ class TaskDetailDialog(QDialog):
             min_size=min_size,
             scale=scale,
             smooth=smooth,
-            with_colorbar=True,
+            with_colorbar=False,  # UI 先不加色条，干净。色条下一步做成单独 item
         )
 
-        # PIL -> QImage -> QLabel
         rgba = pil_img.convert("RGBA")
         data = rgba.tobytes("raw", "RGBA")
         qimg = QImage(data, rgba.width, rgba.height, QImage.Format.Format_RGBA8888)
         pix = QPixmap.fromImage(qimg)
-        self._base_pixmap = pix
-        self.apply_zoom()
 
-        # self.lbl_preview.setPixmap(pix)
+        meta = HeatmapMeta(
+            nx=int(len(xs)),
+            ny=int(len(ys)),
+            x_min=float(xs.min()) if len(xs) else 0.0,
+            x_max=float(xs.max()) if len(xs) else 1.0,
+            y_min=float(ys.min()) if len(ys) else 0.0,
+            y_max=float(ys.max()) if len(ys) else 1.0,
+            vmin=float(vmin2),
+            vmax=float(vmax2),
+        )
 
-        # 关键：让 QLabel 尺寸 = 图片尺寸，ScrollArea 才能正确滚动显示完整内容
-        # self.lbl_preview.setFixedSize(pix.size())
-        # self.lbl_preview.setScaledContents(False)
+        self.view.set_heatmap(pix, meta, grid_values=grid)
 
     def on_zoom_changed(self, val: int) -> None:
         self._zoom_percent = int(val)
@@ -222,9 +234,9 @@ class TaskDetailDialog(QDialog):
         viz = (self._cfg.get("visualization") or {})
         exp = (viz.get("export") or {})
         smooth = bool(exp.get("smooth", True))
-        mode = Qt.SmoothTransformation if smooth else Qt.FastTransformation
+        mode = Qt.TransformationMode.SmoothTransformation if smooth else Qt.TransformationMode.FastTransformation
 
-        scaled = self._base_pixmap.scaled(target_w, target_h, Qt.IgnoreAspectRatio, mode)
+        scaled = self._base_pixmap.scaled(target_w, target_h, Qt.AspectRatioMode.IgnoreAspectRatio, mode)
         self.lbl_preview.setPixmap(scaled)
         self.lbl_preview.setFixedSize(scaled.size())
         self.lbl_preview.setScaledContents(False)
@@ -248,6 +260,10 @@ class TaskDetailDialog(QDialog):
         val = int(z * 100)
         val = max(50, min(400, val))
         self.sld_zoom.setValue(val)
+
+    def on_hover_info(self, x: float, y: float, val: float, gx: int, gy: int) -> None:
+        self.lbl_hover.setText(f"鼠标悬停：x={x:.3f}, y={y:.3f}, value={val:.6g} (ix={gx}, iy={gy})")
+
 
 
 
