@@ -109,6 +109,10 @@ class TaskDetailDialog(QDialog):
 
         self.view.pick_changed.connect(self.on_pick_changed)
 
+        cam = QPixmap(800, 600)
+        cam.fill(Qt.GlobalColor.darkGray)
+        self.view.set_camera_image(cam)
+
     def load_task(self) -> None:
         task = self._store.get_task(self._task_id)
         if not task:

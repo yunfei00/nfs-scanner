@@ -58,6 +58,8 @@ class HeatmapView(QGraphicsView):
         self._pick_items = []
         self._picked = []  # [(gx, gy, x, y, value)]
 
+        self._camera_item = None
+
     def set_heatmap(self, pixmap: QPixmap, meta: HeatmapMeta, grid_values=None) -> None:
         self.scene().clear()
         self._pixmap_item = self.scene().addPixmap(pixmap)
@@ -72,6 +74,7 @@ class HeatmapView(QGraphicsView):
 
         self.update_axes()
         self.update_colorbar()
+        self._pixmap_item.setOpacity(self._meta.opacity if hasattr(self._meta, "opacity") else 1.0)
 
     def wheelEvent(self, event):
         # 滚轮缩放
@@ -367,6 +370,11 @@ class HeatmapView(QGraphicsView):
         self.scene().addItem(v)
         self._pick_items.extend([h, v])
 
+    def set_camera_image(self, pixmap: QPixmap):
+        if self._camera_item:
+            self.scene().removeItem(self._camera_item)
+        self._camera_item = self.scene().addPixmap(pixmap)
+        self._camera_item.setZValue(-10)
 
 
 
