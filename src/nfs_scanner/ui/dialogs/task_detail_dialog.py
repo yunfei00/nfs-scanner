@@ -6,118 +6,133 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QMessageBox, QScrollArea, QSlider, QComboBox
+    QDialog,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QTextEdit,
+    QMessageBox,
+    QComboBox,
 )
 
 from nfs_scanner.core.scan.trace_store import TraceStore
 from nfs_scanner.core.visualization.heatmap_export import export_heatmap_png, render_heatmap_from_grid
+from nfs_scanner.core.export.exporters import export_trace_csv
 from nfs_scanner.infra.storage.paths import ensure_dirs, get_app_home
 from nfs_scanner.infra.storage.sqlite_store import SQLiteStore
 from nfs_scanner.ui.widgets.heatmap_view import HeatmapView, HeatmapMeta
 
 
 class TaskDetailDialog(QDialog):
+    """
+    任务详情：
+    - 扫描任务（data/scans/<task_id>/meta.json + traces/*.npz）：预览/导出均基于 npz
+    - 旧任务（DB points）：导出保持原逻辑（CSV/PNG），预览目前不支持（可后续扩展）
+    """
+
     def __init__(self, store: SQLiteStore, task_id: str, export_dir: Path, cfg: dict, parent=None):
         super().__init__(parent)
         self.setWindowTitle("任务详情")
-        self.resize(900, 600)
+        self.resize(900, 650)
 
         self._store = store
         self._task_id = task_id
         self._export_dir = export_dir
         self._cfg = cfg
 
+        # task_dir（扫描任务的数据目录）
+        paths = ensure_dirs(get_app_home())
+        self._task_dir = paths["scans"] / self._task_id
+        self._meta_path = self._task_dir / "meta.json"
+
         layout = QVBoxLayout(self)
 
+        # header
         self.lbl_title = QLabel()
         self.lbl_meta = QLabel()
         self.txt_config = QTextEdit()
         self.txt_config.setReadOnly(True)
 
-        btns = QHBoxLayout()
-        self.btn_export = QPushButton("导出点位 CSV")
-        self.btn_close = QPushButton("关闭")
-        self.btn_export_png = QPushButton("导出热力图 PNG")
-
-        self.btn_preview = QPushButton("预览热力图")
-        btns.addWidget(self.btn_preview)
-        self.btn_preview.clicked.connect(self.preview_png)
-
+        # trace selector
+        trace_bar = QHBoxLayout()
+        trace_bar.addWidget(QLabel("Trace："))
         self.cmb_trace = QComboBox()
-        layout.addWidget(self.cmb_trace)
-        self.cmb_trace.currentIndexChanged.connect(self.preview_png)
+        trace_bar.addWidget(self.cmb_trace, 1)
+        layout.addLayout(trace_bar)
 
-        btns.addStretch(1)
-        btns.addWidget(self.btn_export)
-        btns.addWidget(self.btn_close)
-        btns.addWidget(self.btn_export_png)
-
-        self.lbl_preview = QLabel("预览区（点击下方“预览热力图”生成）")
-        self.lbl_preview.setMinimumHeight(300)
-        self.lbl_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        # --- Zoom state ---
-        self._base_pixmap: QPixmap | None = None
-        self._zoom_percent = 100
-
-        # --- Zoom controls ---
-        zoom_bar = QHBoxLayout()
-        zoom_bar.addWidget(QLabel("缩放"))
-
-        self.sld_zoom = QSlider(Qt.Orientation.Horizontal)
-        self.sld_zoom.setMinimum(50)
-        self.sld_zoom.setMaximum(400)
-        self.sld_zoom.setValue(100)
-        self.sld_zoom.setSingleStep(10)
-        self.sld_zoom.setPageStep(25)
-
-        self.lbl_zoom = QLabel("100%")
-        self.btn_fit = QPushButton("适配宽度")
-        self.btn_100 = QPushButton("100%")
-
-        zoom_bar.addWidget(self.sld_zoom, 1)
-        zoom_bar.addWidget(self.lbl_zoom)
-        zoom_bar.addWidget(self.btn_fit)
-        zoom_bar.addWidget(self.btn_100)
-
-        layout.addLayout(zoom_bar)
-
-        # signals
-        self.sld_zoom.valueChanged.connect(self.on_zoom_changed)
-        self.btn_100.clicked.connect(lambda: self.sld_zoom.setValue(100))
-        self.btn_fit.clicked.connect(self.fit_width)
-
-        self.scroll = QScrollArea()
-        self.scroll.setWidgetResizable(True)
-        self.scroll.setWidget(self.lbl_preview)
-
+        # view
         self.view = HeatmapView()
         self.lbl_hover = QLabel("鼠标悬停：x=, y=, value=")
+        self.lbl_pick = QLabel("取点：单击选择两个点")
+        layout.addWidget(self.view, 1)
+        layout.addWidget(self.lbl_hover)
+        layout.addWidget(self.lbl_pick)
 
+        # buttons
+        btns = QHBoxLayout()
+        self.btn_preview = QPushButton("预览热力图")
+        self.btn_export_csv = QPushButton("导出 CSV")
+        self.btn_export_png = QPushButton("导出 PNG")
+        self.btn_close = QPushButton("关闭")
+
+        btns.addWidget(self.btn_preview)
+        btns.addStretch(1)
+        btns.addWidget(self.btn_export_csv)
+        btns.addWidget(self.btn_export_png)
+        btns.addWidget(self.btn_close)
+        layout.addLayout(btns)
+
+        # bottom config
         layout.addWidget(self.lbl_title)
         layout.addWidget(self.lbl_meta)
         layout.addWidget(self.txt_config)
-        layout.addWidget(self.view)
-        layout.addWidget(self.lbl_hover)
 
-        layout.addLayout(btns)
-
+        # signals
         self.btn_close.clicked.connect(self.close)
-        self.btn_export.clicked.connect(self.export_csv)
+        self.btn_preview.clicked.connect(self.preview_png)
+        self.btn_export_csv.clicked.connect(self.export_csv)
         self.btn_export_png.clicked.connect(self.export_png)
+
+        self.cmb_trace.currentIndexChanged.connect(self.preview_png)
+
         self.view.hover_info.connect(self.on_hover_info)
-
-        self.load_task()
-
-        self.lbl_pick = QLabel("取点：单击选择两个点")
-        layout.addWidget(self.lbl_pick)
-
         self.view.pick_changed.connect(self.on_pick_changed)
 
+        # optional camera placeholder (kept)
         cam = QPixmap(800, 600)
         cam.fill(Qt.GlobalColor.darkGray)
         self.view.set_camera_image(cam)
 
+        self.load_task()
+
+    # ----------------------------
+    # helpers
+    # ----------------------------
+    def _is_scan_task(self) -> bool:
+        return self._meta_path.exists() and (self._task_dir / "traces").exists()
+
+    def _current_trace(self) -> str:
+        return self.cmb_trace.currentText().strip()
+
+    def _viz_params(self) -> dict:
+        viz = (self._cfg.get("visualization") or {})
+        exp = (viz.get("export") or {})
+
+        return {
+            "lut_name": str(viz.get("lut", "viridis")),
+            "opacity": float(viz.get("opacity", 1.0)),
+            "autoscale": bool(viz.get("autoscale", True)),
+            "vmin": viz.get("vmin", None),
+            "vmax": viz.get("vmax", None),
+            "min_size": int(exp.get("min_size", 800)),
+            "scale": int(exp.get("scale", 20)),
+            "smooth": bool(exp.get("smooth", True)),
+        }
+
+    # ----------------------------
+    # UI load
+    # ----------------------------
     def load_task(self) -> None:
         task = self._store.get_task(self._task_id)
         if not task:
@@ -125,18 +140,18 @@ class TaskDetailDialog(QDialog):
             self.close()
             return
 
-        # 从 task_dir/meta.json 读取 trace 列表（优先）
-        paths = ensure_dirs(get_app_home())
-        task_dir = paths["scans"] / self._task_id
-        meta_p = task_dir / "meta.json"
-        self._task_dir = task_dir
-
+        # trace list from meta.json (scan task)
         self.cmb_trace.blockSignals(True)
         self.cmb_trace.clear()
-        if meta_p.exists():
-            meta = json.loads(meta_p.read_text(encoding="utf-8"))
-            for t in meta.get("trace_list", []):
-                self.cmb_trace.addItem(t.get("name", ""))
+        if self._meta_path.exists():
+            try:
+                meta = json.loads(self._meta_path.read_text(encoding="utf-8"))
+                for t in meta.get("trace_list", []):
+                    name = (t.get("name") or "").strip()
+                    if name:
+                        self.cmb_trace.addItem(name)
+            except Exception:
+                pass
         self.cmb_trace.blockSignals(False)
 
         n_points = self._store.count_points(self._task_id)
@@ -157,83 +172,36 @@ class TaskDetailDialog(QDialog):
 
         self.txt_config.setPlainText(text)
 
-    def export_csv(self) -> None:
-        out = self._export_dir / f"{self._task_id}.csv"
-        n = self._store.export_points_csv(self._task_id, out)
-        QMessageBox.information(self, "导出完成", f"已导出 {n} 行：\n{out}")
-
-    def export_png(self) -> None:
-        points = self._store.fetch_points(self._task_id)
-        out = self._export_dir / f"{self._task_id}.png"
-
-        viz = (self._cfg.get("visualization") or {})
-        exp = (viz.get("export") or {})
-
-        lut_name = str(viz.get("lut", "viridis"))
-        opacity = float(viz.get("opacity", 1.0))
-        autoscale = bool(viz.get("autoscale", True))
-        vmin = viz.get("vmin", None)
-        vmax = viz.get("vmax", None)
-
-        min_size = int(exp.get("min_size", 800))
-        scale = int(exp.get("scale", 20))
-        smooth = bool(exp.get("smooth", True))
-
-        meta = export_heatmap_png(
-            points, out,
-            lut_name=lut_name,
-            opacity=opacity,
-            autoscale=autoscale,
-            vmin=vmin,
-            vmax=vmax,
-            min_size=min_size,
-            scale=scale,
-            smooth=smooth,
-        )
-
-        QMessageBox.information(
-            self,
-            "导出完成",
-            f"热力图已导出：\n{meta['out']}\n"
-            f"网格：{meta['nx']} x {meta['ny']}\n"
-            f"范围：[{meta['vmin']:.6g}, {meta['vmax']:.6g}]"
-        )
-
+    # ----------------------------
+    # preview
+    # ----------------------------
     def preview_png(self) -> None:
-        trace_name = self.cmb_trace.currentText().strip()
-        if not trace_name or not hasattr(self, "_task_dir"):
+        # 仅对扫描任务（npz）启用预览
+        if not self._is_scan_task():
+            return
+
+        trace_name = self._current_trace()
+        if not trace_name:
             return
 
         ts = TraceStore(self._task_dir)
         grid = ts.load_grid(trace_name)
+        values_2d = grid.values[:, :, 0]  # 单频点
 
-        # 单频点：values[..., 0]
-        values_2d = grid.values[:, :, 0]
-
-        viz = (self._cfg.get("visualization") or {})
-        exp = (viz.get("export") or {})
-        min_size = int(exp.get("min_size", 800))
-        scale = int(exp.get("scale", 20))
-        smooth = bool(exp.get("smooth", True))
-
-        lut_name = str(viz.get("lut", "viridis"))
-        opacity = float(viz.get("opacity", 1.0))
-        autoscale = bool(viz.get("autoscale", True))
-        vmin = viz.get("vmin", None)
-        vmax = viz.get("vmax", None)
+        p = self._viz_params()
 
         pil_img, vmin2, vmax2 = render_heatmap_from_grid(
             grid.xs,
             grid.ys,
             values_2d,
-            lut_name=lut_name,
-            opacity=opacity,
-            autoscale=autoscale,
-            vmin=vmin,
-            vmax=vmax,
-            min_size=min_size,
-            scale=scale,
-            smooth=smooth,
+            lut_name=p["lut_name"],
+            opacity=p["opacity"],
+            autoscale=p["autoscale"],
+            vmin=p["vmin"],
+            vmax=p["vmax"],
+            min_size=p["min_size"],
+            scale=p["scale"],
+            smooth=p["smooth"],
             with_colorbar=False,
         )
 
@@ -242,7 +210,6 @@ class TaskDetailDialog(QDialog):
         qimg = QImage(data, rgba.width, rgba.height, QImage.Format.Format_RGBA8888)
         pix = QPixmap.fromImage(qimg)
 
-        # 更新 HeatmapView（含 meta）
         meta = HeatmapMeta(
             nx=len(grid.xs),
             ny=len(grid.ys),
@@ -252,60 +219,129 @@ class TaskDetailDialog(QDialog):
             y_max=float(grid.ys.max()),
             vmin=float(vmin2),
             vmax=float(vmax2),
-            lut=lut_name,
-            opacity=opacity,
+            lut=p["lut_name"],
+            opacity=p["opacity"],
         )
 
         self.view.set_heatmap(pix, meta, grid_values=values_2d)
 
-    def on_zoom_changed(self, val: int) -> None:
-        self._zoom_percent = int(val)
-        self.lbl_zoom.setText(f"{self._zoom_percent}%")
-        self.apply_zoom()
+    # ----------------------------
+    # export (auto route)
+    # ----------------------------
+    def export_csv(self) -> None:
+        if self._is_scan_task():
+            trace_name = self._current_trace()
+            if not trace_name:
+                QMessageBox.warning(self, "提示", "未选择 Trace")
+                return
+            return self._export_csv_from_npz(trace_name)
 
-    def apply_zoom(self) -> None:
-        if self._base_pixmap is None:
-            return
+        # legacy fallback
+        return self._export_csv_from_points()
 
-        z = max(10, self._zoom_percent) / 100.0
-        target_w = max(1, int(self._base_pixmap.width() * z))
-        target_h = max(1, int(self._base_pixmap.height() * z))
+    def export_png(self) -> None:
+        if self._is_scan_task():
+            trace_name = self._current_trace()
+            if not trace_name:
+                QMessageBox.warning(self, "提示", "未选择 Trace")
+                return
+            return self._export_png_from_npz(trace_name)
 
-        # 缩放质量：如果导出/预览配置 smooth=true，用平滑；否则用最近邻保持像素块
-        viz = (self._cfg.get("visualization") or {})
-        exp = (viz.get("export") or {})
-        smooth = bool(exp.get("smooth", True))
-        mode = Qt.TransformationMode.SmoothTransformation if smooth else Qt.TransformationMode.FastTransformation
+        # legacy fallback
+        return self._export_png_from_points()
 
-        scaled = self._base_pixmap.scaled(target_w, target_h, Qt.AspectRatioMode.IgnoreAspectRatio, mode)
-        self.lbl_preview.setPixmap(scaled)
-        self.lbl_preview.setFixedSize(scaled.size())
-        self.lbl_preview.setScaledContents(False)
+    # ---- npz path (scan tasks)
+    def _export_csv_from_npz(self, trace_name: str) -> None:
+        ts = TraceStore(self._task_dir)
+        grid = ts.load_grid(trace_name)
+        values_2d = grid.values[:, :, 0]
 
-    def fit_width(self) -> None:
-        """
-        将图片缩放到刚好适配 scroll area 的可视宽度（保留纵向滚动）。
-        """
-        if self._base_pixmap is None:
-            return
+        out_dir = self._task_dir / "exports"
+        out_path = out_dir / f"points_{trace_name}.csv"
 
-        # scroll viewport 可用宽度
-        viewport_w = self.scroll.viewport().width()
-        if viewport_w <= 10:
-            return
+        export_trace_csv(
+            xs=grid.xs,
+            ys=grid.ys,
+            values_2d=values_2d,
+            out_path=out_path,
+        )
 
-        # 留一点边距
-        viewport_w = max(10, viewport_w - 10)
+        QMessageBox.information(self, "导出完成", f"CSV 已导出：\n{out_path}")
 
-        z = viewport_w / max(1, self._base_pixmap.width())
-        val = int(z * 100)
-        val = max(50, min(400, val))
-        self.sld_zoom.setValue(val)
+    def _export_png_from_npz(self, trace_name: str) -> None:
+        ts = TraceStore(self._task_dir)
+        grid = ts.load_grid(trace_name)
+        values_2d = grid.values[:, :, 0]
 
+        p = self._viz_params()
+
+        pil_img, vmin2, vmax2 = render_heatmap_from_grid(
+            grid.xs,
+            grid.ys,
+            values_2d,
+            lut_name=p["lut_name"],
+            opacity=p["opacity"],
+            autoscale=p["autoscale"],
+            vmin=p["vmin"],
+            vmax=p["vmax"],
+            min_size=p["min_size"],
+            scale=p["scale"],
+            smooth=p["smooth"],
+            with_colorbar=True,  # 导出带色条
+        )
+
+        out_dir = self._task_dir / "exports"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / f"heatmap_{trace_name}.png"
+        pil_img.save(out_path)
+
+        QMessageBox.information(
+            self,
+            "导出完成",
+            f"PNG 已导出：\n{out_path}\n"
+            f"范围：[{vmin2:.6g}, {vmax2:.6g}]",
+        )
+
+    # ---- legacy path (DB points)
+    def _export_csv_from_points(self) -> None:
+        out = self._export_dir / f"{self._task_id}.csv"
+        n = self._store.export_points_csv(self._task_id, out)
+        QMessageBox.information(self, "导出完成", f"已导出 {n} 行：\n{out}")
+
+    def _export_png_from_points(self) -> None:
+        points = self._store.fetch_points(self._task_id)
+        out = self._export_dir / f"{self._task_id}.png"
+
+        p = self._viz_params()
+
+        meta = export_heatmap_png(
+            points,
+            out,
+            lut_name=p["lut_name"],
+            opacity=p["opacity"],
+            autoscale=p["autoscale"],
+            vmin=p["vmin"],
+            vmax=p["vmax"],
+            min_size=p["min_size"],
+            scale=p["scale"],
+            smooth=p["smooth"],
+        )
+
+        QMessageBox.information(
+            self,
+            "导出完成",
+            f"热力图已导出：\n{meta['out']}\n"
+            f"网格：{meta['nx']} x {meta['ny']}\n"
+            f"范围：[{meta['vmin']:.6g}, {meta['vmax']:.6g}]",
+        )
+
+    # ----------------------------
+    # view callbacks
+    # ----------------------------
     def on_hover_info(self, x: float, y: float, val: float, gx: int, gy: int) -> None:
         self.lbl_hover.setText(f"鼠标悬停：x={x:.3f}, y={y:.3f}, value={val:.6g} (ix={gx}, iy={gy})")
 
-    def on_pick_changed(self):
+    def on_pick_changed(self) -> None:
         p = self.view._picked
         if len(p) == 1:
             _, _, x, y, v = p[0]
@@ -317,8 +353,3 @@ class TaskDetailDialog(QDialog):
                 f"P2: ({x2:.3f},{y2:.3f}) v={v2:.6g}   "
                 f"Δx={x2 - x1:.3f}, Δy={y2 - y1:.3f}, Δv={v2 - v1:.6g}"
             )
-
-
-
-
-
