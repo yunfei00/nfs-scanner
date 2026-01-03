@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
+from uuid import uuid4
 
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import Qt, QUrl, QThread
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox
+    QLabel, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QGroupBox, QFormLayout, QDoubleSpinBox,
+    QListWidget, QCheckBox, QProgressBar, QListWidgetItem
 )
 
+from nfs_scanner.core.drivers.motion.mock import MockMotion
 from nfs_scanner.core.drivers.spectrum.mock import MockSpectrum
+from nfs_scanner.core.scan.scan_runner import ScanParams, ScanRunner
 from nfs_scanner.infra.storage.paths import ensure_dirs, get_app_home
 from nfs_scanner.infra.storage.sqlite_store import SQLiteStore
 from nfs_scanner.core.scan.scan_manager import ScanManager
@@ -53,6 +58,73 @@ class MainWindow(QMainWindow):
         top.addWidget(self.btn_open_export)
 
         layout.addLayout(top)
+
+        self.grp_scan = QGroupBox("扫描控制台（Mock 驱动）")
+        form = QFormLayout(self.grp_scan)
+
+        def spin(minv, maxv, val, step=0.5):
+            s = QDoubleSpinBox()
+            s.setRange(minv, maxv)
+            s.setDecimals(3)
+            s.setSingleStep(step)
+            s.setValue(val)
+            return s
+
+        self.sp_xmin = spin(-1000, 1000, -5, 1)
+        self.sp_xmax = spin(-1000, 1000, 5, 1)
+        self.sp_ymin = spin(-1000, 1000, -5, 1)
+        self.sp_ymax = spin(-1000, 1000, 5, 1)
+        self.sp_step = spin(0.1, 100, 1.0, 0.5)
+        self.sp_z = spin(-1000, 1000, 1.0, 0.5)
+        self.sp_feed = spin(1, 20000, 1000, 100)
+        self.sp_freq = spin(1e6, 50e9, 5e9, 1e9)  # Hz
+
+        self.lst_traces = QListWidget()
+        self.lst_traces.setMinimumHeight(80)
+
+        self.chk_autoload = QCheckBox("启动时自动加载 Trace")
+        self.chk_autoload.setChecked(True)
+
+        self.prg = QProgressBar()
+        self.prg.setValue(0)
+
+        form.addRow("X min / max", self._hpair(self.sp_xmin, self.sp_xmax))
+        form.addRow("Y min / max", self._hpair(self.sp_ymin, self.sp_ymax))
+        form.addRow("step (mm)", self.sp_step)
+        form.addRow("Z (mm)", self.sp_z)
+        form.addRow("feed", self.sp_feed)
+        form.addRow("freq (Hz)", self.sp_freq)
+        form.addRow("Trace 列表（多选）", self.lst_traces)
+        form.addRow("", self.chk_autoload)
+        form.addRow("进度", self.prg)
+
+        # buttons
+        btn_line = QHBoxLayout()
+        self.btn_load_traces = QPushButton("加载 Trace")
+        self.btn_start_scan = QPushButton("开始扫描")
+        self.btn_pause_scan = QPushButton("暂停")
+        self.btn_stop_scan = QPushButton("停止")
+        self.btn_pause_scan.setEnabled(False)
+        self.btn_stop_scan.setEnabled(False)
+        btn_line.addWidget(self.btn_load_traces)
+        btn_line.addWidget(self.btn_start_scan)
+        btn_line.addWidget(self.btn_pause_scan)
+        btn_line.addWidget(self.btn_stop_scan)
+        form.addRow("", btn_line)
+
+        layout.addWidget(self.grp_scan)
+
+        # drivers (mock for now)
+        self._motion = MockMotion()
+        self._spec = MockSpectrum()
+
+        self.btn_load_traces.clicked.connect(self.load_traces_into_list)
+        self.btn_start_scan.clicked.connect(self.start_scan)
+        self.btn_pause_scan.clicked.connect(self.toggle_pause)
+        self.btn_stop_scan.clicked.connect(self.stop_scan)
+
+        if self.chk_autoload.isChecked():
+            self.load_traces_into_list()
 
         # 任务表格
         self.table = QTableWidget(0, 4)
@@ -118,4 +190,137 @@ class MainWindow(QMainWindow):
         text = "\n".join([f"- {t.name} ({t.kind or 'N/A'} {t.unit})" for t in traces])
         QMessageBox.information(self, "Trace 列表（来自仪表驱动）", text or "(empty)")
 
+
+    def _hpair(self, a, b):
+        w = QWidget()
+        l = QHBoxLayout(w)
+        l.setContentsMargins(0, 0, 0, 0)
+        l.addWidget(a)
+        l.addWidget(b)
+        return w
+
+    def load_traces_into_list(self) -> None:
+        self.lst_traces.clear()
+        self._spec.connect()
+        traces = self._spec.list_traces()
+        for t in traces:
+            item = QListWidgetItem(f"{t.name} ({t.unit})")
+            item.setData(Qt.ItemDataRole.UserRole, t)  # 保存 TraceInfo
+            item.setCheckState(Qt.CheckState.Checked)
+            self.lst_traces.addItem(item)
+
+    def start_scan(self) -> None:
+        # 选中的 trace
+        traces = []
+        for i in range(self.lst_traces.count()):
+            it = self.lst_traces.item(i)
+            if it.checkState() == Qt.CheckState.Checked:
+                traces.append(it.data(Qt.ItemDataRole.UserRole))
+        if not traces:
+            QMessageBox.warning(self, "提示", "请至少选择一个 Trace")
+            return
+
+        task_id = str(uuid4())
+        task_name = f"Scan {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+
+        # scans_dir
+        from nfs_scanner.infra.storage.paths import get_app_home, ensure_dirs
+        paths = ensure_dirs(get_app_home())
+        scans_dir = paths["scans"]
+
+        params = ScanParams(
+            x_min=float(self.sp_xmin.value()),
+            x_max=float(self.sp_xmax.value()),
+            y_min=float(self.sp_ymin.value()),
+            y_max=float(self.sp_ymax.value()),
+            step_mm=float(self.sp_step.value()),
+            z_height_mm=float(self.sp_z.value()),
+            feed=float(self.sp_feed.value()),
+            freq_hz=float(self.sp_freq.value()),
+        )
+
+        # DB 里也创建任务（让任务列表立刻出现）
+        self._store.create_task(
+            task_id=task_id,
+            name=task_name,
+            created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            status="running",
+            config=self._cfg,
+            note="scan started",
+        )
+
+        # runner in QThread
+        self._thread = QThread()
+        self._runner = ScanRunner(
+            task_id=task_id,
+            task_name=task_name,
+            scans_dir=scans_dir,
+            params=params,
+            traces=traces,
+            motion=self._motion,
+            spectrum=self._spec,
+        )
+        self._runner.moveToThread(self._thread)
+
+        self._thread.started.connect(self._runner.run)
+        self._runner.progress.connect(self.on_scan_progress)
+        self._runner.status.connect(self.on_scan_status)
+        self._runner.finished.connect(self.on_scan_finished)
+
+        self._thread.start()
+
+        self.btn_start_scan.setEnabled(False)
+        self.btn_pause_scan.setEnabled(True)
+        self.btn_stop_scan.setEnabled(True)
+        self.prg.setValue(0)
+        self.refresh_tasks()
+
+    def on_scan_progress(self, done: int, total: int) -> None:
+        v = int(done * 100 / max(1, total))
+        self.prg.setValue(v)
+
+    def on_scan_status(self, text: str) -> None:
+        # 可选：显示到状态栏
+        self.statusBar().showMessage(text)
+
+    def on_scan_finished(self, task_id: str, ok: bool, msg: str) -> None:
+        # 更新 DB 状态
+        # 这里简单做：直接写 running->done/failed（我们下一步会加 update_task_status 方法）
+        try:
+            with self._store.connect() as conn:
+                conn.execute(
+                    "UPDATE scan_task SET status=? WHERE id=?",
+                    ("done" if ok else "failed", task_id),
+                )
+        except Exception:
+            pass
+
+        self.btn_start_scan.setEnabled(True)
+        self.btn_pause_scan.setEnabled(False)
+        self.btn_stop_scan.setEnabled(False)
+        self.prg.setValue(100 if ok else 0)
+
+        # 收尾 thread
+        try:
+            self._thread.quit()
+            self._thread.wait(2000)
+        except Exception:
+            pass
+
+        QMessageBox.information(self, "扫描完成" if ok else "扫描失败", f"{task_id}\n{msg}")
+        self.refresh_tasks()
+
+    def toggle_pause(self) -> None:
+        if not hasattr(self, "_runner") or self._runner is None:
+            return
+        paused = getattr(self, "_paused", False)
+        paused = not paused
+        self._paused = paused
+        self._runner.request_pause(paused)
+        self.btn_pause_scan.setText("继续" if paused else "暂停")
+
+    def stop_scan(self) -> None:
+        if not hasattr(self, "_runner") or self._runner is None:
+            return
+        self._runner.request_stop()
 

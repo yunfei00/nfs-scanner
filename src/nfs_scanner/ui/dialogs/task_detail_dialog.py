@@ -6,11 +6,13 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QMessageBox, QScrollArea, QSlider
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QMessageBox, QScrollArea, QSlider, QComboBox
 )
 
+from nfs_scanner.core.scan.trace_store import TraceStore
 from nfs_scanner.core.visualization.heatmap_export import export_heatmap_png, \
     render_heatmap_for_ui
+from nfs_scanner.infra.storage.paths import ensure_dirs, get_app_home
 from nfs_scanner.infra.storage.sqlite_store import SQLiteStore
 from nfs_scanner.ui.widgets.heatmap_view import HeatmapView, HeatmapMeta
 
@@ -41,6 +43,10 @@ class TaskDetailDialog(QDialog):
         self.btn_preview = QPushButton("预览热力图")
         btns.addWidget(self.btn_preview)
         self.btn_preview.clicked.connect(self.preview_png)
+
+        self.cmb_trace = QComboBox()
+        layout.addWidget(self.cmb_trace)
+        self.cmb_trace.currentIndexChanged.connect(self.preview_png)
 
         btns.addStretch(1)
         btns.addWidget(self.btn_export)
@@ -120,6 +126,20 @@ class TaskDetailDialog(QDialog):
             self.close()
             return
 
+        # 从 task_dir/meta.json 读取 trace 列表（优先）
+        paths = ensure_dirs(get_app_home())
+        task_dir = paths["scans"] / self._task_id
+        meta_p = task_dir / "meta.json"
+        self._task_dir = task_dir
+
+        self.cmb_trace.blockSignals(True)
+        self.cmb_trace.clear()
+        if meta_p.exists():
+            meta = json.loads(meta_p.read_text(encoding="utf-8"))
+            for t in meta.get("trace_list", []):
+                self.cmb_trace.addItem(t.get("name", ""))
+        self.cmb_trace.blockSignals(False)
+
         n_points = self._store.count_points(self._task_id)
 
         self.lbl_title.setText(f"任务：{task['name']}")
@@ -181,6 +201,16 @@ class TaskDetailDialog(QDialog):
         )
 
     def preview_png(self) -> None:
+        trace_name = self.cmb_trace.currentText().strip()
+        if trace_name and hasattr(self, "_task_dir"):
+            ts = TraceStore(self._task_dir)
+            grid = ts.load_grid(trace_name)
+            # 组装 points（直接用 grid -> heatmap，不再从 DB point 表）
+            # 我们为 UI 渲染新增一个路径：直接渲染 grid values[:,:,0]
+            points = None
+        else:
+            points = self._store.fetch_points(self._task_id)  # 兼容旧假任务
+
         points = self._store.fetch_points(self._task_id)
 
         viz = (self._cfg.get("visualization") or {})
