@@ -1,67 +1,69 @@
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
+    QComboBox,
     QDialog,
-    QVBoxLayout,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QTextEdit,
-    QMessageBox,
-    QComboBox,
+    QVBoxLayout,
 )
 
 from nfs_scanner.core.scan.trace_store import TraceStore
 from nfs_scanner.core.visualization.heatmap_export import export_heatmap_png, render_heatmap_from_grid
-from nfs_scanner.core.export.exporters import export_trace_csv
 from nfs_scanner.infra.storage.paths import ensure_dirs, get_app_home
 from nfs_scanner.infra.storage.sqlite_store import SQLiteStore
-from nfs_scanner.ui.widgets.heatmap_view import HeatmapView, HeatmapMeta
+from nfs_scanner.ui.widgets.heatmap_view import HeatmapMeta, HeatmapView
 
 
 class TaskDetailDialog(QDialog):
     """
     任务详情：
     - 扫描任务（data/scans/<task_id>/meta.json + traces/*.npz）：预览/导出均基于 npz
-    - 旧任务（DB points）：导出保持原逻辑（CSV/PNG），预览目前不支持（可后续扩展）
+    - 旧/假任务（DB points）：导出保持旧逻辑（CSV/PNG）；预览默认不启用（避免混乱）
     """
 
     def __init__(self, store: SQLiteStore, task_id: str, export_dir: Path, cfg: dict, parent=None):
         super().__init__(parent)
         self.setWindowTitle("任务详情")
-        self.resize(900, 650)
+        self.resize(950, 720)
 
         self._store = store
         self._task_id = task_id
         self._export_dir = export_dir
         self._cfg = cfg
 
-        # task_dir（扫描任务的数据目录）
+        # 扫描任务目录（npz/meta.json）
         paths = ensure_dirs(get_app_home())
         self._task_dir = paths["scans"] / self._task_id
         self._meta_path = self._task_dir / "meta.json"
 
+        self._meta_cache: dict | None = None
+
         layout = QVBoxLayout(self)
 
-        # header
+        # 顶部信息
         self.lbl_title = QLabel()
         self.lbl_meta = QLabel()
-        self.txt_config = QTextEdit()
-        self.txt_config.setReadOnly(True)
 
         # trace selector
         trace_bar = QHBoxLayout()
         trace_bar.addWidget(QLabel("Trace："))
         self.cmb_trace = QComboBox()
         trace_bar.addWidget(self.cmb_trace, 1)
+        self.btn_preview = QPushButton("预览热力图")
+        trace_bar.addWidget(self.btn_preview)
         layout.addLayout(trace_bar)
 
-        # view
+        # heatmap view
         self.view = HeatmapView()
         self.lbl_hover = QLabel("鼠标悬停：x=, y=, value=")
         self.lbl_pick = QLabel("取点：单击选择两个点")
@@ -71,12 +73,9 @@ class TaskDetailDialog(QDialog):
 
         # buttons
         btns = QHBoxLayout()
-        self.btn_preview = QPushButton("预览热力图")
         self.btn_export_csv = QPushButton("导出 CSV")
         self.btn_export_png = QPushButton("导出 PNG")
         self.btn_close = QPushButton("关闭")
-
-        btns.addWidget(self.btn_preview)
         btns.addStretch(1)
         btns.addWidget(self.btn_export_csv)
         btns.addWidget(self.btn_export_png)
@@ -84,6 +83,8 @@ class TaskDetailDialog(QDialog):
         layout.addLayout(btns)
 
         # bottom config
+        self.txt_config = QTextEdit()
+        self.txt_config.setReadOnly(True)
         layout.addWidget(self.lbl_title)
         layout.addWidget(self.lbl_meta)
         layout.addWidget(self.txt_config)
@@ -93,13 +94,12 @@ class TaskDetailDialog(QDialog):
         self.btn_preview.clicked.connect(self.preview_png)
         self.btn_export_csv.clicked.connect(self.export_csv)
         self.btn_export_png.clicked.connect(self.export_png)
-
         self.cmb_trace.currentIndexChanged.connect(self.preview_png)
 
         self.view.hover_info.connect(self.on_hover_info)
         self.view.pick_changed.connect(self.on_pick_changed)
 
-        # optional camera placeholder (kept)
+        # camera placeholder (optional)
         cam = QPixmap(800, 600)
         cam.fill(Qt.GlobalColor.darkGray)
         self.view.set_camera_image(cam)
@@ -107,7 +107,7 @@ class TaskDetailDialog(QDialog):
         self.load_task()
 
     # ----------------------------
-    # helpers
+    # basic helpers
     # ----------------------------
     def _is_scan_task(self) -> bool:
         return self._meta_path.exists() and (self._task_dir / "traces").exists()
@@ -118,7 +118,6 @@ class TaskDetailDialog(QDialog):
     def _viz_params(self) -> dict:
         viz = (self._cfg.get("visualization") or {})
         exp = (viz.get("export") or {})
-
         return {
             "lut_name": str(viz.get("lut", "viridis")),
             "opacity": float(viz.get("opacity", 1.0)),
@@ -129,6 +128,17 @@ class TaskDetailDialog(QDialog):
             "scale": int(exp.get("scale", 20)),
             "smooth": bool(exp.get("smooth", True)),
         }
+
+    def _load_meta(self) -> dict | None:
+        if self._meta_cache is not None:
+            return self._meta_cache
+        if not self._meta_path.exists():
+            return None
+        try:
+            self._meta_cache = json.loads(self._meta_path.read_text(encoding="utf-8"))
+            return self._meta_cache
+        except Exception:
+            return None
 
     # ----------------------------
     # UI load
@@ -143,15 +153,17 @@ class TaskDetailDialog(QDialog):
         # trace list from meta.json (scan task)
         self.cmb_trace.blockSignals(True)
         self.cmb_trace.clear()
-        if self._meta_path.exists():
-            try:
-                meta = json.loads(self._meta_path.read_text(encoding="utf-8"))
-                for t in meta.get("trace_list", []):
-                    name = (t.get("name") or "").strip()
-                    if name:
-                        self.cmb_trace.addItem(name)
-            except Exception:
-                pass
+        if self._is_scan_task():
+            meta = self._load_meta() or {}
+            for t in meta.get("trace_list", []):
+                name = (t.get("name") or "").strip()
+                if name:
+                    self.cmb_trace.addItem(name)
+            self.cmb_trace.setEnabled(True)
+            self.btn_preview.setEnabled(True)
+        else:
+            self.cmb_trace.setEnabled(False)
+            self.btn_preview.setEnabled(False)
         self.cmb_trace.blockSignals(False)
 
         n_points = self._store.count_points(self._task_id)
@@ -163,20 +175,16 @@ class TaskDetailDialog(QDialog):
             f"备注：{task['note']}"
         )
 
-        # pretty print config_json
         try:
             cfg = json.loads(task["config_json"])
-            text = json.dumps(cfg, ensure_ascii=False, indent=2)
+            self.txt_config.setPlainText(json.dumps(cfg, ensure_ascii=False, indent=2))
         except Exception:
-            text = task["config_json"]
-
-        self.txt_config.setPlainText(text)
+            self.txt_config.setPlainText(task.get("config_json", ""))
 
     # ----------------------------
-    # preview
+    # preview (npz scan task)
     # ----------------------------
     def preview_png(self) -> None:
-        # 仅对扫描任务（npz）启用预览
         if not self._is_scan_task():
             return
 
@@ -189,7 +197,6 @@ class TaskDetailDialog(QDialog):
         values_2d = grid.values[:, :, 0]  # 单频点
 
         p = self._viz_params()
-
         pil_img, vmin2, vmax2 = render_heatmap_from_grid(
             grid.xs,
             grid.ys,
@@ -226,7 +233,7 @@ class TaskDetailDialog(QDialog):
         self.view.set_heatmap(pix, meta, grid_values=values_2d)
 
     # ----------------------------
-    # export (auto route)
+    # export routing (npz first, legacy fallback)
     # ----------------------------
     def export_csv(self) -> None:
         if self._is_scan_task():
@@ -234,10 +241,11 @@ class TaskDetailDialog(QDialog):
             if not trace_name:
                 QMessageBox.warning(self, "提示", "未选择 Trace")
                 return
-            return self._export_csv_from_npz(trace_name)
+            self._export_csv_from_npz(trace_name)
+            return
 
         # legacy fallback
-        return self._export_csv_from_points()
+        self._export_csv_from_points()
 
     def export_png(self) -> None:
         if self._is_scan_task():
@@ -245,26 +253,29 @@ class TaskDetailDialog(QDialog):
             if not trace_name:
                 QMessageBox.warning(self, "提示", "未选择 Trace")
                 return
-            return self._export_png_from_npz(trace_name)
+            self._export_png_from_npz(trace_name)
+            return
 
         # legacy fallback
-        return self._export_png_from_points()
+        self._export_png_from_points()
 
-    # ---- npz path (scan tasks)
+    # ---- npz exports (scan tasks)
     def _export_csv_from_npz(self, trace_name: str) -> None:
         ts = TraceStore(self._task_dir)
         grid = ts.load_grid(trace_name)
         values_2d = grid.values[:, :, 0]
 
         out_dir = self._task_dir / "exports"
+        out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / f"points_{trace_name}.csv"
 
-        export_trace_csv(
-            xs=grid.xs,
-            ys=grid.ys,
-            values_2d=values_2d,
-            out_path=out_path,
-        )
+        with out_path.open("w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(["x", "y", "value"])
+            ny, nx = values_2d.shape
+            for iy in range(ny):
+                for ix in range(nx):
+                    w.writerow([float(grid.xs[ix]), float(grid.ys[iy]), float(values_2d[iy, ix])])
 
         QMessageBox.information(self, "导出完成", f"CSV 已导出：\n{out_path}")
 
@@ -274,7 +285,6 @@ class TaskDetailDialog(QDialog):
         values_2d = grid.values[:, :, 0]
 
         p = self._viz_params()
-
         pil_img, vmin2, vmax2 = render_heatmap_from_grid(
             grid.xs,
             grid.ys,
@@ -295,14 +305,9 @@ class TaskDetailDialog(QDialog):
         out_path = out_dir / f"heatmap_{trace_name}.png"
         pil_img.save(out_path)
 
-        QMessageBox.information(
-            self,
-            "导出完成",
-            f"PNG 已导出：\n{out_path}\n"
-            f"范围：[{vmin2:.6g}, {vmax2:.6g}]",
-        )
+        QMessageBox.information(self, "导出完成", f"PNG 已导出：\n{out_path}\n范围：[{vmin2:.6g}, {vmax2:.6g}]")
 
-    # ---- legacy path (DB points)
+    # ---- legacy exports (DB points)
     def _export_csv_from_points(self) -> None:
         out = self._export_dir / f"{self._task_id}.csv"
         n = self._store.export_points_csv(self._task_id, out)
@@ -313,7 +318,6 @@ class TaskDetailDialog(QDialog):
         out = self._export_dir / f"{self._task_id}.png"
 
         p = self._viz_params()
-
         meta = export_heatmap_png(
             points,
             out,
@@ -330,9 +334,7 @@ class TaskDetailDialog(QDialog):
         QMessageBox.information(
             self,
             "导出完成",
-            f"热力图已导出：\n{meta['out']}\n"
-            f"网格：{meta['nx']} x {meta['ny']}\n"
-            f"范围：[{meta['vmin']:.6g}, {meta['vmax']:.6g}]",
+            f"热力图已导出：\n{meta['out']}\n网格：{meta['nx']} x {meta['ny']}\n范围：[{meta['vmin']:.6g}, {meta['vmax']:.6g}]",
         )
 
     # ----------------------------
