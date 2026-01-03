@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QLabel, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox
 )
 
+from nfs_scanner.core.drivers.spectrum.mock import MockSpectrum
 from nfs_scanner.infra.storage.paths import ensure_dirs, get_app_home
 from nfs_scanner.infra.storage.sqlite_store import SQLiteStore
 from nfs_scanner.core.scan.scan_manager import ScanManager
@@ -30,6 +31,9 @@ class MainWindow(QMainWindow):
 
         # 顶部信息 + 按钮
         top = QHBoxLayout()
+        self.btn_traces = QPushButton("读取仪表 Trace 列表")
+        top.addWidget(self.btn_traces)
+
         self.lbl_info = QLabel("Near-Field Scanning System")
         self.btn_refresh = QPushButton("刷新任务列表")
         self.btn_fake = QPushButton("创建一次假扫描任务")
@@ -53,9 +57,9 @@ class MainWindow(QMainWindow):
         # 任务表格
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(["时间", "名称", "状态", "ID"])
-        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.table.setSelectionMode(QTableWidget.SingleSelection)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.table.horizontalHeader().setStretchLastSection(True)
 
         layout.addWidget(self.table)
@@ -68,9 +72,16 @@ class MainWindow(QMainWindow):
         self.btn_open_data.clicked.connect(lambda: self.open_dir(self._data_dir))
         self.btn_open_export.clicked.connect(lambda: self.open_dir(self._export_dir))
         self.table.cellDoubleClicked.connect(self.open_task_detail)
+        self._spec = MockSpectrum()
+        self._spec.connect()
+
+        self.btn_traces.clicked.connect(self.show_traces)
 
         # 首次刷新
         self.refresh_tasks()
+
+        self.btn_viz = QPushButton("显示设置")
+        top.addWidget(self.btn_viz)
 
     def refresh_tasks(self) -> None:
         tasks = self._store.list_tasks(limit=50)
@@ -80,7 +91,7 @@ class MainWindow(QMainWindow):
             self.table.setItem(i, 1, QTableWidgetItem(t.name))
             self.table.setItem(i, 2, QTableWidgetItem(t.status))
             item_id = QTableWidgetItem(t.id)
-            item_id.setFlags(item_id.flags() & ~Qt.ItemIsEditable)
+            item_id.setFlags(item_id.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.table.setItem(i, 3, item_id)
 
         self.lbl_info.setText(f"Tasks: {len(tasks)}")
@@ -101,4 +112,10 @@ class MainWindow(QMainWindow):
         dlg = TaskDetailDialog(self._store, task_id, export_dir=self._export_dir, cfg=self._cfg, parent=self)
 
         dlg.exec()
+
+    def show_traces(self) -> None:
+        traces = self._spec.list_traces()
+        text = "\n".join([f"- {t.name} ({t.kind or 'N/A'} {t.unit})" for t in traces])
+        QMessageBox.information(self, "Trace 列表（来自仪表驱动）", text or "(empty)")
+
 
