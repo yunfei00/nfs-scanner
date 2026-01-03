@@ -21,7 +21,8 @@ class HeatmapMeta:
     y_max: float
     vmin: float
     vmax: float
-    lut: str
+    lut: str = "viridis"
+    opacity: float = 1.0
 
 
 class HeatmapView(QGraphicsView):
@@ -74,7 +75,7 @@ class HeatmapView(QGraphicsView):
 
         self.update_axes()
         self.update_colorbar()
-        self._pixmap_item.setOpacity(self._meta.opacity if hasattr(self._meta, "opacity") else 1.0)
+        self._pixmap_item.setOpacity(float(self._meta.opacity))
 
     def wheelEvent(self, event):
         # 滚轮缩放
@@ -279,7 +280,7 @@ class HeatmapView(QGraphicsView):
         # 用 LUT 生成真正的渐变
         try:
             from nfs_scanner.core.visualization.lut_manager import get_lut
-            lut = get_lut(getattr(self._meta, "lut", "viridis")).table
+            lut = get_lut(self._meta.lut).table
             for i in range(256):
                 t = i / 255.0
                 r, g, b = lut[255 - i]

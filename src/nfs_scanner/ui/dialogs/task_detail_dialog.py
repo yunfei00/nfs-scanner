@@ -10,8 +10,7 @@ from PySide6.QtWidgets import (
 )
 
 from nfs_scanner.core.scan.trace_store import TraceStore
-from nfs_scanner.core.visualization.heatmap_export import export_heatmap_png, \
-    render_heatmap_for_ui, render_heatmap_from_grid
+from nfs_scanner.core.visualization.heatmap_export import export_heatmap_png, render_heatmap_from_grid
 from nfs_scanner.infra.storage.paths import ensure_dirs, get_app_home
 from nfs_scanner.infra.storage.sqlite_store import SQLiteStore
 from nfs_scanner.ui.widgets.heatmap_view import HeatmapView, HeatmapMeta
@@ -253,9 +252,9 @@ class TaskDetailDialog(QDialog):
             y_max=float(grid.ys.max()),
             vmin=float(vmin2),
             vmax=float(vmax2),
+            lut=lut_name,
+            opacity=opacity,
         )
-        meta.lut = lut_name
-        meta.opacity = opacity
 
         self.view.set_heatmap(pix, meta, grid_values=values_2d)
 
