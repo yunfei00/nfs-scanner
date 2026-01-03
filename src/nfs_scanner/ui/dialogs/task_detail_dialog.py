@@ -4,7 +4,7 @@ import csv
 import json
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
@@ -30,6 +30,7 @@ class TaskDetailDialog(QDialog):
     - 扫描任务（data/scans/<task_id>/meta.json + traces/*.npz）：预览/导出均基于 npz
     - 旧/假任务（DB points）：导出保持旧逻辑（CSV/PNG）；预览默认不启用（避免混乱）
     """
+    request_rescan = Signal(dict)  # payload: {"params":..., "traces":[...]}
 
     def __init__(self, store: SQLiteStore, task_id: str, export_dir: Path, cfg: dict, parent=None):
         super().__init__(parent)
@@ -80,7 +81,12 @@ class TaskDetailDialog(QDialog):
         btns.addWidget(self.btn_export_csv)
         btns.addWidget(self.btn_export_png)
         btns.addWidget(self.btn_close)
+        self.btn_rescan = QPushButton("一键复扫")
+        btns.insertWidget(1, self.btn_rescan)  # 放在预览旁边也行
+        self.btn_rescan.clicked.connect(self.on_rescan_clicked)
         layout.addLayout(btns)
+
+
 
         # bottom config
         self.txt_config = QTextEdit()
@@ -355,3 +361,14 @@ class TaskDetailDialog(QDialog):
                 f"P2: ({x2:.3f},{y2:.3f}) v={v2:.6g}   "
                 f"Δx={x2 - x1:.3f}, Δy={y2 - y1:.3f}, Δv={v2 - v1:.6g}"
             )
+
+    def on_rescan_clicked(self) -> None:
+        if not self._meta_path.exists():
+            QMessageBox.warning(self, "提示", "meta.json 不存在，无法复扫")
+            return
+        meta = json.loads(self._meta_path.read_text(encoding="utf-8"))
+        payload = {
+            "params": meta.get("params", {}),
+            "trace_list": meta.get("trace_list", []),
+        }
+        self.request_rescan.emit(payload)

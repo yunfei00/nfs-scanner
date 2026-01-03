@@ -182,7 +182,7 @@ class MainWindow(QMainWindow):
             return
         task_id = item.text().strip()
         dlg = TaskDetailDialog(self._store, task_id, export_dir=self._export_dir, cfg=self._cfg, parent=self)
-
+        dlg.request_rescan.connect(self.apply_rescan_payload)
         dlg.exec()
 
     def show_traces(self) -> None:
@@ -323,4 +323,34 @@ class MainWindow(QMainWindow):
         if not hasattr(self, "_runner") or self._runner is None:
             return
         self._runner.request_stop()
+
+    def apply_rescan_payload(self, payload: dict) -> None:
+        p = payload.get("params", {})
+        traces = payload.get("trace_list", [])
+
+        # 1) 填充扫描控制台参数
+        self.sp_xmin.setValue(float(p.get("x_min", -5)))
+        self.sp_xmax.setValue(float(p.get("x_max", 5)))
+        self.sp_ymin.setValue(float(p.get("y_min", -5)))
+        self.sp_ymax.setValue(float(p.get("y_max", 5)))
+        self.sp_step.setValue(float(p.get("step_mm", 1.0)))
+        self.sp_z.setValue(float(p.get("z_height_mm", 1.0)))
+        self.sp_feed.setValue(float(p.get("feed", 1000)))
+        self.sp_freq.setValue(float(p.get("freq_hz", 5e9)))
+
+        # 2) 重新加载 trace 列表（来自当前 driver），然后勾选与 payload 匹配的 trace
+        self.load_traces_into_list()
+        want = set([t.get("name") for t in traces if t.get("name")])
+
+        for i in range(self.lst_traces.count()):
+            it = self.lst_traces.item(i)
+            ti = it.data(Qt.ItemDataRole.UserRole)
+            if ti and ti.name in want:
+                it.setCheckState(Qt.CheckState.Checked)
+            else:
+                it.setCheckState(Qt.CheckState.Unchecked)
+
+        # 3) 直接开始扫描
+        self.start_scan()
+
 
