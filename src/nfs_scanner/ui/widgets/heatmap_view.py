@@ -62,20 +62,37 @@ class HeatmapView(QGraphicsView):
         self._camera_item = None
 
     def set_heatmap(self, pixmap: QPixmap, meta: HeatmapMeta, grid_values=None) -> None:
-        self.scene().clear()
+        # 1) 清理我们自己维护的 overlay items（不要用 scene.clear）
+        self._clear_axis_items()
+        self._clear_colorbar_items()
+        self._clear_picks()
+
+        # 2) 只移除旧的 heatmap pixmap item（如果存在）
+        if self._pixmap_item is not None:
+            try:
+                self.scene().removeItem(self._pixmap_item)
+            except Exception:
+                pass
+            self._pixmap_item = None
+
+        # 3) 保留 camera_item（如果你有相机底图层），这里只更新热力图层
         self._pixmap_item = self.scene().addPixmap(pixmap)
         self._pixmap_item.setZValue(0)
+        self._pixmap_item.setOpacity(float(meta.opacity))
 
         self._meta = meta
         self._grid_values = grid_values
 
-        self.resetTransform()
+        # 4) 更新 scene rect（注意：update_axes / colorbar 会扩展 sceneRect）
         self.setSceneRect(self._pixmap_item.boundingRect())
-        self.fitInView(self.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
 
+        # 5) 视图复位（这里不强制 fit，每次切换也能保持当前缩放；你想每次都 fit 就取消注释）
+        # self.resetTransform()
+        # self.fitInView(self._pixmap_item.boundingRect(), Qt.KeepAspectRatio)
+
+        # 6) 重画 overlay
         self.update_axes()
         self.update_colorbar()
-        self._pixmap_item.setOpacity(float(self._meta.opacity))
 
     def wheelEvent(self, event):
         # 滚轮缩放
@@ -131,7 +148,11 @@ class HeatmapView(QGraphicsView):
 
     def _clear_axis_items(self) -> None:
         for it in self._axis_items:
-            self.scene().removeItem(it)
+            try:
+                it.setVisible(False)
+                self.scene().removeItem(it)
+            except Exception:
+                pass
         self._axis_items.clear()
 
     @staticmethod
@@ -253,7 +274,11 @@ class HeatmapView(QGraphicsView):
 
     def _clear_colorbar_items(self) -> None:
         for it in self._colorbar_items:
-            self.scene().removeItem(it)
+            try:
+                it.setVisible(False)
+                self.scene().removeItem(it)
+            except Exception:
+                pass
         self._colorbar_items.clear()
 
     def update_colorbar(self) -> None:
@@ -320,7 +345,11 @@ class HeatmapView(QGraphicsView):
 
     def _clear_picks(self):
         for it in self._pick_items:
-            self.scene().removeItem(it)
+            try:
+                it.setVisible(False)
+                self.scene().removeItem(it)
+            except Exception:
+                pass
         self._pick_items.clear()
         self._picked.clear()
 
