@@ -256,4 +256,53 @@ def render_heatmap_for_ui(
     out_img = draw_colorbar(hm_big, hm.vmin, hm.vmax) if with_colorbar else hm_big
     return xs, ys, grid, out_img, hm.vmin, hm.vmax
 
+def render_heatmap_from_grid(
+    xs,
+    ys,
+    values_2d,
+    *,
+    lut_name: str = "viridis",
+    opacity: float = 1.0,
+    autoscale: bool = True,
+    vmin: float | None = None,
+    vmax: float | None = None,
+    min_size: int = 600,
+    scale: int = 20,
+    smooth: bool = True,
+    with_colorbar: bool = False,
+):
+    """
+    xs: (nx,)
+    ys: (ny,)
+    values_2d: (ny, nx)
+    """
+    import numpy as np
+    from PIL import Image
 
+    grid = np.asarray(values_2d, dtype=np.float32)
+
+    hm = apply_lut(
+        grid,
+        lut_name=lut_name,
+        opacity=opacity,
+        autoscale=autoscale,
+        vmin=vmin,
+        vmax=vmax,
+    )
+
+    w0, h0 = hm.image.size
+    target_w = w0 * max(1, int(scale))
+    target_h = h0 * max(1, int(scale))
+    shortest = min(target_w, target_h)
+    if shortest < min_size:
+        k = int(np.ceil(min_size / max(1, shortest)))
+        target_w *= k
+        target_h *= k
+
+    resample = Image.Resampling.BILINEAR if smooth else Image.Resampling.NEAREST
+    img_big = hm.image.resize((target_w, target_h), resample=resample)
+
+    if with_colorbar:
+        img_big = draw_colorbar(img_big, hm.vmin, hm.vmax)
+
+    return img_big, hm.vmin, hm.vmax

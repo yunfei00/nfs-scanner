@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
 
 from nfs_scanner.core.scan.trace_store import TraceStore
 from nfs_scanner.core.visualization.heatmap_export import export_heatmap_png, \
-    render_heatmap_for_ui
+    render_heatmap_for_ui, render_heatmap_from_grid
 from nfs_scanner.infra.storage.paths import ensure_dirs, get_app_home
 from nfs_scanner.infra.storage.sqlite_store import SQLiteStore
 from nfs_scanner.ui.widgets.heatmap_view import HeatmapView, HeatmapMeta
@@ -202,16 +202,14 @@ class TaskDetailDialog(QDialog):
 
     def preview_png(self) -> None:
         trace_name = self.cmb_trace.currentText().strip()
-        if trace_name and hasattr(self, "_task_dir"):
-            ts = TraceStore(self._task_dir)
-            grid = ts.load_grid(trace_name)
-            # 组装 points（直接用 grid -> heatmap，不再从 DB point 表）
-            # 我们为 UI 渲染新增一个路径：直接渲染 grid values[:,:,0]
-            points = None
-        else:
-            points = self._store.fetch_points(self._task_id)  # 兼容旧假任务
+        if not trace_name or not hasattr(self, "_task_dir"):
+            return
 
-        points = self._store.fetch_points(self._task_id)
+        ts = TraceStore(self._task_dir)
+        grid = ts.load_grid(trace_name)
+
+        # 单频点：values[..., 0]
+        values_2d = grid.values[:, :, 0]
 
         viz = (self._cfg.get("visualization") or {})
         exp = (viz.get("export") or {})
@@ -225,8 +223,10 @@ class TaskDetailDialog(QDialog):
         vmin = viz.get("vmin", None)
         vmax = viz.get("vmax", None)
 
-        xs, ys, grid, pil_img, vmin2, vmax2 = render_heatmap_for_ui(
-            points,
+        pil_img, vmin2, vmax2 = render_heatmap_from_grid(
+            grid.xs,
+            grid.ys,
+            values_2d,
             lut_name=lut_name,
             opacity=opacity,
             autoscale=autoscale,
@@ -235,7 +235,7 @@ class TaskDetailDialog(QDialog):
             min_size=min_size,
             scale=scale,
             smooth=smooth,
-            with_colorbar=False,  # UI 先不加色条，干净。色条下一步做成单独 item
+            with_colorbar=False,
         )
 
         rgba = pil_img.convert("RGBA")
@@ -243,19 +243,21 @@ class TaskDetailDialog(QDialog):
         qimg = QImage(data, rgba.width, rgba.height, QImage.Format.Format_RGBA8888)
         pix = QPixmap.fromImage(qimg)
 
+        # 更新 HeatmapView（含 meta）
         meta = HeatmapMeta(
-            nx=int(len(xs)),
-            ny=int(len(ys)),
-            x_min=float(xs.min()) if len(xs) else 0.0,
-            x_max=float(xs.max()) if len(xs) else 1.0,
-            y_min=float(ys.min()) if len(ys) else 0.0,
-            y_max=float(ys.max()) if len(ys) else 1.0,
+            nx=len(grid.xs),
+            ny=len(grid.ys),
+            x_min=float(grid.xs.min()),
+            x_max=float(grid.xs.max()),
+            y_min=float(grid.ys.min()),
+            y_max=float(grid.ys.max()),
             vmin=float(vmin2),
             vmax=float(vmax2),
-            lut=lut_name,
         )
+        meta.lut = lut_name
+        meta.opacity = opacity
 
-        self.view.set_heatmap(pix, meta, grid_values=grid)
+        self.view.set_heatmap(pix, meta, grid_values=values_2d)
 
     def on_zoom_changed(self, val: int) -> None:
         self._zoom_percent = int(val)
