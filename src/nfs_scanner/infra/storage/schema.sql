@@ -20,3 +20,16 @@ CREATE TABLE IF NOT EXISTS scan_point (
 );
 
 CREATE INDEX IF NOT EXISTS idx_scan_point_task_id ON scan_point(task_id);
+
+CREATE TABLE IF NOT EXISTS scan_queue_item (
+  id TEXT PRIMARY KEY,
+  created_at TEXT NOT NULL,
+  status TEXT NOT NULL,
+  params_json TEXT NOT NULL,
+  trace_list_json TEXT NOT NULL,
+  task_id TEXT,
+  message TEXT DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_scan_queue_status ON scan_queue_item(status);
+CREATE INDEX IF NOT EXISTS idx_scan_queue_created ON scan_queue_item(created_at);
+

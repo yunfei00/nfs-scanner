@@ -119,3 +119,63 @@ class SQLiteStore:
             ).fetchall()
         return [(float(x), float(y), float(z), float(v) if v is not None else 0.0) for (x, y, z, v) in rows]
 
+def queue_add(self, *, item_id: str, created_at: str, params: dict, trace_list: list, status: str = "queued") -> None:
+    import json
+    with self.connect() as conn:
+        conn.execute(
+            "INSERT INTO scan_queue_item (id, created_at, status, params_json, trace_list_json) VALUES (?,?,?,?,?)",
+            (item_id, created_at, status, json.dumps(params, ensure_ascii=False), json.dumps(trace_list, ensure_ascii=False)),
+        )
+
+def queue_list(self, *, limit: int = 200) -> list[dict]:
+    import json
+    with self.connect() as conn:
+        rows = conn.execute(
+            "SELECT id, created_at, status, params_json, trace_list_json, task_id, message FROM scan_queue_item ORDER BY created_at ASC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    out = []
+    for r in rows:
+        out.append({
+            "id": r[0],
+            "created_at": r[1],
+            "status": r[2],
+            "params": json.loads(r[3]),
+            "trace_list": json.loads(r[4]),
+            "task_id": r[5],
+            "message": r[6] or "",
+        })
+    return out
+
+def queue_update_status(self, item_id: str, status: str, message: str = "") -> None:
+    with self.connect() as conn:
+        conn.execute("UPDATE scan_queue_item SET status=?, message=? WHERE id=?", (status, message, item_id))
+
+def queue_bind_task(self, item_id: str, task_id: str) -> None:
+    with self.connect() as conn:
+        conn.execute("UPDATE scan_queue_item SET task_id=? WHERE id=?", (task_id, item_id))
+
+def queue_delete(self, item_id: str) -> None:
+    with self.connect() as conn:
+        conn.execute("DELETE FROM scan_queue_item WHERE id=?", (item_id,))
+
+
+def queue_next_queued(self) -> dict | None:
+    import json
+    with self.connect() as conn:
+        r = conn.execute(
+            "SELECT id, created_at, status, params_json, trace_list_json, task_id, message "
+            "FROM scan_queue_item WHERE status='queued' ORDER BY created_at ASC LIMIT 1"
+        ).fetchone()
+    if not r:
+        return None
+    return {
+        "id": r[0],
+        "created_at": r[1],
+        "status": r[2],
+        "params": json.loads(r[3]),
+        "trace_list": json.loads(r[4]),
+        "task_id": r[5],
+        "message": r[6] or "",
+    }
+

@@ -14,51 +14,69 @@ from PySide6.QtWidgets import (
 
 from nfs_scanner.core.drivers.motion.mock import MockMotion
 from nfs_scanner.core.drivers.spectrum.mock import MockSpectrum
-from nfs_scanner.core.scan.scan_runner import ScanParams, ScanRunner
-from nfs_scanner.infra.storage.paths import ensure_dirs, get_app_home
+from nfs_scanner.core.scan.scan_runner import ScanRunner, ScanParams
+
 from nfs_scanner.infra.storage.sqlite_store import SQLiteStore
-from nfs_scanner.core.scan.scan_manager import ScanManager
 from nfs_scanner.ui.dialogs.task_detail_dialog import TaskDetailDialog
+
+from nfs_scanner.core.scan.scan_queue_manager import ScanQueueManager
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, store: SQLiteStore, cfg: dict) -> None:
+    def __init__(self, store: SQLiteStore, cfg: dict):
         super().__init__()
         self.setWindowTitle("NFS Scanner")
-        self.resize(1200, 800)
+        self.resize(1100, 800)
 
         self._store = store
-        self._cfg = cfg
-        self._scan_mgr = ScanManager(store)
-
-        root = QWidget()
-        layout = QVBoxLayout(root)
-
-        # 顶部信息 + 按钮
-        top = QHBoxLayout()
-        self.btn_traces = QPushButton("读取仪表 Trace 列表")
-        top.addWidget(self.btn_traces)
-
-        self.lbl_info = QLabel("Near-Field Scanning System")
-        self.btn_refresh = QPushButton("刷新任务列表")
-        self.btn_fake = QPushButton("创建一次假扫描任务")
-        top.addWidget(self.lbl_info)
-        top.addStretch(1)
-        top.addWidget(self.btn_fake)
-        top.addWidget(self.btn_refresh)
-
+        from nfs_scanner.infra.storage.paths import get_app_home, ensure_dirs
         paths = ensure_dirs(get_app_home())
-        self._data_dir = paths["data"]
         self._export_dir = paths["exports"]
 
-        self.btn_open_data = QPushButton("打开数据目录")
+        self._cfg = cfg
+
+        # queue manager (auto create table)
+        self._queue = ScanQueueManager(self._store)
+        self._queue_running = False
+        self._queue_current_item_id: str | None = None
+
+        self._paused = False
+        self._thread = None
+        self._runner = None
+
+        central = QWidget()
+        self.setCentralWidget(central)
+        layout = QVBoxLayout(central)
+
+        # -------------------------
+        # top: actions
+        # -------------------------
+        top = QHBoxLayout()
+        self.btn_refresh = QPushButton("刷新任务列表")
         self.btn_open_export = QPushButton("打开导出目录")
-
-        top.addWidget(self.btn_open_data)
+        top.addWidget(self.btn_refresh)
         top.addWidget(self.btn_open_export)
-
+        top.addStretch(1)
         layout.addLayout(top)
 
+        self.btn_refresh.clicked.connect(self.refresh_tasks)
+        self.btn_open_export.clicked.connect(self.open_export_dir)
+
+        # -------------------------
+        # tasks table
+        # -------------------------
+        self.tbl = QTableWidget()
+        self.tbl.setColumnCount(5)
+        self.tbl.setHorizontalHeaderLabels(["时间", "名称", "状态", "点位数", "ID"])
+        self.tbl.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.tbl.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.tbl.cellDoubleClicked.connect(self.open_task_detail)
+        layout.addWidget(QLabel("任务列表"))
+        layout.addWidget(self.tbl)
+
+        # -------------------------
+        # scan console
+        # -------------------------
         self.grp_scan = QGroupBox("扫描控制台（Mock 驱动）")
         form = QFormLayout(self.grp_scan)
 
@@ -98,7 +116,6 @@ class MainWindow(QMainWindow):
         form.addRow("", self.chk_autoload)
         form.addRow("进度", self.prg)
 
-        # buttons
         btn_line = QHBoxLayout()
         self.btn_load_traces = QPushButton("加载 Trace")
         self.btn_start_scan = QPushButton("开始扫描")
@@ -126,71 +143,54 @@ class MainWindow(QMainWindow):
         if self.chk_autoload.isChecked():
             self.load_traces_into_list()
 
-        # 任务表格
-        self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(["时间", "名称", "状态", "ID"])
-        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
-        self.table.horizontalHeader().setStretchLastSection(True)
+        # -------------------------
+        # queue panel (E2)
+        # -------------------------
+        self.grp_queue = QGroupBox("扫描队列（串行执行）")
+        qv = QVBoxLayout(self.grp_queue)
 
-        layout.addWidget(self.table)
+        qbtn = QHBoxLayout()
+        self.btn_enqueue = QPushButton("加入队列")
+        self.btn_start_queue = QPushButton("开始队列")
+        self.btn_stop_queue = QPushButton("停止队列")
+        self.btn_skip_selected = QPushButton("跳过选中")
+        self.btn_delete_selected = QPushButton("删除选中")
+        self.btn_refresh_queue = QPushButton("刷新队列")
 
-        self.setCentralWidget(root)
+        qbtn.addWidget(self.btn_enqueue)
+        qbtn.addWidget(self.btn_start_queue)
+        qbtn.addWidget(self.btn_stop_queue)
+        qbtn.addStretch(1)
+        qbtn.addWidget(self.btn_skip_selected)
+        qbtn.addWidget(self.btn_delete_selected)
+        qbtn.addWidget(self.btn_refresh_queue)
 
-        # 事件绑定
-        self.btn_refresh.clicked.connect(self.refresh_tasks)
-        self.btn_fake.clicked.connect(self.create_fake_task)
-        self.btn_open_data.clicked.connect(lambda: self.open_dir(self._data_dir))
-        self.btn_open_export.clicked.connect(lambda: self.open_dir(self._export_dir))
-        self.table.cellDoubleClicked.connect(self.open_task_detail)
-        self._spec = MockSpectrum()
-        self._spec.connect()
+        qv.addLayout(qbtn)
 
-        self.btn_traces.clicked.connect(self.show_traces)
+        self.tbl_queue = QTableWidget()
+        self.tbl_queue.setColumnCount(6)
+        self.tbl_queue.setHorizontalHeaderLabels(["时间", "状态", "ROI/step/z/freq", "Traces", "task_id", "queue_id"])
+        self.tbl_queue.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.tbl_queue.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.tbl_queue.setColumnHidden(5, True)  # hide queue_id column
+        qv.addWidget(self.tbl_queue)
 
-        # 首次刷新
+        layout.addWidget(self.grp_queue)
+
+        self.btn_enqueue.clicked.connect(self.enqueue_current)
+        self.btn_start_queue.clicked.connect(self.start_queue)
+        self.btn_stop_queue.clicked.connect(self.stop_queue)
+        self.btn_skip_selected.clicked.connect(self.skip_selected)
+        self.btn_delete_selected.clicked.connect(self.delete_selected)
+        self.btn_refresh_queue.clicked.connect(self.refresh_queue)
+
+        # initial load
         self.refresh_tasks()
+        self.refresh_queue()
 
-        self.btn_viz = QPushButton("显示设置")
-        top.addWidget(self.btn_viz)
-
-    def refresh_tasks(self) -> None:
-        tasks = self._store.list_tasks(limit=50)
-        self.table.setRowCount(len(tasks))
-        for i, t in enumerate(tasks):
-            self.table.setItem(i, 0, QTableWidgetItem(t.created_at))
-            self.table.setItem(i, 1, QTableWidgetItem(t.name))
-            self.table.setItem(i, 2, QTableWidgetItem(t.status))
-            item_id = QTableWidgetItem(t.id)
-            item_id.setFlags(item_id.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            self.table.setItem(i, 3, item_id)
-
-        self.lbl_info.setText(f"Tasks: {len(tasks)}")
-
-    def create_fake_task(self) -> None:
-        task_id = self._scan_mgr.create_fake_task(self._cfg)
-        QMessageBox.information(self, "完成", f"已生成假扫描任务：\n{task_id}")
-        self.refresh_tasks()
-
-    def open_dir(self, p: Path) -> None:
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(p)))
-
-    def open_task_detail(self, row: int, col: int) -> None:
-        item = self.table.item(row, 3)  # ID 列
-        if not item:
-            return
-        task_id = item.text().strip()
-        dlg = TaskDetailDialog(self._store, task_id, export_dir=self._export_dir, cfg=self._cfg, parent=self)
-        dlg.request_rescan.connect(self.apply_rescan_payload)
-        dlg.exec()
-
-    def show_traces(self) -> None:
-        traces = self._spec.list_traces()
-        text = "\n".join([f"- {t.name} ({t.kind or 'N/A'} {t.unit})" for t in traces])
-        QMessageBox.information(self, "Trace 列表（来自仪表驱动）", text or "(empty)")
-
-
+    # -------------------------
+    # small UI helper
+    # -------------------------
     def _hpair(self, a, b):
         w = QWidget()
         l = QHBoxLayout(w)
@@ -199,6 +199,47 @@ class MainWindow(QMainWindow):
         l.addWidget(b)
         return w
 
+    def open_export_dir(self) -> None:
+        if self._export_dir.exists():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._export_dir)))
+
+    def _get(self, obj, key, default=""):
+        # 支持 dict 和 dataclass/对象
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        return getattr(obj, key, default)
+
+    # -------------------------
+    # tasks
+    # -------------------------
+    def refresh_tasks(self) -> None:
+        tasks = self._store.list_tasks(limit=200)
+        self.tbl.setRowCount(len(tasks))
+        for r, t in enumerate(tasks):
+            self.tbl.setItem(r, 0, QTableWidgetItem(str(self._get(t, "created_at", ""))))
+            self.tbl.setItem(r, 1, QTableWidgetItem(str(self._get(t, "name", ""))))
+            self.tbl.setItem(r, 2, QTableWidgetItem(str(self._get(t, "status", ""))))
+            # 有的实现叫 n_points / n_points，或 points_count；都兼容一下
+            n_points = self._get(t, "n_points", None)
+            if n_points is None:
+                n_points = self._get(t, "points_count", "")
+            self.tbl.setItem(r, 3, QTableWidgetItem(str(n_points)))
+            self.tbl.setItem(r, 4, QTableWidgetItem(str(self._get(t, "id", ""))))
+        self.tbl.resizeColumnsToContents()
+
+    def open_task_detail(self, row: int, col: int) -> None:
+        task_id = self.tbl.item(row, 4).text()
+        dlg = TaskDetailDialog(self._store, task_id, self._export_dir, self._cfg, self)
+        # E1 已经做完的话，这里可继续保留
+        try:
+            dlg.request_rescan.connect(self.apply_rescan_payload)
+        except Exception:
+            pass
+        dlg.exec()
+
+    # -------------------------
+    # traces (dynamic)
+    # -------------------------
     def load_traces_into_list(self) -> None:
         self.lst_traces.clear()
         self._spec.connect()
@@ -209,16 +250,23 @@ class MainWindow(QMainWindow):
             item.setCheckState(Qt.CheckState.Checked)
             self.lst_traces.addItem(item)
 
-    def start_scan(self) -> None:
-        # 选中的 trace
+    def _collect_selected_traces(self):
         traces = []
         for i in range(self.lst_traces.count()):
             it = self.lst_traces.item(i)
             if it.checkState() == Qt.CheckState.Checked:
                 traces.append(it.data(Qt.ItemDataRole.UserRole))
+        return traces
+
+    # -------------------------
+    # scan
+    # -------------------------
+    def start_scan(self) -> str | None:
+        # 选中的 trace
+        traces = self._collect_selected_traces()
         if not traces:
             QMessageBox.warning(self, "提示", "请至少选择一个 Trace")
-            return
+            return None
 
         task_id = str(uuid4())
         task_name = f"Scan {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
@@ -239,7 +287,7 @@ class MainWindow(QMainWindow):
             freq_hz=float(self.sp_freq.value()),
         )
 
-        # DB 里也创建任务（让任务列表立刻出现）
+        # DB 里创建任务（让任务列表立刻出现）
         self._store.create_task(
             task_id=task_id,
             name=task_name,
@@ -274,18 +322,17 @@ class MainWindow(QMainWindow):
         self.btn_stop_scan.setEnabled(True)
         self.prg.setValue(0)
         self.refresh_tasks()
+        return task_id
 
     def on_scan_progress(self, done: int, total: int) -> None:
         v = int(done * 100 / max(1, total))
         self.prg.setValue(v)
 
     def on_scan_status(self, text: str) -> None:
-        # 可选：显示到状态栏
         self.statusBar().showMessage(text)
 
     def on_scan_finished(self, task_id: str, ok: bool, msg: str) -> None:
         # 更新 DB 状态
-        # 这里简单做：直接写 running->done/failed（我们下一步会加 update_task_status 方法）
         try:
             with self._store.connect() as conn:
                 conn.execute(
@@ -302,33 +349,47 @@ class MainWindow(QMainWindow):
 
         # 收尾 thread
         try:
-            self._thread.quit()
-            self._thread.wait(2000)
+            if self._thread is not None:
+                self._thread.quit()
+                self._thread.wait(2000)
         except Exception:
             pass
 
-        QMessageBox.information(self, "扫描完成" if ok else "扫描失败", f"{task_id}\n{msg}")
         self.refresh_tasks()
+
+        # ----- E2: queue chaining -----
+        if self._queue_running and self._queue_current_item_id:
+            qid = self._queue_current_item_id
+            self._queue.update_status(qid, "done" if ok else "failed", msg)
+            self._queue_current_item_id = None
+            self.refresh_queue()
+            self.run_next_queue_item()
 
     def toggle_pause(self) -> None:
         if not hasattr(self, "_runner") or self._runner is None:
             return
-        paused = getattr(self, "_paused", False)
-        paused = not paused
-        self._paused = paused
-        self._runner.request_pause(paused)
-        self.btn_pause_scan.setText("继续" if paused else "暂停")
+        self._paused = not self._paused
+        self._runner.request_pause(self._paused)
+        self.btn_pause_scan.setText("继续" if self._paused else "暂停")
 
     def stop_scan(self) -> None:
         if not hasattr(self, "_runner") or self._runner is None:
             return
         self._runner.request_stop()
 
+    # -------------------------
+    # E1 (already done): rescan payload
+    # -------------------------
     def apply_rescan_payload(self, payload: dict) -> None:
-        p = payload.get("params", {})
-        traces = payload.get("trace_list", [])
+        # keep behavior: apply params + select traces + start scan
+        self.apply_payload_to_controls(payload)
+        self.start_scan()
 
-        # 1) 填充扫描控制台参数
+    def apply_payload_to_controls(self, payload: dict) -> None:
+        p = payload.get("params", {}) or {}
+        traces = payload.get("trace_list", []) or []
+
+        # fill params
         self.sp_xmin.setValue(float(p.get("x_min", -5)))
         self.sp_xmax.setValue(float(p.get("x_max", 5)))
         self.sp_ymin.setValue(float(p.get("y_min", -5)))
@@ -338,9 +399,9 @@ class MainWindow(QMainWindow):
         self.sp_feed.setValue(float(p.get("feed", 1000)))
         self.sp_freq.setValue(float(p.get("freq_hz", 5e9)))
 
-        # 2) 重新加载 trace 列表（来自当前 driver），然后勾选与 payload 匹配的 trace
+        # select traces
         self.load_traces_into_list()
-        want = set([t.get("name") for t in traces if t.get("name")])
+        want = set([t.get("name") for t in traces if isinstance(t, dict) and t.get("name")])
 
         for i in range(self.lst_traces.count()):
             it = self.lst_traces.item(i)
@@ -350,7 +411,135 @@ class MainWindow(QMainWindow):
             else:
                 it.setCheckState(Qt.CheckState.Unchecked)
 
-        # 3) 直接开始扫描
-        self.start_scan()
+    # -------------------------
+    # E2: Queue UI + executor
+    # -------------------------
+    def _current_params_dict(self) -> dict:
+        return {
+            "x_min": float(self.sp_xmin.value()),
+            "x_max": float(self.sp_xmax.value()),
+            "y_min": float(self.sp_ymin.value()),
+            "y_max": float(self.sp_ymax.value()),
+            "step_mm": float(self.sp_step.value()),
+            "z_height_mm": float(self.sp_z.value()),
+            "feed": float(self.sp_feed.value()),
+            "freq_hz": float(self.sp_freq.value()),
+        }
 
+    def _current_trace_list_dicts(self) -> list[dict]:
+        traces = self._collect_selected_traces()
+        out = []
+        for t in traces:
+            out.append({"name": t.name, "kind": getattr(t, "kind", ""), "unit": getattr(t, "unit", "dB")})
+        return out
 
+    def refresh_queue(self) -> None:
+        items = self._queue.list(limit=300)
+        self.tbl_queue.setRowCount(len(items))
+        for r, it in enumerate(items):
+            summary = (
+                f"x[{it.params.get('x_min')},{it.params.get('x_max')}] "
+                f"y[{it.params.get('y_min')},{it.params.get('y_max')}] "
+                f"step={it.params.get('step_mm')} z={it.params.get('z_height_mm')} "
+                f"f={it.params.get('freq_hz')}"
+            )
+            traces_str = ",".join([t.get("name", "") for t in it.trace_list]) if it.trace_list else ""
+            self.tbl_queue.setItem(r, 0, QTableWidgetItem(it.created_at))
+            self.tbl_queue.setItem(r, 1, QTableWidgetItem(it.status))
+            self.tbl_queue.setItem(r, 2, QTableWidgetItem(summary))
+            self.tbl_queue.setItem(r, 3, QTableWidgetItem(traces_str))
+            self.tbl_queue.setItem(r, 4, QTableWidgetItem(it.task_id or ""))
+            self.tbl_queue.setItem(r, 5, QTableWidgetItem(it.id))
+        self.tbl_queue.resizeColumnsToContents()
+
+    def _selected_queue_ids(self) -> list[str]:
+        ids: list[str] = []
+        rows = set([idx.row() for idx in self.tbl_queue.selectedIndexes()])
+        for r in rows:
+            qid_item = self.tbl_queue.item(r, 5)
+            if qid_item:
+                ids.append(qid_item.text())
+        return ids
+
+    def enqueue_current(self) -> None:
+        traces = self._collect_selected_traces()
+        if not traces:
+            QMessageBox.warning(self, "提示", "请至少选择一个 Trace 后再加入队列")
+            return
+
+        qid = str(uuid4())
+        params = self._current_params_dict()
+        trace_list = self._current_trace_list_dicts()
+        self._queue.add(item_id=qid, params=params, trace_list=trace_list)
+        self.refresh_queue()
+
+    def start_queue(self) -> None:
+        if self._queue_running:
+            QMessageBox.information(self, "队列", "队列已在运行中")
+            return
+        self._queue_running = True
+        self.run_next_queue_item()
+
+    def stop_queue(self) -> None:
+        self._queue_running = False
+        # stop current running scan if exists
+        if self._runner is not None:
+            try:
+                self._runner.request_stop()
+            except Exception:
+                pass
+        QMessageBox.information(self, "队列", "已停止队列（当前扫描会尽快停止）")
+
+    def skip_selected(self) -> None:
+        ids = self._selected_queue_ids()
+        if not ids:
+            return
+        # only skip queued items (best effort)
+        for qid in ids:
+            self._queue.update_status(qid, "skipped", "user skipped")
+        self.refresh_queue()
+
+    def delete_selected(self) -> None:
+        ids = self._selected_queue_ids()
+        if not ids:
+            return
+        # only safe delete queued/skipped/failed/done (best effort)
+        for qid in ids:
+            # if deleting current running item, refuse
+            if self._queue_current_item_id == qid and self._queue_running:
+                QMessageBox.warning(self, "提示", "不能删除正在执行的队列项")
+                continue
+            self._queue.delete(qid)
+        self.refresh_queue()
+
+    def run_next_queue_item(self) -> None:
+        if not self._queue_running:
+            return
+
+        item = self._queue.next_queued()
+        if not item:
+            self._queue_running = False
+            self.refresh_queue()
+            QMessageBox.information(self, "队列完成", "没有待执行项（queued）了")
+            return
+
+        # mark running
+        self._queue_current_item_id = item.id
+        self._queue.update_status(item.id, "running", "")
+
+        # apply to controls
+        payload = {"params": item.params, "trace_list": item.trace_list}
+        self.apply_payload_to_controls(payload)
+
+        # start scan and bind task_id
+        task_id = self.start_scan()
+        if task_id:
+            self._queue.bind_task(item.id, task_id)
+        else:
+            # failed to start (no trace etc.)
+            self._queue.update_status(item.id, "failed", "failed to start scan")
+            self._queue_current_item_id = None
+            self.refresh_queue()
+            self.run_next_queue_item()
+
+        self.refresh_queue()
