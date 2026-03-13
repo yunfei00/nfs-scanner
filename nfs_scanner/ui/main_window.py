@@ -5,6 +5,8 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMainWindow, QSplitter, QVBoxLayout, QWidget
 
+from nfs_scanner.core import DeviceManager, ScanManager
+
 from .controls_panel import ControlsPanel
 from .heatmap_view import HeatmapView
 from .log_panel import LogPanel
@@ -16,6 +18,8 @@ class MainWindow(QMainWindow):
 
     def __init__(self) -> None:
         super().__init__()
+        self.device_manager = DeviceManager()
+        self.scan_manager = ScanManager()
         self.controls_panel: ControlsPanel
         self.heatmap_view: HeatmapView
         self.spectrum_panel: SpectrumPanel
@@ -23,6 +27,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("近场扫描系统")
         self.resize(1600, 900)
         self._setup_ui()
+        self._connect_signals()
 
     def _setup_ui(self) -> None:
         """Assemble the main application layout from UI components."""
@@ -59,4 +64,62 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
 
         self.statusBar().showMessage("系统就绪")
-        self.log_panel.append_log("系统启动，基础界面已加载。")
+        self._append_log("[INFO] Application UI initialized")
+
+    def _connect_signals(self) -> None:
+        """Connect UI actions to application-layer handlers."""
+
+        self.controls_panel.serial_connect_button.clicked.connect(self._handle_motion_controller_connect)
+        self.controls_panel.move_button.clicked.connect(self._handle_move_command)
+        self.controls_panel.start_scan_button.clicked.connect(self._handle_start_scan)
+        self.controls_panel.stop_scan_button.clicked.connect(self._handle_stop_scan)
+
+    def _handle_motion_controller_connect(self) -> None:
+        """Handle the placeholder motion-controller connect action."""
+
+        self.device_manager.connect_motion_controller()
+        self.statusBar().showMessage("运动控制器连接请求已记录")
+        self._append_log("[INFO] Motion controller connect requested")
+
+    def _handle_move_command(self) -> None:
+        """Handle the placeholder move command."""
+
+        x_value = self._format_axis_value(self.controls_panel.x_input.text())
+        y_value = self._format_axis_value(self.controls_panel.y_input.text())
+        z_value = self._format_axis_value(self.controls_panel.z_input.text())
+
+        self.statusBar().showMessage("移动命令已记录")
+        self._append_log(f"[INFO] Move command X={x_value} Y={y_value} Z={z_value}")
+
+    def _handle_start_scan(self) -> None:
+        """Handle the placeholder scan-start action."""
+
+        if self.scan_manager.start_scan():
+            self.statusBar().showMessage("扫描已开始")
+            self._append_log("[INFO] Scan started")
+            return
+
+        self.statusBar().showMessage("扫描已在运行")
+        self._append_log("[WARN] Scan is already running")
+
+    def _handle_stop_scan(self) -> None:
+        """Handle the placeholder scan-stop action."""
+
+        if self.scan_manager.stop_scan():
+            self.statusBar().showMessage("扫描已停止")
+            self._append_log("[INFO] Scan stopped")
+            return
+
+        self.statusBar().showMessage("当前没有运行中的扫描")
+        self._append_log("[WARN] No active scan to stop")
+
+    def _append_log(self, message: str) -> None:
+        """Append one message to the log panel."""
+
+        self.log_panel.append_log(message)
+
+    def _format_axis_value(self, value: str) -> str:
+        """Normalize axis input for placeholder command logging."""
+
+        normalized = value.strip()
+        return normalized if normalized else "?"
