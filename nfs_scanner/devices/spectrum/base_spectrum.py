@@ -24,5 +24,5 @@ class SpectrumAnalyzer(ABC):
         """Apply a spectrum acquisition configuration."""
 
     @abstractmethod
-    def acquire_trace(self) -> Sequence[float]:
-        """Acquire one trace from the device."""
+    def acquire_trace(self) -> tuple[Sequence[float], Sequence[float]]:
+        """Acquire one frequency axis and one amplitude trace."""

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 
 class CameraDevice(ABC):
@@ -17,5 +18,5 @@ class CameraDevice(ABC):
         """Close the device connection."""
 
     @abstractmethod
-    def capture_image(self) -> bytes:
+    def capture_image(self) -> Any:
         """Capture one image frame from the device."""
