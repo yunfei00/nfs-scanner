@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import numpy as np
+from numpy.typing import NDArray
+
 
 @dataclass(slots=True)
 class SerialConfig:
@@ -34,3 +37,14 @@ class SpectrumConfig:
     rbw: str = "100kHz"
     lut_name: str = "viridis"
     auto_range: bool = True
+
+
+@dataclass(slots=True)
+class ScanPointResult:
+    """One scan-point result containing position, spectrum and image data."""
+
+    x: float
+    y: float
+    z: float
+    spectrum_trace: tuple[NDArray[np.float64], NDArray[np.float64]]
+    camera_image: NDArray[np.uint8]
