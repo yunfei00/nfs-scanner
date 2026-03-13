@@ -5,7 +5,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMainWindow, QSplitter, QVBoxLayout, QWidget
 
-from nfs_scanner.core import DeviceManager, ScanManager
+from nfs_scanner.core import DeviceManager, ScanManager, SpectrumConfig
 
 from .controls_panel import ControlsPanel
 from .heatmap_view import HeatmapView
@@ -73,6 +73,13 @@ class MainWindow(QMainWindow):
         self.controls_panel.move_button.clicked.connect(self._handle_move_command)
         self.controls_panel.start_scan_button.clicked.connect(self._handle_start_scan)
         self.controls_panel.stop_scan_button.clicked.connect(self._handle_stop_scan)
+        self.spectrum_panel.device_connect_button.clicked.connect(self._handle_spectrum_device_connect)
+        self.spectrum_panel.device_type_combo.currentTextChanged.connect(self._handle_spectrum_config_changed)
+        self.spectrum_panel.start_freq_input.textChanged.connect(self._handle_spectrum_config_changed)
+        self.spectrum_panel.stop_freq_input.textChanged.connect(self._handle_spectrum_config_changed)
+        self.spectrum_panel.rbw_input.textChanged.connect(self._handle_spectrum_config_changed)
+        self.spectrum_panel.lut_combo.currentTextChanged.connect(self._handle_spectrum_config_changed)
+        self.spectrum_panel.auto_range_checkbox.toggled.connect(self._handle_spectrum_config_changed)
 
     def _handle_motion_controller_connect(self) -> None:
         """Handle the placeholder motion-controller connect action."""
@@ -113,10 +120,39 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("当前没有运行中的扫描")
         self._append_log("[WARN] No active scan to stop")
 
+    def _handle_spectrum_device_connect(self) -> None:
+        """Handle the placeholder spectrum-device connect action."""
+
+        device_type = self.spectrum_panel.get_selected_device_type()
+        spectrum_config = self.spectrum_panel.get_spectrum_config()
+
+        self.device_manager.connect_spectrum_device()
+        self.statusBar().showMessage("频谱设备连接请求已记录")
+        self._append_log(f"[INFO] Spectrum device connect requested: {device_type}")
+        self._append_spectrum_config_log(spectrum_config)
+
+    def _handle_spectrum_config_changed(self, *_: object) -> None:
+        """Handle right-panel parameter updates."""
+
+        spectrum_config = self.spectrum_panel.get_spectrum_config()
+        self._append_spectrum_config_log(spectrum_config)
+
     def _append_log(self, message: str) -> None:
         """Append one message to the log panel."""
 
         self.log_panel.append_log(message)
+
+    def _append_spectrum_config_log(self, spectrum_config: SpectrumConfig) -> None:
+        """Write one spectrum configuration snapshot to the log panel."""
+
+        self._append_log(
+            "[INFO] Spectrum config updated: "
+            f"start={spectrum_config.start_freq} "
+            f"stop={spectrum_config.stop_freq} "
+            f"rbw={spectrum_config.rbw} "
+            f"lut={spectrum_config.lut_name} "
+            f"auto_range={spectrum_config.auto_range}"
+        )
 
     def _format_axis_value(self, value: str) -> str:
         """Normalize axis input for placeholder command logging."""

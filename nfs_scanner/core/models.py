@@ -29,9 +29,8 @@ class ScanConfig:
 class SpectrumConfig:
     """Basic spectrum acquisition and display parameters."""
 
-    device_type: str = "频谱仪"
-    start_freq_hz: float = 1.0e9
-    stop_freq_hz: float = 6.0e9
-    rbw_hz: float = 1.0e5
-    lut: str = "Viridis"
+    start_freq: str = "100MHz"
+    stop_freq: str = "3GHz"
+    rbw: str = "100kHz"
+    lut_name: str = "viridis"
     auto_range: bool = True

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from nfs_scanner.core import SpectrumConfig
+
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -17,6 +19,10 @@ from PySide6.QtWidgets import (
 
 class SpectrumPanel(QWidget):
     """Right-side structured panel for spectrum-related settings."""
+
+    DEFAULT_START_FREQ = "100MHz"
+    DEFAULT_STOP_FREQ = "3GHz"
+    DEFAULT_RBW = "100kHz"
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -52,7 +58,7 @@ class SpectrumPanel(QWidget):
         layout.setSpacing(10)
 
         self.device_type_combo = QComboBox(group_box)
-        self.device_type_combo.addItems(["频谱仪（后续适配）", "接收设备（后续适配）"])
+        self.device_type_combo.addItems(["TCPIP-SCPI", "USB-TMC", "Mock-Spectrum"])
 
         self.device_connect_button = QPushButton("连接", group_box)
 
@@ -71,9 +77,9 @@ class SpectrumPanel(QWidget):
         layout.setContentsMargins(12, 16, 12, 12)
         layout.setSpacing(10)
 
-        self.start_freq_input = self._create_input("例如 1.0 GHz", group_box)
-        self.stop_freq_input = self._create_input("例如 6.0 GHz", group_box)
-        self.rbw_input = self._create_input("例如 100 kHz", group_box)
+        self.start_freq_input = self._create_input(self.DEFAULT_START_FREQ, group_box)
+        self.stop_freq_input = self._create_input(self.DEFAULT_STOP_FREQ, group_box)
+        self.rbw_input = self._create_input(self.DEFAULT_RBW, group_box)
 
         layout.addRow("Start Freq", self.start_freq_input)
         layout.addRow("Stop Freq", self.stop_freq_input)
@@ -92,7 +98,7 @@ class SpectrumPanel(QWidget):
         layout.setSpacing(10)
 
         self.lut_combo = QComboBox(group_box)
-        self.lut_combo.addItems(["Viridis", "Jet", "Gray", "Hot"])
+        self.lut_combo.addItems(["viridis", "jet", "gray", "hot"])
 
         self.auto_range_checkbox = QCheckBox("启用自动范围", group_box)
         self.auto_range_checkbox.setChecked(True)
@@ -102,9 +108,31 @@ class SpectrumPanel(QWidget):
 
         return group_box
 
-    def _create_input(self, placeholder: str, parent: QWidget) -> QLineEdit:
-        """Create a line edit with placeholder text."""
+    def get_selected_device_type(self) -> str:
+        """Return the selected placeholder spectrum-device type."""
+
+        return self.device_type_combo.currentText().strip()
+
+    def get_spectrum_config(self) -> SpectrumConfig:
+        """Return the current spectrum parameter snapshot."""
+
+        return SpectrumConfig(
+            start_freq=self._get_text_or_default(self.start_freq_input, self.DEFAULT_START_FREQ),
+            stop_freq=self._get_text_or_default(self.stop_freq_input, self.DEFAULT_STOP_FREQ),
+            rbw=self._get_text_or_default(self.rbw_input, self.DEFAULT_RBW),
+            lut_name=self.lut_combo.currentText().strip(),
+            auto_range=self.auto_range_checkbox.isChecked(),
+        )
+
+    def _create_input(self, default_value: str, parent: QWidget) -> QLineEdit:
+        """Create a line edit with a default placeholder value."""
 
         line_edit = QLineEdit(parent)
-        line_edit.setPlaceholderText(placeholder)
+        line_edit.setText(default_value)
         return line_edit
+
+    def _get_text_or_default(self, line_edit: QLineEdit, default_value: str) -> str:
+        """Return the current field text or a fallback default."""
+
+        value = line_edit.text().strip()
+        return value if value else default_value
