@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
 from numpy.typing import NDArray
@@ -18,7 +19,7 @@ class SerialConfig:
 
 @dataclass(slots=True)
 class ScanConfig:
-    """Basic scan-range parameters."""
+    """Basic scan-range parameters for grid or line scans."""
 
     start_x: float = 0.0
     stop_x: float = 100.0
@@ -26,6 +27,8 @@ class ScanConfig:
     start_y: float = 0.0
     stop_y: float = 100.0
     step_y: float = 1.0
+    z_height: float = 5.0
+    scan_mode: Literal["grid", "line"] = "grid"
 
 
 @dataclass(slots=True)

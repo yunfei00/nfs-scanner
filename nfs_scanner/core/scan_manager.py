@@ -57,7 +57,41 @@ class ScanManager:
         return True
 
     def run_grid_scan(self, x_points: Sequence[float], y_points: Sequence[float], z: float) -> list[ScanPointResult]:
-        """Run a mock grid scan and store all point results in memory."""
+        """Run a mock grid scan from explicit point lists."""
+
+        return self._execute_scan(x_points, y_points, z)
+
+    def generate_grid_points(self, config: ScanConfig) -> tuple[list[float], list[float]]:
+        """Generate inclusive scan points from a scan configuration."""
+
+        x_points = self._generate_axis_points(config.start_x, config.stop_x, config.step_x)
+        if config.scan_mode == "line":
+            y_points = [float(config.start_y)]
+        elif config.scan_mode == "grid":
+            y_points = self._generate_axis_points(config.start_y, config.stop_y, config.step_y)
+        else:
+            raise ValueError(f"Unsupported scan mode: {config.scan_mode!r}")
+
+        return x_points, y_points
+
+    def run_scan(self, config: ScanConfig) -> list[ScanPointResult]:
+        """Run one mock scan from a scan configuration."""
+
+        if self.is_scanning:
+            raise RuntimeError("Scan is already running.")
+
+        x_points, y_points = self.generate_grid_points(config)
+        total_points = len(x_points) * len(y_points)
+
+        self._logger.info("[SCAN] start scan")
+        self._logger.info("[SCAN] total points: %s", total_points)
+
+        results = self._execute_scan(x_points, y_points, config.z_height)
+        self._logger.info("[SCAN] scan finished")
+        return results
+
+    def _execute_scan(self, x_points: Sequence[float], y_points: Sequence[float], z: float) -> list[ScanPointResult]:
+        """Execute one mock scan over explicit axis point lists."""
 
         if not self.start_scan():
             raise RuntimeError("Scan is already running.")
@@ -101,3 +135,27 @@ class ScanManager:
             self.stop_scan()
 
         return self.results
+
+    def _generate_axis_points(self, start: float, stop: float, step: float) -> list[float]:
+        """Generate an inclusive point list for one scan axis."""
+
+        start_value = float(start)
+        stop_value = float(stop)
+        step_value = float(step)
+
+        if step_value <= 0.0:
+            raise ValueError("Scan step must be greater than zero.")
+        if stop_value < start_value:
+            raise ValueError("Scan stop must be greater than or equal to scan start.")
+
+        points: list[float] = []
+        current = start_value
+        epsilon = step_value * 1.0e-9
+        while current <= stop_value + epsilon:
+            points.append(round(current, 10))
+            current += step_value
+
+        if not points or points[-1] != round(stop_value, 10):
+            points.append(round(stop_value, 10))
+
+        return points
