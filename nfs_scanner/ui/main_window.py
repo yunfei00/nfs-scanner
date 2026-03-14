@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import numpy as np
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMainWindow, QSplitter, QVBoxLayout, QWidget
 
@@ -62,6 +63,7 @@ class MainWindow(QMainWindow):
 
         root_layout.addWidget(bottom_splitter)
         self.setCentralWidget(central_widget)
+        self._load_demo_heatmap()
 
         self.statusBar().showMessage("系统就绪")
         self._append_log("[INFO] Application UI initialized")
@@ -80,6 +82,13 @@ class MainWindow(QMainWindow):
         self.spectrum_panel.rbw_input.textChanged.connect(self._handle_spectrum_config_changed)
         self.spectrum_panel.lut_combo.currentTextChanged.connect(self._handle_spectrum_config_changed)
         self.spectrum_panel.auto_range_checkbox.toggled.connect(self._handle_spectrum_config_changed)
+
+    def _load_demo_heatmap(self) -> None:
+        """Load a placeholder random heatmap when the UI starts."""
+
+        demo_matrix = np.random.default_rng(20260314).random((20, 20))
+        self.heatmap_view.set_heatmap(demo_matrix)
+        self.heatmap_view.set_status_text("热力图视图（示例数据）")
 
     def _handle_motion_controller_connect(self) -> None:
         """Handle the placeholder motion-controller connect action."""
