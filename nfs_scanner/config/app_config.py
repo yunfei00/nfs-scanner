@@ -22,7 +22,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "step_y": "1",
         "scan_mode": "snake",
     },
-    "last_device_selection": "TCPIP-SCPI",
+    "spectrum_start_freq": "100MHz",
+    "spectrum_stop_freq": "3GHz",
+    "spectrum_rbw": "100kHz",
+    "spectrum_device_type": "TCPIP-SCPI",
 }
 
 
@@ -84,8 +87,17 @@ def _normalize_config(payload: Any) -> dict[str, Any]:
         if isinstance(scan_mode, str) and scan_mode in SCAN_MODE_VALUES:
             config["scan"]["scan_mode"] = scan_mode
 
-    last_device_selection = payload.get("last_device_selection")
-    if isinstance(last_device_selection, str) and last_device_selection.strip():
-        config["last_device_selection"] = last_device_selection.strip()
+    for field_name in ("spectrum_start_freq", "spectrum_stop_freq", "spectrum_rbw"):
+        value = payload.get(field_name)
+        if value is not None:
+            config[field_name] = str(value)
+
+    spectrum_device_type = payload.get("spectrum_device_type")
+    if isinstance(spectrum_device_type, str) and spectrum_device_type.strip():
+        config["spectrum_device_type"] = spectrum_device_type.strip()
+    else:
+        last_device_selection = payload.get("last_device_selection")
+        if isinstance(last_device_selection, str) and last_device_selection.strip():
+            config["spectrum_device_type"] = last_device_selection.strip()
 
     return config

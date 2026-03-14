@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any, Mapping
+
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -123,6 +125,34 @@ class SpectrumPanel(QWidget):
         if index >= 0:
             self.device_type_combo.setCurrentIndex(index)
 
+    def get_persistent_settings(self) -> dict[str, str]:
+        """Return spectrum settings that should persist across app runs."""
+
+        return {
+            "spectrum_start_freq": self._get_text_or_default(
+                self.start_freq_input, self.DEFAULT_START_FREQ
+            ),
+            "spectrum_stop_freq": self._get_text_or_default(
+                self.stop_freq_input, self.DEFAULT_STOP_FREQ
+            ),
+            "spectrum_rbw": self._get_text_or_default(self.rbw_input, self.DEFAULT_RBW),
+            "spectrum_device_type": self.get_selected_device_type() or self.DEFAULT_DEVICE_TYPE,
+        }
+
+    def apply_persistent_settings(self, settings: Mapping[str, Any]) -> None:
+        """Apply persisted spectrum settings back into the panel."""
+
+        self.start_freq_input.setText(
+            self._coerce_setting(settings.get("spectrum_start_freq"), self.DEFAULT_START_FREQ)
+        )
+        self.stop_freq_input.setText(
+            self._coerce_setting(settings.get("spectrum_stop_freq"), self.DEFAULT_STOP_FREQ)
+        )
+        self.rbw_input.setText(self._coerce_setting(settings.get("spectrum_rbw"), self.DEFAULT_RBW))
+        self.set_selected_device_type(
+            self._coerce_setting(settings.get("spectrum_device_type"), self.DEFAULT_DEVICE_TYPE)
+        )
+
     def get_spectrum_config(self) -> SpectrumConfig:
         """Return the current spectrum parameter snapshot."""
 
@@ -146,3 +176,11 @@ class SpectrumPanel(QWidget):
 
         value = line_edit.text().strip()
         return value if value else default_value
+
+    def _coerce_setting(self, value: Any, default_value: str) -> str:
+        """Convert one persisted setting into a safe line-edit value."""
+
+        if value is None:
+            return default_value
+        text = str(value).strip()
+        return text if text else default_value

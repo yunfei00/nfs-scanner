@@ -87,14 +87,18 @@ class MainWindow(QMainWindow):
 
         self.spectrum_panel.device_connect_button.clicked.connect(self._handle_spectrum_device_connect)
         self.spectrum_panel.device_type_combo.currentTextChanged.connect(self._handle_spectrum_config_changed)
-        self.spectrum_panel.device_type_combo.currentTextChanged.connect(
-            self._handle_last_device_selection_changed
-        )
+        self.spectrum_panel.device_type_combo.currentTextChanged.connect(self._handle_spectrum_settings_changed)
         self.spectrum_panel.start_freq_input.textChanged.connect(self._handle_spectrum_config_changed)
         self.spectrum_panel.stop_freq_input.textChanged.connect(self._handle_spectrum_config_changed)
         self.spectrum_panel.rbw_input.textChanged.connect(self._handle_spectrum_config_changed)
         self.spectrum_panel.lut_combo.currentTextChanged.connect(self._handle_spectrum_config_changed)
         self.spectrum_panel.auto_range_checkbox.toggled.connect(self._handle_spectrum_config_changed)
+        self.spectrum_panel.start_freq_input.textChanged.connect(self._sync_spectrum_settings)
+        self.spectrum_panel.stop_freq_input.textChanged.connect(self._sync_spectrum_settings)
+        self.spectrum_panel.rbw_input.textChanged.connect(self._sync_spectrum_settings)
+        self.spectrum_panel.start_freq_input.editingFinished.connect(self._handle_spectrum_settings_changed)
+        self.spectrum_panel.stop_freq_input.editingFinished.connect(self._handle_spectrum_settings_changed)
+        self.spectrum_panel.rbw_input.editingFinished.connect(self._handle_spectrum_settings_changed)
 
     def _load_demo_heatmap(self) -> None:
         """Load a placeholder random heatmap when the UI starts."""
@@ -202,10 +206,15 @@ class MainWindow(QMainWindow):
         spectrum_config = self.spectrum_panel.get_spectrum_config()
         self._append_spectrum_config_log(spectrum_config)
 
-    def _handle_last_device_selection_changed(self, *_: object) -> None:
-        """Persist the last selected spectrum-device type."""
+    def _handle_spectrum_settings_changed(self, *_: object) -> None:
+        """Persist spectrum settings after one relevant UI change."""
 
-        self._save_persistent_config()
+        self._save_persistent_config(include_scan_log=False, include_spectrum_log=True)
+
+    def _sync_spectrum_settings(self, *_: object) -> None:
+        """Persist spectrum settings immediately without adding extra log noise."""
+
+        self._save_persistent_config(include_scan_log=False, include_spectrum_log=False)
 
     def _handle_persistent_config_changed(self) -> None:
         """Persist scan parameters after the user edits one field."""
@@ -240,18 +249,20 @@ class MainWindow(QMainWindow):
 
         config = load_config()
         self.controls_panel.apply_persistent_scan_settings(config.get("scan", {}))
-        self.spectrum_panel.set_selected_device_type(
-            str(config.get("last_device_selection", self.spectrum_panel.DEFAULT_DEVICE_TYPE))
-        )
+        self.spectrum_panel.apply_persistent_settings(config)
         self._append_log("[CONFIG] config loaded")
+        self._append_log("[CONFIG] spectrum settings loaded")
 
-    def _save_persistent_config(self) -> None:
+    def _save_persistent_config(
+        self,
+        *,
+        include_scan_log: bool = True,
+        include_spectrum_log: bool = False,
+    ) -> None:
         """Save current persistent UI configuration to disk."""
 
-        config = {
-            "scan": self.controls_panel.get_persistent_scan_settings(),
-            "last_device_selection": self.spectrum_panel.get_selected_device_type(),
-        }
+        config = {"scan": self.controls_panel.get_persistent_scan_settings()}
+        config.update(self.spectrum_panel.get_persistent_settings())
 
         try:
             save_config(config)
@@ -259,7 +270,10 @@ class MainWindow(QMainWindow):
             self._append_log(f"[WARN] Config save failed: {error}")
             return
 
-        self._append_log("[CONFIG] config saved")
+        if include_scan_log:
+            self._append_log("[CONFIG] config saved")
+        if include_spectrum_log:
+            self._append_log("[CONFIG] spectrum settings saved")
 
     def _get_persistent_scan_inputs(self) -> tuple[QLineEdit, ...]:
         """Return scan inputs that should trigger config persistence."""
