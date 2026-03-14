@@ -36,6 +36,7 @@ class ControlsPanel(QWidget):
         self.scan_start_y_input: QLineEdit
         self.scan_stop_y_input: QLineEdit
         self.scan_step_y_input: QLineEdit
+        self.scan_mode_combo: QComboBox
         self.start_scan_button: QPushButton
         self.stop_scan_button: QPushButton
         self._setup_ui()
@@ -133,6 +134,9 @@ class ControlsPanel(QWidget):
         self.scan_start_y_input.setText("0")
         self.scan_stop_y_input.setText("4")
         self.scan_step_y_input.setText("1")
+        self.scan_mode_combo = QComboBox(group_box)
+        self.scan_mode_combo.addItems(["raster", "snake"])
+        self.scan_mode_combo.setCurrentText("snake")
 
         self.start_scan_button = QPushButton("开始扫描", group_box)
         self.stop_scan_button = QPushButton("停止扫描", group_box)
@@ -150,6 +154,7 @@ class ControlsPanel(QWidget):
         layout.addRow("起始Y", self.scan_start_y_input)
         layout.addRow("终止Y", self.scan_stop_y_input)
         layout.addRow("步长Y", self.scan_step_y_input)
+        layout.addRow("Scan Mode", self.scan_mode_combo)
         layout.addRow("", button_container)
 
         return group_box
@@ -173,7 +178,7 @@ class ControlsPanel(QWidget):
             stop_y=self._read_float(self.scan_stop_y_input, defaults.stop_y),
             step_y=self._read_float(self.scan_step_y_input, defaults.step_y),
             z_height=self._read_float(self.z_input, defaults.z_height),
-            scan_mode=defaults.scan_mode,
+            scan_mode=self.scan_mode_combo.currentText().strip() or defaults.scan_mode,
         )
 
     def _read_float(self, line_edit: QLineEdit, default_value: float) -> float:

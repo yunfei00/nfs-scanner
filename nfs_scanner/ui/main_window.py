@@ -79,6 +79,7 @@ class MainWindow(QMainWindow):
         self.controls_panel.move_button.clicked.connect(self._handle_move_command)
         self.controls_panel.start_scan_button.clicked.connect(self._handle_start_scan)
         self.controls_panel.stop_scan_button.clicked.connect(self._handle_stop_scan)
+        self.controls_panel.scan_mode_combo.currentTextChanged.connect(self._handle_scan_mode_changed)
         self.spectrum_panel.device_connect_button.clicked.connect(self._handle_spectrum_device_connect)
         self.spectrum_panel.device_type_combo.currentTextChanged.connect(self._handle_spectrum_config_changed)
         self.spectrum_panel.start_freq_input.textChanged.connect(self._handle_spectrum_config_changed)
@@ -93,6 +94,11 @@ class MainWindow(QMainWindow):
         demo_matrix = np.random.default_rng(20260314).random((20, 20))
         self.heatmap_view.set_heatmap(demo_matrix)
         self.heatmap_view.set_status_text("热力图视图（示例数据）")
+
+    def _handle_scan_mode_changed(self, scan_mode: str) -> None:
+        """Log the current scan traversal mode selected in the UI."""
+
+        self._append_log(f"[UI] scan mode selected: {scan_mode}")
 
     def _handle_motion_controller_connect(self) -> None:
         """Handle the placeholder motion-controller connect action."""
@@ -129,6 +135,8 @@ class MainWindow(QMainWindow):
         self.dataset_manager.create_dataset(scan_config)
         self.heatmap_view.set_status_text("热力图视图（扫描中）")
         self.statusBar().showMessage("扫描执行中")
+        self._append_log(f"[UI] scan mode selected: {scan_config.scan_mode}")
+        self._append_log(f"[SCAN] mode={scan_config.scan_mode}")
         self._append_log("[SCAN] start scan")
 
         try:
