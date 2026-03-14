@@ -99,6 +99,8 @@ class MainWindow(QMainWindow):
         self.spectrum_panel.start_freq_input.editingFinished.connect(self._handle_spectrum_settings_changed)
         self.spectrum_panel.stop_freq_input.editingFinished.connect(self._handle_spectrum_settings_changed)
         self.spectrum_panel.rbw_input.editingFinished.connect(self._handle_spectrum_settings_changed)
+        self.heatmap_view.settings_changed.connect(self._sync_heatmap_settings)
+        self.heatmap_view.settings_committed.connect(self._handle_heatmap_settings_changed)
 
     def _load_demo_heatmap(self) -> None:
         """Load a placeholder random heatmap when the UI starts."""
@@ -216,6 +218,16 @@ class MainWindow(QMainWindow):
 
         self._save_persistent_config(include_scan_log=False, include_spectrum_log=False)
 
+    def _handle_heatmap_settings_changed(self) -> None:
+        """Persist heatmap settings after one committed UI change."""
+
+        self._save_persistent_config(include_scan_log=False, include_heatmap_log=True)
+
+    def _sync_heatmap_settings(self) -> None:
+        """Persist heatmap settings immediately without extra log noise."""
+
+        self._save_persistent_config(include_scan_log=False, include_heatmap_log=False)
+
     def _handle_persistent_config_changed(self) -> None:
         """Persist scan parameters after the user edits one field."""
 
@@ -250,19 +262,23 @@ class MainWindow(QMainWindow):
         config = load_config()
         self.controls_panel.apply_persistent_scan_settings(config.get("scan", {}))
         self.spectrum_panel.apply_persistent_settings(config)
+        self.heatmap_view.apply_persistent_settings(config)
         self._append_log("[CONFIG] config loaded")
         self._append_log("[CONFIG] spectrum settings loaded")
+        self._append_log("[CONFIG] heatmap settings loaded")
 
     def _save_persistent_config(
         self,
         *,
         include_scan_log: bool = True,
         include_spectrum_log: bool = False,
+        include_heatmap_log: bool = False,
     ) -> None:
         """Save current persistent UI configuration to disk."""
 
         config = {"scan": self.controls_panel.get_persistent_scan_settings()}
         config.update(self.spectrum_panel.get_persistent_settings())
+        config.update(self.heatmap_view.get_persistent_settings())
 
         try:
             save_config(config)
@@ -274,6 +290,8 @@ class MainWindow(QMainWindow):
             self._append_log("[CONFIG] config saved")
         if include_spectrum_log:
             self._append_log("[CONFIG] spectrum settings saved")
+        if include_heatmap_log:
+            self._append_log("[CONFIG] heatmap settings saved")
 
     def _get_persistent_scan_inputs(self) -> tuple[QLineEdit, ...]:
         """Return scan inputs that should trigger config persistence."""

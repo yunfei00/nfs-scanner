@@ -26,6 +26,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "spectrum_stop_freq": "3GHz",
     "spectrum_rbw": "100kHz",
     "spectrum_device_type": "TCPIP-SCPI",
+    "heatmap_colormap": "viridis",
+    "heatmap_auto_range": True,
+    "heatmap_scale_min": 0.0,
+    "heatmap_scale_max": 1.0,
 }
 
 
@@ -99,5 +103,28 @@ def _normalize_config(payload: Any) -> dict[str, Any]:
         last_device_selection = payload.get("last_device_selection")
         if isinstance(last_device_selection, str) and last_device_selection.strip():
             config["spectrum_device_type"] = last_device_selection.strip()
+
+    heatmap_colormap = payload.get("heatmap_colormap")
+    if isinstance(heatmap_colormap, str) and heatmap_colormap.strip():
+        config["heatmap_colormap"] = heatmap_colormap.strip()
+
+    heatmap_auto_range = payload.get("heatmap_auto_range")
+    if isinstance(heatmap_auto_range, bool):
+        config["heatmap_auto_range"] = heatmap_auto_range
+    elif isinstance(heatmap_auto_range, str):
+        normalized_auto_range = heatmap_auto_range.strip().lower()
+        if normalized_auto_range in {"true", "1", "yes", "on"}:
+            config["heatmap_auto_range"] = True
+        elif normalized_auto_range in {"false", "0", "no", "off"}:
+            config["heatmap_auto_range"] = False
+
+    for field_name in ("heatmap_scale_min", "heatmap_scale_max"):
+        value = payload.get(field_name)
+        if value is None:
+            continue
+        try:
+            config[field_name] = float(value)
+        except (TypeError, ValueError):
+            continue
 
     return config
