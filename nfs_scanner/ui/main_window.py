@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import numpy as np
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QMainWindow, QSplitter, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QLineEdit, QMainWindow, QSplitter, QVBoxLayout, QWidget
 
 from nfs_scanner.analysis import HeatmapGenerator
+from nfs_scanner.config import load_config, save_config
 from nfs_scanner.core import DeviceManager, ScanManager, ScanPointResult, SpectrumConfig
 from nfs_scanner.storage import DatasetManager
 
@@ -32,6 +33,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("近场扫描系统")
         self.resize(1600, 900)
         self._setup_ui()
+        self._load_persistent_config()
         self._connect_signals()
 
     def _setup_ui(self) -> None:
@@ -53,7 +55,6 @@ class MainWindow(QMainWindow):
         top_splitter.addWidget(self.controls_panel)
         top_splitter.addWidget(self.heatmap_view)
         top_splitter.addWidget(self.spectrum_panel)
-
         top_splitter.setStretchFactor(0, 0)
         top_splitter.setStretchFactor(1, 1)
         top_splitter.setStretchFactor(2, 0)
@@ -80,8 +81,15 @@ class MainWindow(QMainWindow):
         self.controls_panel.start_scan_button.clicked.connect(self._handle_start_scan)
         self.controls_panel.stop_scan_button.clicked.connect(self._handle_stop_scan)
         self.controls_panel.scan_mode_combo.currentTextChanged.connect(self._handle_scan_mode_changed)
+
+        for scan_input in self._get_persistent_scan_inputs():
+            scan_input.editingFinished.connect(self._handle_persistent_config_changed)
+
         self.spectrum_panel.device_connect_button.clicked.connect(self._handle_spectrum_device_connect)
         self.spectrum_panel.device_type_combo.currentTextChanged.connect(self._handle_spectrum_config_changed)
+        self.spectrum_panel.device_type_combo.currentTextChanged.connect(
+            self._handle_last_device_selection_changed
+        )
         self.spectrum_panel.start_freq_input.textChanged.connect(self._handle_spectrum_config_changed)
         self.spectrum_panel.stop_freq_input.textChanged.connect(self._handle_spectrum_config_changed)
         self.spectrum_panel.rbw_input.textChanged.connect(self._handle_spectrum_config_changed)
@@ -99,6 +107,7 @@ class MainWindow(QMainWindow):
         """Log the current scan traversal mode selected in the UI."""
 
         self._append_log(f"[UI] scan mode selected: {scan_mode}")
+        self._save_persistent_config()
 
     def _handle_motion_controller_connect(self) -> None:
         """Handle the placeholder motion-controller connect action."""
@@ -193,6 +202,16 @@ class MainWindow(QMainWindow):
         spectrum_config = self.spectrum_panel.get_spectrum_config()
         self._append_spectrum_config_log(spectrum_config)
 
+    def _handle_last_device_selection_changed(self, *_: object) -> None:
+        """Persist the last selected spectrum-device type."""
+
+        self._save_persistent_config()
+
+    def _handle_persistent_config_changed(self) -> None:
+        """Persist scan parameters after the user edits one field."""
+
+        self._save_persistent_config()
+
     def _append_log(self, message: str) -> None:
         """Append one message to the log panel."""
 
@@ -215,3 +234,41 @@ class MainWindow(QMainWindow):
 
         normalized = value.strip()
         return normalized if normalized else "?"
+
+    def _load_persistent_config(self) -> None:
+        """Load persistent UI configuration and apply it to widgets."""
+
+        config = load_config()
+        self.controls_panel.apply_persistent_scan_settings(config.get("scan", {}))
+        self.spectrum_panel.set_selected_device_type(
+            str(config.get("last_device_selection", self.spectrum_panel.DEFAULT_DEVICE_TYPE))
+        )
+        self._append_log("[CONFIG] config loaded")
+
+    def _save_persistent_config(self) -> None:
+        """Save current persistent UI configuration to disk."""
+
+        config = {
+            "scan": self.controls_panel.get_persistent_scan_settings(),
+            "last_device_selection": self.spectrum_panel.get_selected_device_type(),
+        }
+
+        try:
+            save_config(config)
+        except OSError as error:
+            self._append_log(f"[WARN] Config save failed: {error}")
+            return
+
+        self._append_log("[CONFIG] config saved")
+
+    def _get_persistent_scan_inputs(self) -> tuple[QLineEdit, ...]:
+        """Return scan inputs that should trigger config persistence."""
+
+        return (
+            self.controls_panel.scan_start_x_input,
+            self.controls_panel.scan_stop_x_input,
+            self.controls_panel.scan_step_x_input,
+            self.controls_panel.scan_start_y_input,
+            self.controls_panel.scan_stop_y_input,
+            self.controls_panel.scan_step_y_input,
+        )

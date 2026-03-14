@@ -1,8 +1,6 @@
-"""Right-side spectrum settings placeholder panel."""
+"""Right-side spectrum settings panel."""
 
 from __future__ import annotations
-
-from nfs_scanner.core import SpectrumConfig
 
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -16,10 +14,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from nfs_scanner.core import SpectrumConfig
+
 
 class SpectrumPanel(QWidget):
     """Right-side structured panel for spectrum-related settings."""
 
+    DEFAULT_DEVICE_TYPE = "TCPIP-SCPI"
     DEFAULT_START_FREQ = "100MHz"
     DEFAULT_STOP_FREQ = "3GHz"
     DEFAULT_RBW = "100kHz"
@@ -59,6 +60,7 @@ class SpectrumPanel(QWidget):
 
         self.device_type_combo = QComboBox(group_box)
         self.device_type_combo.addItems(["TCPIP-SCPI", "USB-TMC", "Mock-Spectrum"])
+        self.device_type_combo.setCurrentText(self.DEFAULT_DEVICE_TYPE)
 
         self.device_connect_button = QPushButton("连接", group_box)
 
@@ -112,6 +114,14 @@ class SpectrumPanel(QWidget):
         """Return the selected placeholder spectrum-device type."""
 
         return self.device_type_combo.currentText().strip()
+
+    def set_selected_device_type(self, device_type: str) -> None:
+        """Apply the last persisted spectrum-device selection."""
+
+        normalized = device_type.strip() or self.DEFAULT_DEVICE_TYPE
+        index = self.device_type_combo.findText(normalized)
+        if index >= 0:
+            self.device_type_combo.setCurrentIndex(index)
 
     def get_spectrum_config(self) -> SpectrumConfig:
         """Return the current spectrum parameter snapshot."""

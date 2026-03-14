@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from nfs_scanner.core import ScanConfig
+from typing import Any, Mapping
 
 from PySide6.QtWidgets import (
     QComboBox,
@@ -16,9 +16,22 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from nfs_scanner.core import ScanConfig
+
 
 class ControlsPanel(QWidget):
     """Left-side structured panel for control-related parameters."""
+
+    DEFAULT_X_VALUE = "0"
+    DEFAULT_Y_VALUE = "0"
+    DEFAULT_Z_VALUE = "5"
+    DEFAULT_SCAN_START_X = "0"
+    DEFAULT_SCAN_STOP_X = "4"
+    DEFAULT_SCAN_STEP_X = "1"
+    DEFAULT_SCAN_START_Y = "0"
+    DEFAULT_SCAN_STOP_Y = "4"
+    DEFAULT_SCAN_STEP_Y = "1"
+    DEFAULT_SCAN_MODE = "snake"
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -91,9 +104,9 @@ class ControlsPanel(QWidget):
         self.x_input = self._create_axis_input(group_box)
         self.y_input = self._create_axis_input(group_box)
         self.z_input = self._create_axis_input(group_box)
-        self.x_input.setText("0")
-        self.y_input.setText("0")
-        self.z_input.setText("5")
+        self.x_input.setText(self.DEFAULT_X_VALUE)
+        self.y_input.setText(self.DEFAULT_Y_VALUE)
+        self.z_input.setText(self.DEFAULT_Z_VALUE)
 
         self.move_button = QPushButton("移动", group_box)
         self.home_button = QPushButton("回零", group_box)
@@ -128,15 +141,16 @@ class ControlsPanel(QWidget):
         self.scan_start_y_input = self._create_axis_input(group_box)
         self.scan_stop_y_input = self._create_axis_input(group_box)
         self.scan_step_y_input = self._create_axis_input(group_box)
-        self.scan_start_x_input.setText("0")
-        self.scan_stop_x_input.setText("4")
-        self.scan_step_x_input.setText("1")
-        self.scan_start_y_input.setText("0")
-        self.scan_stop_y_input.setText("4")
-        self.scan_step_y_input.setText("1")
+        self.scan_start_x_input.setText(self.DEFAULT_SCAN_START_X)
+        self.scan_stop_x_input.setText(self.DEFAULT_SCAN_STOP_X)
+        self.scan_step_x_input.setText(self.DEFAULT_SCAN_STEP_X)
+        self.scan_start_y_input.setText(self.DEFAULT_SCAN_START_Y)
+        self.scan_stop_y_input.setText(self.DEFAULT_SCAN_STOP_Y)
+        self.scan_step_y_input.setText(self.DEFAULT_SCAN_STEP_Y)
+
         self.scan_mode_combo = QComboBox(group_box)
         self.scan_mode_combo.addItems(["raster", "snake"])
-        self.scan_mode_combo.setCurrentText("snake")
+        self.scan_mode_combo.setCurrentText(self.DEFAULT_SCAN_MODE)
 
         self.start_scan_button = QPushButton("开始扫描", group_box)
         self.stop_scan_button = QPushButton("停止扫描", group_box)
@@ -154,7 +168,7 @@ class ControlsPanel(QWidget):
         layout.addRow("起始Y", self.scan_start_y_input)
         layout.addRow("终止Y", self.scan_stop_y_input)
         layout.addRow("步长Y", self.scan_step_y_input)
-        layout.addRow("Scan Mode", self.scan_mode_combo)
+        layout.addRow("扫描模式", self.scan_mode_combo)
         layout.addRow("", button_container)
 
         return group_box
@@ -169,7 +183,16 @@ class ControlsPanel(QWidget):
     def get_scan_config(self) -> ScanConfig:
         """Build a scan configuration from the current UI values."""
 
-        defaults = ScanConfig()
+        defaults = ScanConfig(
+            start_x=float(self.DEFAULT_SCAN_START_X),
+            stop_x=float(self.DEFAULT_SCAN_STOP_X),
+            step_x=float(self.DEFAULT_SCAN_STEP_X),
+            start_y=float(self.DEFAULT_SCAN_START_Y),
+            stop_y=float(self.DEFAULT_SCAN_STOP_Y),
+            step_y=float(self.DEFAULT_SCAN_STEP_Y),
+            z_height=float(self.DEFAULT_Z_VALUE),
+            scan_mode=self.DEFAULT_SCAN_MODE,
+        )
         return ScanConfig(
             start_x=self._read_float(self.scan_start_x_input, defaults.start_x),
             stop_x=self._read_float(self.scan_stop_x_input, defaults.stop_x),
@@ -181,6 +204,45 @@ class ControlsPanel(QWidget):
             scan_mode=self.scan_mode_combo.currentText().strip() or defaults.scan_mode,
         )
 
+    def get_persistent_scan_settings(self) -> dict[str, str]:
+        """Return scan settings that should persist across app runs."""
+
+        return {
+            "start_x": self._get_text_or_default(self.scan_start_x_input, self.DEFAULT_SCAN_START_X),
+            "stop_x": self._get_text_or_default(self.scan_stop_x_input, self.DEFAULT_SCAN_STOP_X),
+            "step_x": self._get_text_or_default(self.scan_step_x_input, self.DEFAULT_SCAN_STEP_X),
+            "start_y": self._get_text_or_default(self.scan_start_y_input, self.DEFAULT_SCAN_START_Y),
+            "stop_y": self._get_text_or_default(self.scan_stop_y_input, self.DEFAULT_SCAN_STOP_Y),
+            "step_y": self._get_text_or_default(self.scan_step_y_input, self.DEFAULT_SCAN_STEP_Y),
+            "scan_mode": self.scan_mode_combo.currentText().strip() or self.DEFAULT_SCAN_MODE,
+        }
+
+    def apply_persistent_scan_settings(self, settings: Mapping[str, Any]) -> None:
+        """Apply persisted scan settings back into the panel."""
+
+        self.scan_start_x_input.setText(
+            self._coerce_setting(settings.get("start_x"), self.DEFAULT_SCAN_START_X)
+        )
+        self.scan_stop_x_input.setText(
+            self._coerce_setting(settings.get("stop_x"), self.DEFAULT_SCAN_STOP_X)
+        )
+        self.scan_step_x_input.setText(
+            self._coerce_setting(settings.get("step_x"), self.DEFAULT_SCAN_STEP_X)
+        )
+        self.scan_start_y_input.setText(
+            self._coerce_setting(settings.get("start_y"), self.DEFAULT_SCAN_START_Y)
+        )
+        self.scan_stop_y_input.setText(
+            self._coerce_setting(settings.get("stop_y"), self.DEFAULT_SCAN_STOP_Y)
+        )
+        self.scan_step_y_input.setText(
+            self._coerce_setting(settings.get("step_y"), self.DEFAULT_SCAN_STEP_Y)
+        )
+
+        scan_mode = self._coerce_setting(settings.get("scan_mode"), self.DEFAULT_SCAN_MODE)
+        if self.scan_mode_combo.findText(scan_mode) >= 0:
+            self.scan_mode_combo.setCurrentText(scan_mode)
+
     def _read_float(self, line_edit: QLineEdit, default_value: float) -> float:
         """Read a float from one line edit, or fall back to a default."""
 
@@ -188,3 +250,17 @@ class ControlsPanel(QWidget):
         if not text:
             return default_value
         return float(text)
+
+    def _get_text_or_default(self, line_edit: QLineEdit, default_value: str) -> str:
+        """Return the current field text or a fallback default."""
+
+        value = line_edit.text().strip()
+        return value if value else default_value
+
+    def _coerce_setting(self, value: Any, default_value: str) -> str:
+        """Convert one persisted setting into a safe line-edit value."""
+
+        if value is None:
+            return default_value
+        text = str(value).strip()
+        return text if text else default_value
