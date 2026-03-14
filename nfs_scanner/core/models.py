@@ -19,7 +19,7 @@ class SerialConfig:
 
 @dataclass(slots=True)
 class ScanConfig:
-    """Basic scan-range parameters for grid or line scans."""
+    """Basic scan-range parameters and traversal strategy."""
 
     start_x: float = 0.0
     stop_x: float = 100.0
@@ -28,7 +28,7 @@ class ScanConfig:
     stop_y: float = 100.0
     step_y: float = 1.0
     z_height: float = 5.0
-    scan_mode: Literal["grid", "line"] = "grid"
+    scan_mode: Literal["raster", "snake"] = "snake"
 
 
 @dataclass(slots=True)

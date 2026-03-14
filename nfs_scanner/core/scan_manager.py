@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Sequence
+from typing import Literal
 
 from nfs_scanner.devices import MockCameraDevice, MockMotionController, MockSpectrumAnalyzer
 
@@ -61,25 +62,20 @@ class ScanManager:
         x_points: Sequence[float],
         y_points: Sequence[float],
         z: float,
+        scan_mode: Literal["raster", "snake"] = "snake",
         on_point_acquired: Callable[[ScanPointResult], None] | None = None,
     ) -> list[ScanPointResult]:
         """Run a mock grid scan from explicit point lists."""
 
-        scan_points = self.generate_snake_scan_points(x_points, y_points)
-        self._logger.info("[SCAN] snake path enabled")
+        scan_points = self._select_scan_points(x_points, y_points, scan_mode)
+        self._logger.info("[SCAN] mode=%s", scan_mode)
         return self._execute_scan_points(scan_points, z, on_point_acquired=on_point_acquired)
 
     def generate_grid_points(self, config: ScanConfig) -> tuple[list[float], list[float]]:
-        """Generate inclusive scan points from a scan configuration."""
+        """Generate inclusive axis point lists from a scan configuration."""
 
         x_points = self._generate_axis_points(config.start_x, config.stop_x, config.step_x)
-        if config.scan_mode == "line":
-            y_points = [float(config.start_y)]
-        elif config.scan_mode == "grid":
-            y_points = self._generate_axis_points(config.start_y, config.stop_y, config.step_y)
-        else:
-            raise ValueError(f"Unsupported scan mode: {config.scan_mode!r}")
-
+        y_points = self._generate_axis_points(config.start_y, config.stop_y, config.step_y)
         return x_points, y_points
 
     def run_scan(
@@ -93,11 +89,11 @@ class ScanManager:
             raise RuntimeError("Scan is already running.")
 
         x_points, y_points = self.generate_grid_points(config)
-        scan_points = self.generate_snake_scan_points(x_points, y_points)
+        scan_points = self._select_scan_points(x_points, y_points, config.scan_mode)
         total_points = len(scan_points)
 
         self._logger.info("[SCAN] start scan")
-        self._logger.info("[SCAN] snake path enabled")
+        self._logger.info("[SCAN] mode=%s", config.scan_mode)
         self._logger.info("[SCAN] total points: %s", total_points)
 
         results = self._execute_scan_points(scan_points, config.z_height, on_point_acquired=on_point_acquired)
@@ -120,6 +116,17 @@ class ScanManager:
             scan_points.extend((x_value, y_value) for x_value in row_x_points)
 
         return scan_points
+
+    def generate_raster_scan_points(
+        self,
+        x_points: Sequence[float],
+        y_points: Sequence[float],
+    ) -> list[tuple[float, float]]:
+        """Generate a traditional row-major raster scan path."""
+
+        normalized_x_points = [float(value) for value in x_points]
+        normalized_y_points = [float(value) for value in y_points]
+        return [(x_value, y_value) for y_value in normalized_y_points for x_value in normalized_x_points]
 
     def _execute_scan_points(
         self,
@@ -174,6 +181,20 @@ class ScanManager:
             self.stop_scan()
 
         return self.results
+
+    def _select_scan_points(
+        self,
+        x_points: Sequence[float],
+        y_points: Sequence[float],
+        scan_mode: Literal["raster", "snake"],
+    ) -> list[tuple[float, float]]:
+        """Select one traversal strategy for the current scan."""
+
+        if scan_mode == "snake":
+            return self.generate_snake_scan_points(x_points, y_points)
+        if scan_mode == "raster":
+            return self.generate_raster_scan_points(x_points, y_points)
+        raise ValueError(f"Unsupported scan mode: {scan_mode!r}")
 
     def _generate_axis_points(self, start: float, stop: float, step: float) -> list[float]:
         """Generate an inclusive point list for one scan axis."""
