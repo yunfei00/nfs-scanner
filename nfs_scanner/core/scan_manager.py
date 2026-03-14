@@ -65,7 +65,9 @@ class ScanManager:
     ) -> list[ScanPointResult]:
         """Run a mock grid scan from explicit point lists."""
 
-        return self._execute_scan(x_points, y_points, z, on_point_acquired=on_point_acquired)
+        scan_points = self.generate_snake_scan_points(x_points, y_points)
+        self._logger.info("[SCAN] snake path enabled")
+        return self._execute_scan_points(scan_points, z, on_point_acquired=on_point_acquired)
 
     def generate_grid_points(self, config: ScanConfig) -> tuple[list[float], list[float]]:
         """Generate inclusive scan points from a scan configuration."""
@@ -91,24 +93,42 @@ class ScanManager:
             raise RuntimeError("Scan is already running.")
 
         x_points, y_points = self.generate_grid_points(config)
-        total_points = len(x_points) * len(y_points)
+        scan_points = self.generate_snake_scan_points(x_points, y_points)
+        total_points = len(scan_points)
 
         self._logger.info("[SCAN] start scan")
+        self._logger.info("[SCAN] snake path enabled")
         self._logger.info("[SCAN] total points: %s", total_points)
 
-        results = self._execute_scan(x_points, y_points, config.z_height, on_point_acquired=on_point_acquired)
+        results = self._execute_scan_points(scan_points, config.z_height, on_point_acquired=on_point_acquired)
         self._logger.info("[SCAN] scan finished")
         return results
 
-    def _execute_scan(
+    def generate_snake_scan_points(
         self,
         x_points: Sequence[float],
         y_points: Sequence[float],
+    ) -> list[tuple[float, float]]:
+        """Generate a snake-style scan path from X and Y axis points."""
+
+        normalized_x_points = [float(value) for value in x_points]
+        normalized_y_points = [float(value) for value in y_points]
+        scan_points: list[tuple[float, float]] = []
+
+        for row_index, y_value in enumerate(normalized_y_points):
+            row_x_points = normalized_x_points if row_index % 2 == 0 else list(reversed(normalized_x_points))
+            scan_points.extend((x_value, y_value) for x_value in row_x_points)
+
+        return scan_points
+
+    def _execute_scan_points(
+        self,
+        scan_points: Sequence[tuple[float, float]],
         z: float,
         *,
         on_point_acquired: Callable[[ScanPointResult], None] | None = None,
     ) -> list[ScanPointResult]:
-        """Execute one mock scan over explicit axis point lists."""
+        """Execute one mock scan over an explicit XY scan path."""
 
         if not self.start_scan():
             raise RuntimeError("Scan is already running.")
@@ -121,33 +141,32 @@ class ScanManager:
         self._spectrum_analyzer.configure(self._spectrum_config)
 
         try:
-            for y_value in y_points:
-                for x_value in x_points:
-                    x_position = float(x_value)
-                    y_position = float(y_value)
-                    z_position = float(z)
+            for x_value, y_value in scan_points:
+                x_position = float(x_value)
+                y_position = float(y_value)
+                z_position = float(z)
 
-                    self._logger.info("[SCAN] Move to (%s,%s,%s)", x_position, y_position, z_position)
-                    self._motion_controller.move_to(x_position, y_position, z_position)
+                self._logger.info("[SCAN] move (%s,%s)", x_position, y_position)
+                self._motion_controller.move_to(x_position, y_position, z_position)
 
-                    spectrum_trace = self._spectrum_analyzer.acquire_trace()
-                    self._logger.info("[SCAN] Spectrum acquired")
+                spectrum_trace = self._spectrum_analyzer.acquire_trace()
+                self._logger.info("[SCAN] Spectrum acquired")
 
-                    camera_image = self._camera_device.capture_image()
-                    self._logger.info("[SCAN] Image captured")
+                camera_image = self._camera_device.capture_image()
+                self._logger.info("[SCAN] Image captured")
 
-                    point_result = ScanPointResult(
-                        x=x_position,
-                        y=y_position,
-                        z=z_position,
-                        spectrum_trace=spectrum_trace,
-                        camera_image=camera_image,
-                    )
-                    self._results.append(point_result)
-                    self._logger.info("[SCAN] point acquired (%s,%s)", x_position, y_position)
+                point_result = ScanPointResult(
+                    x=x_position,
+                    y=y_position,
+                    z=z_position,
+                    spectrum_trace=spectrum_trace,
+                    camera_image=camera_image,
+                )
+                self._results.append(point_result)
+                self._logger.info("[SCAN] point acquired (%s,%s)", x_position, y_position)
 
-                    if on_point_acquired is not None:
-                        on_point_acquired(point_result)
+                if on_point_acquired is not None:
+                    on_point_acquired(point_result)
         finally:
             self._motion_controller.disconnect()
             self._spectrum_analyzer.disconnect()
