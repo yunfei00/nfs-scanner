@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 from nfs_scanner.devices import MockCameraDevice, MockMotionController, MockSpectrumAnalyzer
 
-from .models import ScanPointResult, SpectrumConfig
+from .models import ScanConfig, ScanPointResult, SpectrumConfig
 
 
 class ScanManager:
@@ -56,10 +56,16 @@ class ScanManager:
         self._logger.info("扫描任务已停止。")
         return True
 
-    def run_grid_scan(self, x_points: Sequence[float], y_points: Sequence[float], z: float) -> list[ScanPointResult]:
+    def run_grid_scan(
+        self,
+        x_points: Sequence[float],
+        y_points: Sequence[float],
+        z: float,
+        on_point_acquired: Callable[[ScanPointResult], None] | None = None,
+    ) -> list[ScanPointResult]:
         """Run a mock grid scan from explicit point lists."""
 
-        return self._execute_scan(x_points, y_points, z)
+        return self._execute_scan(x_points, y_points, z, on_point_acquired=on_point_acquired)
 
     def generate_grid_points(self, config: ScanConfig) -> tuple[list[float], list[float]]:
         """Generate inclusive scan points from a scan configuration."""
@@ -74,7 +80,11 @@ class ScanManager:
 
         return x_points, y_points
 
-    def run_scan(self, config: ScanConfig) -> list[ScanPointResult]:
+    def run_scan(
+        self,
+        config: ScanConfig,
+        on_point_acquired: Callable[[ScanPointResult], None] | None = None,
+    ) -> list[ScanPointResult]:
         """Run one mock scan from a scan configuration."""
 
         if self.is_scanning:
@@ -86,11 +96,18 @@ class ScanManager:
         self._logger.info("[SCAN] start scan")
         self._logger.info("[SCAN] total points: %s", total_points)
 
-        results = self._execute_scan(x_points, y_points, config.z_height)
+        results = self._execute_scan(x_points, y_points, config.z_height, on_point_acquired=on_point_acquired)
         self._logger.info("[SCAN] scan finished")
         return results
 
-    def _execute_scan(self, x_points: Sequence[float], y_points: Sequence[float], z: float) -> list[ScanPointResult]:
+    def _execute_scan(
+        self,
+        x_points: Sequence[float],
+        y_points: Sequence[float],
+        z: float,
+        *,
+        on_point_acquired: Callable[[ScanPointResult], None] | None = None,
+    ) -> list[ScanPointResult]:
         """Execute one mock scan over explicit axis point lists."""
 
         if not self.start_scan():
@@ -119,15 +136,18 @@ class ScanManager:
                     camera_image = self._camera_device.capture_image()
                     self._logger.info("[SCAN] Image captured")
 
-                    self._results.append(
-                        ScanPointResult(
-                            x=x_position,
-                            y=y_position,
-                            z=z_position,
-                            spectrum_trace=spectrum_trace,
-                            camera_image=camera_image,
-                        )
+                    point_result = ScanPointResult(
+                        x=x_position,
+                        y=y_position,
+                        z=z_position,
+                        spectrum_trace=spectrum_trace,
+                        camera_image=camera_image,
                     )
+                    self._results.append(point_result)
+                    self._logger.info("[SCAN] point acquired (%s,%s)", x_position, y_position)
+
+                    if on_point_acquired is not None:
+                        on_point_acquired(point_result)
         finally:
             self._motion_controller.disconnect()
             self._spectrum_analyzer.disconnect()

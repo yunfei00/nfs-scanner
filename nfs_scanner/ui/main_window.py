@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import numpy as np
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QMainWindow, QSplitter, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QMainWindow, QSplitter, QVBoxLayout, QWidget
 
-from nfs_scanner.core import DeviceManager, ScanManager, SpectrumConfig
+from nfs_scanner.analysis import HeatmapGenerator
+from nfs_scanner.core import DeviceManager, ScanManager, ScanPointResult, SpectrumConfig
+from nfs_scanner.storage import DatasetManager
 
 from .controls_panel import ControlsPanel
 from .heatmap_view import HeatmapView
@@ -21,6 +23,8 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.device_manager = DeviceManager()
         self.scan_manager = ScanManager()
+        self.dataset_manager = DatasetManager()
+        self.heatmap_generator = HeatmapGenerator()
         self.controls_panel: ControlsPanel
         self.heatmap_view: HeatmapView
         self.spectrum_panel: SpectrumPanel
@@ -108,15 +112,35 @@ class MainWindow(QMainWindow):
         self._append_log(f"[INFO] Move command X={x_value} Y={y_value} Z={z_value}")
 
     def _handle_start_scan(self) -> None:
-        """Handle the placeholder scan-start action."""
+        """Run one mock scan and progressively update the heatmap view."""
 
-        if self.scan_manager.start_scan():
-            self.statusBar().showMessage("扫描已开始")
-            self._append_log("[INFO] Scan started")
+        if self.scan_manager.is_scanning:
+            self.statusBar().showMessage("扫描已在运行")
+            self._append_log("[WARN] Scan is already running")
             return
 
-        self.statusBar().showMessage("扫描已在运行")
-        self._append_log("[WARN] Scan is already running")
+        try:
+            scan_config = self.controls_panel.get_scan_config()
+        except ValueError as error:
+            self.statusBar().showMessage("扫描参数无效")
+            self._append_log(f"[WARN] Invalid scan config: {error}")
+            return
+
+        self.dataset_manager.create_dataset(scan_config)
+        self.heatmap_view.set_status_text("热力图视图（扫描中）")
+        self.statusBar().showMessage("扫描执行中")
+        self._append_log("[SCAN] start scan")
+
+        try:
+            results = self.scan_manager.run_scan(scan_config, on_point_acquired=self._handle_scan_point_acquired)
+        except Exception as error:
+            self.statusBar().showMessage("扫描失败")
+            self._append_log(f"[WARN] Scan failed: {error}")
+            return
+
+        self.heatmap_view.set_status_text("热力图视图（扫描完成）")
+        self.statusBar().showMessage(f"扫描完成，共 {len(results)} 个点")
+        self._append_log("[SCAN] scan finished")
 
     def _handle_stop_scan(self) -> None:
         """Handle the placeholder scan-stop action."""
@@ -128,6 +152,21 @@ class MainWindow(QMainWindow):
 
         self.statusBar().showMessage("当前没有运行中的扫描")
         self._append_log("[WARN] No active scan to stop")
+
+    def _handle_scan_point_acquired(self, result: ScanPointResult) -> None:
+        """Update the in-memory dataset and heatmap when one point arrives."""
+
+        self.dataset_manager.append_point(result)
+        self._append_log(f"[SCAN] point acquired ({result.x},{result.y})")
+
+        dataset = self.dataset_manager.dataset
+        if dataset is None:
+            return
+
+        heatmap_matrix = self.heatmap_generator.generate_heatmap(dataset)
+        self.heatmap_view.set_heatmap(heatmap_matrix)
+        self._append_log("[HEATMAP] UI updated")
+        QApplication.processEvents()
 
     def _handle_spectrum_device_connect(self) -> None:
         """Handle the placeholder spectrum-device connect action."""

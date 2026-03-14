@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from nfs_scanner.core import ScanConfig
+
 from PySide6.QtWidgets import (
     QComboBox,
     QFormLayout,
@@ -88,6 +90,9 @@ class ControlsPanel(QWidget):
         self.x_input = self._create_axis_input(group_box)
         self.y_input = self._create_axis_input(group_box)
         self.z_input = self._create_axis_input(group_box)
+        self.x_input.setText("0")
+        self.y_input.setText("0")
+        self.z_input.setText("5")
 
         self.move_button = QPushButton("移动", group_box)
         self.home_button = QPushButton("回零", group_box)
@@ -122,6 +127,12 @@ class ControlsPanel(QWidget):
         self.scan_start_y_input = self._create_axis_input(group_box)
         self.scan_stop_y_input = self._create_axis_input(group_box)
         self.scan_step_y_input = self._create_axis_input(group_box)
+        self.scan_start_x_input.setText("0")
+        self.scan_stop_x_input.setText("4")
+        self.scan_step_x_input.setText("1")
+        self.scan_start_y_input.setText("0")
+        self.scan_stop_y_input.setText("4")
+        self.scan_step_y_input.setText("1")
 
         self.start_scan_button = QPushButton("开始扫描", group_box)
         self.stop_scan_button = QPushButton("停止扫描", group_box)
@@ -149,3 +160,26 @@ class ControlsPanel(QWidget):
         line_edit = QLineEdit(parent)
         line_edit.setPlaceholderText("请输入数值")
         return line_edit
+
+    def get_scan_config(self) -> ScanConfig:
+        """Build a scan configuration from the current UI values."""
+
+        defaults = ScanConfig()
+        return ScanConfig(
+            start_x=self._read_float(self.scan_start_x_input, defaults.start_x),
+            stop_x=self._read_float(self.scan_stop_x_input, defaults.stop_x),
+            step_x=self._read_float(self.scan_step_x_input, defaults.step_x),
+            start_y=self._read_float(self.scan_start_y_input, defaults.start_y),
+            stop_y=self._read_float(self.scan_stop_y_input, defaults.stop_y),
+            step_y=self._read_float(self.scan_step_y_input, defaults.step_y),
+            z_height=self._read_float(self.z_input, defaults.z_height),
+            scan_mode=defaults.scan_mode,
+        )
+
+    def _read_float(self, line_edit: QLineEdit, default_value: float) -> float:
+        """Read a float from one line edit, or fall back to a default."""
+
+        text = line_edit.text().strip()
+        if not text:
+            return default_value
+        return float(text)
