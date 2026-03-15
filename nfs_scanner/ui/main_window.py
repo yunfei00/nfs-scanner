@@ -4,11 +4,22 @@ from __future__ import annotations
 
 import numpy as np
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QLineEdit, QMainWindow, QSplitter, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QFormLayout,
+    QFrame,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QSplitter,
+    QVBoxLayout,
+    QWidget,
+)
 
 from nfs_scanner.analysis import HeatmapGenerator
 from nfs_scanner.config import load_config, save_config
 from nfs_scanner.core import DeviceManager, ScanManager, ScanPointResult, SpectrumConfig
+from nfs_scanner.scan import ScanJob
 from nfs_scanner.storage import DatasetManager
 
 from .controls_panel import ControlsPanel
@@ -29,7 +40,11 @@ class MainWindow(QMainWindow):
         self.controls_panel: ControlsPanel
         self.heatmap_view: HeatmapView
         self.spectrum_panel: SpectrumPanel
+        self.job_id_label: QLabel
+        self.job_status_label: QLabel
+        self.job_progress_label: QLabel
         self.log_panel: LogPanel
+        self._last_job_display_snapshot: tuple[str, str, str] | None = None
         self.setWindowTitle("近场扫描系统")
         self.resize(1600, 900)
         self._setup_ui()
@@ -50,7 +65,15 @@ class MainWindow(QMainWindow):
         self.controls_panel = ControlsPanel()
         self.heatmap_view = HeatmapView()
         self.spectrum_panel = SpectrumPanel()
+        job_status_panel = self._create_job_status_panel()
         self.log_panel = LogPanel()
+
+        bottom_panel = QWidget(central_widget)
+        bottom_layout = QVBoxLayout(bottom_panel)
+        bottom_layout.setContentsMargins(0, 0, 0, 0)
+        bottom_layout.setSpacing(8)
+        bottom_layout.addWidget(job_status_panel)
+        bottom_layout.addWidget(self.log_panel)
 
         top_splitter.addWidget(self.controls_panel)
         top_splitter.addWidget(self.heatmap_view)
@@ -61,14 +84,15 @@ class MainWindow(QMainWindow):
         top_splitter.setSizes([320, 900, 320])
 
         bottom_splitter.addWidget(top_splitter)
-        bottom_splitter.addWidget(self.log_panel)
+        bottom_splitter.addWidget(bottom_panel)
         bottom_splitter.setStretchFactor(0, 1)
         bottom_splitter.setStretchFactor(1, 0)
-        bottom_splitter.setSizes([700, 180])
+        bottom_splitter.setSizes([680, 220])
 
         root_layout.addWidget(bottom_splitter)
         self.setCentralWidget(central_widget)
         self._load_demo_heatmap()
+        self._update_job_status_display(None)
 
         self.statusBar().showMessage("系统就绪")
         self._append_log("[INFO] Application UI initialized")
@@ -102,10 +126,29 @@ class MainWindow(QMainWindow):
         self.heatmap_view.settings_changed.connect(self._sync_heatmap_settings)
         self.heatmap_view.settings_committed.connect(self._handle_heatmap_settings_changed)
 
+    def _create_job_status_panel(self) -> QWidget:
+        """Create the bottom scan-job status panel."""
+
+        panel = QFrame(self)
+        panel.setFrameShape(QFrame.Shape.StyledPanel)
+
+        layout = QFormLayout(panel)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(8)
+
+        self.job_id_label = QLabel("-", panel)
+        self.job_status_label = QLabel("-", panel)
+        self.job_progress_label = QLabel("0%", panel)
+
+        layout.addRow("Job ID", self.job_id_label)
+        layout.addRow("Status", self.job_status_label)
+        layout.addRow("Progress", self.job_progress_label)
+        return panel
+
     def _load_demo_heatmap(self) -> None:
         """Load a placeholder random heatmap when the UI starts."""
 
-        demo_matrix = np.random.default_rng(20260314).random((20, 20))
+        demo_matrix = np.random.default_rng(20260315).random((20, 20))
         self.heatmap_view.set_heatmap(demo_matrix)
         self.heatmap_view.set_status_text("热力图视图（示例数据）")
 
@@ -155,15 +198,21 @@ class MainWindow(QMainWindow):
         self._append_log("[SCAN] start scan")
 
         try:
-            results = self.scan_manager.run_scan(scan_config, on_point_acquired=self._handle_scan_point_acquired)
+            results = self.scan_manager.run_scan(
+                scan_config,
+                on_point_acquired=self._handle_scan_point_acquired,
+                on_job_updated=self._handle_job_updated,
+            )
         except Exception as error:
             self.statusBar().showMessage("扫描失败")
             self._append_log(f"[WARN] Scan failed: {error}")
+            self._update_job_status_display(self.scan_manager.current_job)
             return
 
         self.heatmap_view.set_status_text("热力图视图（扫描完成）")
         self.statusBar().showMessage(f"扫描完成，共 {len(results)} 个点")
         self._append_log("[SCAN] scan finished")
+        self._update_job_status_display(self.scan_manager.current_job)
 
     def _handle_stop_scan(self) -> None:
         """Handle the placeholder scan-stop action."""
@@ -189,6 +238,14 @@ class MainWindow(QMainWindow):
         heatmap_matrix = self.heatmap_generator.generate_heatmap(dataset)
         self.heatmap_view.set_heatmap(heatmap_matrix)
         self._append_log("[HEATMAP] UI updated")
+        QApplication.processEvents()
+
+    def _handle_job_updated(self, job: ScanJob) -> None:
+        """Refresh the bottom job-status area from the current scan job."""
+
+        current_job = self.scan_manager.current_job or job
+        if self._update_job_status_display(current_job):
+            self._append_log("[UI] job progress updated")
         QApplication.processEvents()
 
     def _handle_spectrum_device_connect(self) -> None:
@@ -255,6 +312,28 @@ class MainWindow(QMainWindow):
 
         normalized = value.strip()
         return normalized if normalized else "?"
+
+    def _update_job_status_display(self, job: ScanJob | None) -> bool:
+        """Update the visible job-status summary and report whether it changed."""
+
+        if job is None:
+            snapshot = ("-", "-", "0%")
+        else:
+            snapshot = (
+                job.job_id[:6] if job.job_id else "-",
+                job.status,
+                f"{job.progress * 100:.0f}%",
+            )
+
+        if snapshot == self._last_job_display_snapshot:
+            return False
+
+        job_id, status, progress = snapshot
+        self.job_id_label.setText(job_id)
+        self.job_status_label.setText(status)
+        self.job_progress_label.setText(progress)
+        self._last_job_display_snapshot = snapshot
+        return True
 
     def _load_persistent_config(self) -> None:
         """Load persistent UI configuration and apply it to widgets."""

@@ -72,6 +72,7 @@ class ScanManager:
         z: float,
         scan_mode: Literal["raster", "snake"] = "snake",
         on_point_acquired: Callable[[ScanPointResult], None] | None = None,
+        on_job_updated: Callable[[ScanJob], None] | None = None,
     ) -> list[ScanPointResult]:
         """Run a mock grid scan from explicit point lists."""
 
@@ -80,7 +81,13 @@ class ScanManager:
 
         scan_config = self._build_scan_config_from_points(x_points, y_points, z, scan_mode)
         scan_points = self._select_scan_points(x_points, y_points, scan_mode)
-        return self._run_scan_job(scan_config, scan_points, scan_config.z_height, on_point_acquired)
+        return self._run_scan_job(
+            scan_config,
+            scan_points,
+            scan_config.z_height,
+            on_point_acquired,
+            on_job_updated,
+        )
 
     def generate_grid_points(self, config: ScanConfig) -> tuple[list[float], list[float]]:
         """Generate inclusive axis point lists from a scan configuration."""
@@ -93,6 +100,7 @@ class ScanManager:
         self,
         config: ScanConfig,
         on_point_acquired: Callable[[ScanPointResult], None] | None = None,
+        on_job_updated: Callable[[ScanJob], None] | None = None,
     ) -> list[ScanPointResult]:
         """Run one mock scan from a scan configuration."""
 
@@ -101,7 +109,13 @@ class ScanManager:
 
         x_points, y_points = self.generate_grid_points(config)
         scan_points = self._select_scan_points(x_points, y_points, config.scan_mode)
-        return self._run_scan_job(config, scan_points, config.z_height, on_point_acquired)
+        return self._run_scan_job(
+            config,
+            scan_points,
+            config.z_height,
+            on_point_acquired,
+            on_job_updated,
+        )
 
     def generate_snake_scan_points(
         self,
@@ -137,10 +151,12 @@ class ScanManager:
         scan_points: Sequence[tuple[float, float]],
         z: float,
         on_point_acquired: Callable[[ScanPointResult], None] | None = None,
+        on_job_updated: Callable[[ScanJob], None] | None = None,
     ) -> list[ScanPointResult]:
         """Create one scan job and execute it over an explicit path."""
 
         job = self._create_job(config)
+        self._notify_job_updated(job, on_job_updated)
         total_points = len(scan_points)
 
         self._logger.info("[SCAN] start scan")
@@ -152,6 +168,7 @@ class ScanManager:
             scan_points,
             z,
             on_point_acquired=on_point_acquired,
+            on_job_updated=on_job_updated,
         )
         self._logger.info("[SCAN] scan finished")
         return results
@@ -170,6 +187,7 @@ class ScanManager:
         z: float,
         *,
         on_point_acquired: Callable[[ScanPointResult], None] | None = None,
+        on_job_updated: Callable[[ScanJob], None] | None = None,
     ) -> list[ScanPointResult]:
         """Execute one mock scan over an explicit XY scan path."""
 
@@ -185,6 +203,7 @@ class ScanManager:
         self._spectrum_analyzer.configure(self._spectrum_config)
         job.mark_running()
         self._logger.info("[SCAN] job started")
+        self._notify_job_updated(job, on_job_updated)
 
         try:
             for point_index, (x_value, y_value) in enumerate(scan_points, start=1):
@@ -210,6 +229,7 @@ class ScanManager:
                 )
                 self._results.append(point_result)
                 job.update_progress(point_index, total_points)
+                self._notify_job_updated(job, on_job_updated)
                 self._logger.info("[SCAN] point acquired (%s,%s)", x_position, y_position)
 
                 if on_point_acquired is not None:
@@ -217,10 +237,12 @@ class ScanManager:
         except Exception:
             job.mark_failed()
             self._logger.info("[SCAN] job failed")
+            self._notify_job_updated(job, on_job_updated)
             raise
         else:
             job.mark_completed()
             self._logger.info("[SCAN] job completed")
+            self._notify_job_updated(job, on_job_updated)
         finally:
             self._motion_controller.disconnect()
             self._spectrum_analyzer.disconnect()
@@ -297,3 +319,13 @@ class ScanManager:
         if len(points) < 2:
             return 1.0
         return abs(float(points[1]) - float(points[0])) or 1.0
+
+    def _notify_job_updated(
+        self,
+        job: ScanJob,
+        callback: Callable[[ScanJob], None] | None,
+    ) -> None:
+        """Notify one observer that the current job changed."""
+
+        if callback is not None:
+            callback(job)
