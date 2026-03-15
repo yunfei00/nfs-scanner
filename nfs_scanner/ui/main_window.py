@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -30,6 +32,8 @@ from .spectrum_panel import SpectrumPanel
 
 class MainWindow(QMainWindow):
     """Application main window that assembles high-level UI regions."""
+
+    DEFAULT_OUTPUT_DIR = Path("output") / "latest_scan"
 
     def __init__(self) -> None:
         super().__init__()
@@ -87,7 +91,7 @@ class MainWindow(QMainWindow):
         bottom_splitter.addWidget(bottom_panel)
         bottom_splitter.setStretchFactor(0, 1)
         bottom_splitter.setStretchFactor(1, 0)
-        bottom_splitter.setSizes([680, 220])
+        bottom_splitter.setSizes([680, 240])
 
         root_layout.addWidget(bottom_splitter)
         self.setCentralWidget(central_widget)
@@ -104,6 +108,7 @@ class MainWindow(QMainWindow):
         self.controls_panel.move_button.clicked.connect(self._handle_move_command)
         self.controls_panel.start_scan_button.clicked.connect(self._handle_start_scan)
         self.controls_panel.stop_scan_button.clicked.connect(self._handle_stop_scan)
+        self.controls_panel.reset_defaults_button.clicked.connect(self._handle_reset_defaults)
         self.controls_panel.scan_mode_combo.currentTextChanged.connect(self._handle_scan_mode_changed)
 
         for scan_input in self._get_persistent_scan_inputs():
@@ -209,9 +214,23 @@ class MainWindow(QMainWindow):
             self._update_job_status_display(self.scan_manager.current_job)
             return
 
+        output_dir = self._default_output_dir()
+        try:
+            self.dataset_manager.save_dataset(output_dir)
+        except (OSError, RuntimeError, ValueError) as error:
+            self.statusBar().showMessage("扫描完成，但数据保存失败")
+            self._append_log(f"[WARN] Dataset save failed: {error}")
+            return
+
         self.heatmap_view.set_status_text("热力图视图（扫描完成）")
-        self.statusBar().showMessage(f"扫描完成，共 {len(results)} 个点")
+        self.statusBar().showMessage("扫描完成，结果已保存到 output/latest_scan")
         self._append_log("[SCAN] scan finished")
+        self._log_scan_completion_summary(
+            job=self.scan_manager.current_job,
+            total_points=len(results),
+            scan_mode=scan_config.scan_mode,
+            output_dir=output_dir,
+        )
         self._update_job_status_display(self.scan_manager.current_job)
 
     def _handle_stop_scan(self) -> None:
@@ -224,6 +243,14 @@ class MainWindow(QMainWindow):
 
         self.statusBar().showMessage("当前没有运行中的扫描")
         self._append_log("[WARN] No active scan to stop")
+
+    def _handle_reset_defaults(self) -> None:
+        """Reset scan parameters and scan mode to their default values."""
+
+        self.controls_panel.reset_scan_defaults()
+        self._save_persistent_config()
+        self.statusBar().showMessage("扫描参数已恢复默认值")
+        self._append_log("[UI] scan configuration reset to defaults")
 
     def _handle_scan_point_acquired(self, result: ScanPointResult) -> None:
         """Update the in-memory dataset and heatmap when one point arrives."""
@@ -307,6 +334,23 @@ class MainWindow(QMainWindow):
             f"auto_range={spectrum_config.auto_range}"
         )
 
+    def _log_scan_completion_summary(
+        self,
+        *,
+        job: ScanJob | None,
+        total_points: int,
+        scan_mode: str,
+        output_dir: Path,
+    ) -> None:
+        """Write one final scan summary for manual trial testing."""
+
+        job_id = job.job_id if job is not None else "-"
+        resolved_output_dir = output_dir.resolve()
+        self._append_log(f"[SCAN] job id: {job_id}")
+        self._append_log(f"[SCAN] total points: {total_points}")
+        self._append_log(f"[SCAN] scan mode: {scan_mode}")
+        self._append_log(f"[SCAN] dataset save path: {resolved_output_dir}")
+
     def _format_axis_value(self, value: str) -> str:
         """Normalize axis input for placeholder command logging."""
 
@@ -371,6 +415,11 @@ class MainWindow(QMainWindow):
             self._append_log("[CONFIG] spectrum settings saved")
         if include_heatmap_log:
             self._append_log("[CONFIG] heatmap settings saved")
+
+    def _default_output_dir(self) -> Path:
+        """Return the default dataset output directory for trial scans."""
+
+        return self.DEFAULT_OUTPUT_DIR
 
     def _get_persistent_scan_inputs(self) -> tuple[QLineEdit, ...]:
         """Return scan inputs that should trigger config persistence."""

@@ -52,6 +52,7 @@ class ControlsPanel(QWidget):
         self.scan_mode_combo: QComboBox
         self.start_scan_button: QPushButton
         self.stop_scan_button: QPushButton
+        self.reset_defaults_button: QPushButton
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -154,6 +155,7 @@ class ControlsPanel(QWidget):
 
         self.start_scan_button = QPushButton("开始扫描", group_box)
         self.stop_scan_button = QPushButton("停止扫描", group_box)
+        self.reset_defaults_button = QPushButton("恢复默认配置", group_box)
 
         button_container = QWidget(group_box)
         button_layout = QHBoxLayout(button_container)
@@ -170,6 +172,7 @@ class ControlsPanel(QWidget):
         layout.addRow("步长Y", self.scan_step_y_input)
         layout.addRow("扫描模式", self.scan_mode_combo)
         layout.addRow("", button_container)
+        layout.addRow("", self.reset_defaults_button)
 
         return group_box
 
@@ -242,6 +245,24 @@ class ControlsPanel(QWidget):
         scan_mode = self._coerce_setting(settings.get("scan_mode"), self.DEFAULT_SCAN_MODE)
         if self.scan_mode_combo.findText(scan_mode) >= 0:
             self.scan_mode_combo.setCurrentText(scan_mode)
+
+    def reset_scan_defaults(self) -> None:
+        """Reset scan inputs and scan mode to their default values."""
+
+        self.apply_persistent_scan_settings(self.get_default_scan_settings())
+
+    def get_default_scan_settings(self) -> dict[str, str]:
+        """Return the default scan settings."""
+
+        return {
+            "start_x": self.DEFAULT_SCAN_START_X,
+            "stop_x": self.DEFAULT_SCAN_STOP_X,
+            "step_x": self.DEFAULT_SCAN_STEP_X,
+            "start_y": self.DEFAULT_SCAN_START_Y,
+            "stop_y": self.DEFAULT_SCAN_STOP_Y,
+            "step_y": self.DEFAULT_SCAN_STEP_Y,
+            "scan_mode": self.DEFAULT_SCAN_MODE,
+        }
 
     def _read_float(self, line_edit: QLineEdit, default_value: float) -> float:
         """Read a float from one line edit, or fall back to a default."""
