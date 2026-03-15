@@ -7,6 +7,7 @@ from collections.abc import Callable, Sequence
 from typing import Literal
 
 from nfs_scanner.devices import MockCameraDevice, MockMotionController, MockSpectrumAnalyzer
+from nfs_scanner.scan import ScanJob
 
 from .models import ScanConfig, ScanPointResult, SpectrumConfig
 
@@ -22,6 +23,7 @@ class ScanManager:
         self._camera_device = MockCameraDevice()
         self._spectrum_config = SpectrumConfig()
         self._results: list[ScanPointResult] = []
+        self._current_job: ScanJob | None = None
 
     @property
     def is_scanning(self) -> bool:
@@ -35,26 +37,32 @@ class ScanManager:
 
         return list(self._results)
 
+    @property
+    def current_job(self) -> ScanJob | None:
+        """Return the current or most recent scan job."""
+
+        return self._current_job
+
     def start_scan(self) -> bool:
         """Enter placeholder scan-running state."""
 
         if self._is_scanning:
-            self._logger.warning("扫描任务已经处于运行状态。")
+            self._logger.warning("Scan task is already running.")
             return False
 
         self._is_scanning = True
-        self._logger.info("扫描任务已进入占位运行状态。")
+        self._logger.info("Scan task entered running state.")
         return True
 
     def stop_scan(self) -> bool:
         """Leave placeholder scan-running state."""
 
         if not self._is_scanning:
-            self._logger.warning("当前没有运行中的扫描任务。")
+            self._logger.warning("No active scan task is running.")
             return False
 
         self._is_scanning = False
-        self._logger.info("扫描任务已停止。")
+        self._logger.info("Scan task stopped.")
         return True
 
     def run_grid_scan(
@@ -67,9 +75,12 @@ class ScanManager:
     ) -> list[ScanPointResult]:
         """Run a mock grid scan from explicit point lists."""
 
+        if self.is_scanning:
+            raise RuntimeError("Scan is already running.")
+
+        scan_config = self._build_scan_config_from_points(x_points, y_points, z, scan_mode)
         scan_points = self._select_scan_points(x_points, y_points, scan_mode)
-        self._logger.info("[SCAN] mode=%s", scan_mode)
-        return self._execute_scan_points(scan_points, z, on_point_acquired=on_point_acquired)
+        return self._run_scan_job(scan_config, scan_points, scan_config.z_height, on_point_acquired)
 
     def generate_grid_points(self, config: ScanConfig) -> tuple[list[float], list[float]]:
         """Generate inclusive axis point lists from a scan configuration."""
@@ -90,15 +101,7 @@ class ScanManager:
 
         x_points, y_points = self.generate_grid_points(config)
         scan_points = self._select_scan_points(x_points, y_points, config.scan_mode)
-        total_points = len(scan_points)
-
-        self._logger.info("[SCAN] start scan")
-        self._logger.info("[SCAN] mode=%s", config.scan_mode)
-        self._logger.info("[SCAN] total points: %s", total_points)
-
-        results = self._execute_scan_points(scan_points, config.z_height, on_point_acquired=on_point_acquired)
-        self._logger.info("[SCAN] scan finished")
-        return results
+        return self._run_scan_job(config, scan_points, config.z_height, on_point_acquired)
 
     def generate_snake_scan_points(
         self,
@@ -128,8 +131,41 @@ class ScanManager:
         normalized_y_points = [float(value) for value in y_points]
         return [(x_value, y_value) for y_value in normalized_y_points for x_value in normalized_x_points]
 
+    def _run_scan_job(
+        self,
+        config: ScanConfig,
+        scan_points: Sequence[tuple[float, float]],
+        z: float,
+        on_point_acquired: Callable[[ScanPointResult], None] | None = None,
+    ) -> list[ScanPointResult]:
+        """Create one scan job and execute it over an explicit path."""
+
+        job = self._create_job(config)
+        total_points = len(scan_points)
+
+        self._logger.info("[SCAN] start scan")
+        self._logger.info("[SCAN] mode=%s", config.scan_mode)
+        self._logger.info("[SCAN] total points: %s", total_points)
+
+        results = self._execute_scan_points(
+            job,
+            scan_points,
+            z,
+            on_point_acquired=on_point_acquired,
+        )
+        self._logger.info("[SCAN] scan finished")
+        return results
+
+    def _create_job(self, config: ScanConfig) -> ScanJob:
+        """Create and store one scan job for the current execution."""
+
+        self._current_job = ScanJob(scan_config=config)
+        self._logger.info("[SCAN] job created")
+        return self._current_job
+
     def _execute_scan_points(
         self,
+        job: ScanJob,
         scan_points: Sequence[tuple[float, float]],
         z: float,
         *,
@@ -141,14 +177,17 @@ class ScanManager:
             raise RuntimeError("Scan is already running.")
 
         self._results = []
+        total_points = len(scan_points)
 
         self._motion_controller.connect()
         self._spectrum_analyzer.connect()
         self._camera_device.connect()
         self._spectrum_analyzer.configure(self._spectrum_config)
+        job.mark_running()
+        self._logger.info("[SCAN] job started")
 
         try:
-            for x_value, y_value in scan_points:
+            for point_index, (x_value, y_value) in enumerate(scan_points, start=1):
                 x_position = float(x_value)
                 y_position = float(y_value)
                 z_position = float(z)
@@ -170,10 +209,18 @@ class ScanManager:
                     camera_image=camera_image,
                 )
                 self._results.append(point_result)
+                job.update_progress(point_index, total_points)
                 self._logger.info("[SCAN] point acquired (%s,%s)", x_position, y_position)
 
                 if on_point_acquired is not None:
                     on_point_acquired(point_result)
+        except Exception:
+            job.mark_failed()
+            self._logger.info("[SCAN] job failed")
+            raise
+        else:
+            job.mark_completed()
+            self._logger.info("[SCAN] job completed")
         finally:
             self._motion_controller.disconnect()
             self._spectrum_analyzer.disconnect()
@@ -215,7 +262,38 @@ class ScanManager:
             points.append(round(current, 10))
             current += step_value
 
-        if not points or points[-1] != round(stop_value, 10):
-            points.append(round(stop_value, 10))
+        rounded_stop = round(stop_value, 10)
+        if not points or points[-1] != rounded_stop:
+            points.append(rounded_stop)
 
         return points
+
+    def _build_scan_config_from_points(
+        self,
+        x_points: Sequence[float],
+        y_points: Sequence[float],
+        z: float,
+        scan_mode: Literal["raster", "snake"],
+    ) -> ScanConfig:
+        """Build a best-effort scan config from explicit axis point lists."""
+
+        normalized_x_points = [float(value) for value in x_points]
+        normalized_y_points = [float(value) for value in y_points]
+
+        return ScanConfig(
+            start_x=normalized_x_points[0] if normalized_x_points else 0.0,
+            stop_x=normalized_x_points[-1] if normalized_x_points else 0.0,
+            step_x=self._infer_step(normalized_x_points),
+            start_y=normalized_y_points[0] if normalized_y_points else 0.0,
+            stop_y=normalized_y_points[-1] if normalized_y_points else 0.0,
+            step_y=self._infer_step(normalized_y_points),
+            z_height=float(z),
+            scan_mode=scan_mode,
+        )
+
+    def _infer_step(self, points: Sequence[float]) -> float:
+        """Infer one axis step from an explicit point list."""
+
+        if len(points) < 2:
+            return 1.0
+        return abs(float(points[1]) - float(points[0])) or 1.0
