@@ -4,6 +4,7 @@ from .controls_panel import ControlsPanel
 from .heatmap_view import HeatmapView
 from .log_panel import LogPanel
 from .main_window import MainWindow
+from .serial_debug_page import SerialDebugPage
 from .spectrum_panel import SpectrumPanel
 
 __all__ = [
@@ -11,5 +12,6 @@ __all__ = [
     "HeatmapView",
     "LogPanel",
     "MainWindow",
+    "SerialDebugPage",
     "SpectrumPanel",
 ]

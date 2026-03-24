@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QTabWidget,
     QSplitter,
     QVBoxLayout,
     QWidget,
@@ -27,6 +28,7 @@ from nfs_scanner.storage import DatasetManager
 from .controls_panel import ControlsPanel
 from .heatmap_view import HeatmapView
 from .log_panel import LogPanel
+from .serial_debug_page import SerialDebugPage
 from .spectrum_panel import SpectrumPanel
 
 
@@ -48,6 +50,7 @@ class MainWindow(QMainWindow):
         self.job_status_label: QLabel
         self.job_progress_label: QLabel
         self.log_panel: LogPanel
+        self.serial_debug_page: SerialDebugPage
         self._last_job_display_snapshot: tuple[str, str, str] | None = None
         self.setWindowTitle("近场扫描系统")
         self.resize(1600, 900)
@@ -63,8 +66,28 @@ class MainWindow(QMainWindow):
         root_layout.setContentsMargins(12, 12, 12, 12)
         root_layout.setSpacing(12)
 
-        top_splitter = QSplitter(Qt.Orientation.Horizontal, central_widget)
-        bottom_splitter = QSplitter(Qt.Orientation.Vertical, central_widget)
+        tab_widget = QTabWidget(central_widget)
+        tab_widget.addTab(self._create_scan_workspace_page(tab_widget), "扫描主界面")
+        self.serial_debug_page = SerialDebugPage(tab_widget)
+        tab_widget.addTab(self.serial_debug_page, "串口调试")
+        root_layout.addWidget(tab_widget)
+        self.setCentralWidget(central_widget)
+        self._load_demo_heatmap()
+        self._update_job_status_display(None)
+
+        self.statusBar().showMessage("系统就绪")
+        self._append_log("[INFO] Application UI initialized")
+
+    def _create_scan_workspace_page(self, parent: QWidget) -> QWidget:
+        """Create the original scan workspace as one tab page."""
+
+        page = QWidget(parent)
+        page_layout = QVBoxLayout(page)
+        page_layout.setContentsMargins(0, 0, 0, 0)
+        page_layout.setSpacing(0)
+
+        top_splitter = QSplitter(Qt.Orientation.Horizontal, page)
+        bottom_splitter = QSplitter(Qt.Orientation.Vertical, page)
 
         self.controls_panel = ControlsPanel()
         self.heatmap_view = HeatmapView()
@@ -72,7 +95,7 @@ class MainWindow(QMainWindow):
         job_status_panel = self._create_job_status_panel()
         self.log_panel = LogPanel()
 
-        bottom_panel = QWidget(central_widget)
+        bottom_panel = QWidget(page)
         bottom_layout = QVBoxLayout(bottom_panel)
         bottom_layout.setContentsMargins(0, 0, 0, 0)
         bottom_layout.setSpacing(8)
@@ -93,13 +116,8 @@ class MainWindow(QMainWindow):
         bottom_splitter.setStretchFactor(1, 0)
         bottom_splitter.setSizes([680, 240])
 
-        root_layout.addWidget(bottom_splitter)
-        self.setCentralWidget(central_widget)
-        self._load_demo_heatmap()
-        self._update_job_status_display(None)
-
-        self.statusBar().showMessage("系统就绪")
-        self._append_log("[INFO] Application UI initialized")
+        page_layout.addWidget(bottom_splitter)
+        return page
 
     def _connect_signals(self) -> None:
         """Connect UI actions to application-layer handlers."""
