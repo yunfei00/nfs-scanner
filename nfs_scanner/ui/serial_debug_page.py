@@ -39,6 +39,8 @@ class MotionStatus:
 class SerialTransport(QWidget):
     """串口传输层，负责端口枚举、连接、发送和接收。"""
 
+    _PORT_KEYWORDS: tuple[str, ...] = ("CH340", "CH341", "wchusbserial")
+
     connected_changed = Signal(bool, str)
     lines_received = Signal(list)
     error_occurred = Signal(str)
@@ -63,11 +65,16 @@ class SerialTransport(QWidget):
         return self._serial_port.portName()
 
     def list_ports(self) -> list[tuple[str, str]]:
-        """列举可用串口。"""
+        """列举可用串口，仅保留目标关键词设备。"""
 
         ports: list[tuple[str, str]] = []
         for info in QSerialPortInfo.availablePorts():
             description = info.description() or "未知设备"
+            manufacturer = info.manufacturer() or ""
+            port_name = info.portName() or ""
+            identity_text = f"{port_name} {description} {manufacturer}".lower()
+            if not any(keyword.lower() in identity_text for keyword in self._PORT_KEYWORDS):
+                continue
             ports.append((info.portName(), f"{info.portName()} - {description}"))
         ports.sort(key=lambda item: item[0])
         return ports

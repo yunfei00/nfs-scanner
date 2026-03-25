@@ -54,6 +54,7 @@ class ScanControlPage(QWidget):
     X_RANGE = (0.0, 200.0)
     Y_RANGE = (-300.0, 0.0)
     Z_RANGE = (0.0, 10.0)
+    PORT_KEYWORDS = ("CH340", "CH341", "wchusbserial")
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -774,11 +775,16 @@ class ScanControlPage(QWidget):
         self.append_log("显示热力图操作触发（占位）")
 
     def _refresh_available_ports(self) -> None:
-        """刷新可用串口列表。"""
+        """刷新可用串口列表，仅显示目标关键词设备。"""
 
         self.port_combo.clear()
         for info in QSerialPortInfo.availablePorts():
             description = info.description() or "未知设备"
+            manufacturer = info.manufacturer() or ""
+            port_name = info.portName() or ""
+            identity_text = f"{port_name} {description} {manufacturer}".lower()
+            if not any(keyword.lower() in identity_text for keyword in self.PORT_KEYWORDS):
+                continue
             self.port_combo.addItem(f"{info.portName()} - {description}", info.portName())
 
     def _send_serial_command(self, command: str) -> tuple[bool, str]:
