@@ -404,6 +404,7 @@ class ScanControlPage(QWidget):
 
         self.instrument_tabs = QTabWidget(content)
         self.instrument_panels = [
+            InstrumentPanel("ZNA Vector Network Analyzer", self),
             InstrumentPanel("频谱仪", self),
             InstrumentPanel("接收机", self),
             InstrumentPanel("功率计", self),
