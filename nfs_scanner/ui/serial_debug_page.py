@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import datetime
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
+    QDoubleSpinBox,
     QFormLayout,
     QFrame,
     QGridLayout,
@@ -15,25 +19,180 @@ from PySide6.QtWidgets import (
     QPushButton,
     QPlainTextEdit,
     QScrollArea,
-    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
 
 
-class SerialDebugPage(QWidget):
-    """串口调试独立页面骨架。
+@dataclass
+class MotionStatus:
+    """运动控制器状态快照。"""
 
-    当前仅提供界面占位与交互入口，不接入真实串口或运动控制硬件。
+    x: float = 0.0
+    y: float = 0.0
+    z: float = 0.0
+    feed_rate: int = 0
+    state: str = "Idle"
+
+
+class MotionProtocolEmulator:
+    """串口协议占位实现（不接入真实硬件）。
+
+    该类用于在当前阶段模拟下位机命令响应，确保页面可调试、可验证。
     """
+
+    X_RANGE = (0.0, 200.0)
+    Y_RANGE = (-300.0, 0.0)
+    Z_RANGE = (0.0, 10.0)
+
+    def __init__(self) -> None:
+        self._connected = False
+        self._status = MotionStatus()
+
+    @property
+    def connected(self) -> bool:
+        """返回当前是否处于“已连接”状态。"""
+
+        return self._connected
+
+    @property
+    def status(self) -> MotionStatus:
+        """返回当前位置状态。"""
+
+        return self._status
+
+    def connect(self) -> tuple[bool, list[str]]:
+        """模拟串口连接。"""
+
+        self._connected = True
+        return True, ["[SIM] 串口已连接（占位实现）"]
+
+    def disconnect(self) -> tuple[bool, list[str]]:
+        """模拟串口断开。"""
+
+        self._connected = False
+        return True, ["[SIM] 串口已断开"]
+
+    def execute(self, command: str) -> tuple[bool, list[str]]:
+        """执行单条串口命令并返回模拟回包。"""
+
+        cmd = command.strip()
+        if not cmd:
+            return False, ["error: empty command"]
+
+        if not self._connected:
+            return False, ["error: serial not connected"]
+
+        if cmd == "$H":
+            self._status.x = 0.0
+            self._status.y = 0.0
+            self._status.z = 0.0
+            self._status.feed_rate = 0
+            return True, ["ok"]
+
+        if cmd == "?":
+            return True, [self._build_position_line(), "ok"]
+
+        if cmd == "$I":
+            return True, ["[VER:1.1f.20260325:SIM]", "[OPT:V,15,128]", "ok"]
+
+        if cmd == "$":
+            return True, ["$H $I ? G1X..Y..Z..F..", "ok"]
+
+        if cmd.startswith("G1"):
+            return self._execute_move_command(cmd)
+
+        return False, [f"error: unsupported command '{cmd}'"]
+
+    def _execute_move_command(self, command: str) -> tuple[bool, list[str]]:
+        """执行 G1 绝对坐标运动命令。"""
+
+        payload = command[2:]
+        parsed: dict[str, float] = {}
+        token = ""
+        axis = ""
+
+        for char in payload:
+            if char in "XYZF":
+                if axis and token:
+                    try:
+                        parsed[axis] = float(token)
+                    except ValueError:
+                        return False, ["error: invalid number in G1 command"]
+                axis = char
+                token = ""
+            elif char in "0123456789.-":
+                token += char
+            elif char.isspace():
+                continue
+            else:
+                return False, [f"error: invalid char '{char}'"]
+
+        if axis and token:
+            try:
+                parsed[axis] = float(token)
+            except ValueError:
+                return False, ["error: invalid number in G1 command"]
+
+        try:
+            target_x = float(parsed["X"])
+            target_y = float(parsed["Y"])
+            target_z = float(parsed["Z"])
+            target_f = int(parsed["F"])
+        except KeyError as error:
+            return False, [f"error: missing {error.args[0]} in G1 command"]
+        except ValueError:
+            return False, ["error: invalid number in G1 command"]
+
+        range_error = self._validate_range(target_x, target_y, target_z)
+        if range_error:
+            return False, [range_error]
+
+        if target_f <= 0:
+            return False, ["error: F must > 0"]
+
+        self._status.x = target_x
+        self._status.y = target_y
+        self._status.z = target_z
+        self._status.feed_rate = target_f
+
+        return True, ["ok"]
+
+    def _validate_range(self, x: float, y: float, z: float) -> str | None:
+        """校验 XYZ 是否在约束范围内。"""
+
+        if not self.X_RANGE[0] <= x <= self.X_RANGE[1]:
+            return "error: X out of range (0~200)"
+
+        if not self.Y_RANGE[0] <= y <= self.Y_RANGE[1]:
+            return "error: Y out of range (-300~0)"
+
+        if not self.Z_RANGE[0] <= z <= self.Z_RANGE[1]:
+            return "error: Z out of range (0~10)"
+
+        return None
+
+    def _build_position_line(self) -> str:
+        """构建协议约定的位置查询响应。"""
+
+        return (
+            f"<{self._status.state}|MPos:{self._status.x:.3f},{self._status.y:.3f},{self._status.z:.3f}|"
+            f"FS:{self._status.feed_rate},0|WCO:0.000,0.000,0.000>"
+        )
+
+
+class SerialDebugPage(QWidget):
+    """串口调试页面。"""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._setup_ui()
+        self._protocol = MotionProtocolEmulator()
+        self._active_step_mm = 1.0
+        self._build_ui()
+        self._bind_signals()
+        self._sync_position_display()
 
-    def _setup_ui(self) -> None:
-        """构建串口调试页整体布局。"""
-
+    def _build_ui(self) -> None:
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(12, 12, 12, 12)
         root_layout.setSpacing(10)
@@ -56,17 +215,33 @@ class SerialDebugPage(QWidget):
         panels_layout.setSpacing(10)
         panels_layout.addWidget(self._create_left_column(), 1)
         panels_layout.addWidget(self._create_right_column(), 1)
-        content_layout.addWidget(panels)
 
+        content_layout.addWidget(panels)
         content_layout.addWidget(self._create_log_group())
-        content_layout.addWidget(QLabel("提示：该页面为独立调试模块，便于后续接入真实串口与运动控制。", container))
 
         scroll_area.setWidget(container)
         root_layout.addWidget(scroll_area)
 
-    def _create_header(self) -> QWidget:
-        """创建页面顶部标题区域。"""
+    def _bind_signals(self) -> None:
+        self.refresh_port_button.clicked.connect(self._handle_refresh_ports)
+        self.connect_button.clicked.connect(self._handle_connect_clicked)
+        self.version_button.clicked.connect(lambda: self._send_command("$I"))
+        self.help_button.clicked.connect(lambda: self._send_command("$"))
+        self.home_button.clicked.connect(lambda: self._send_command("$H"))
+        self.query_button.clicked.connect(lambda: self._send_command("?"))
+        self.send_raw_button.clicked.connect(self._handle_send_raw_command)
+        self.log_send_button.clicked.connect(self._handle_send_log_command)
 
+        for axis in ("X", "Y", "Z"):
+            self.step_buttons[f"{axis}+"].clicked.connect(lambda _=False, a=axis: self._jog_axis(a, +1.0))
+            self.step_buttons[f"{axis}-"].clicked.connect(lambda _=False, a=axis: self._jog_axis(a, -1.0))
+
+        for step, button in self.step_select_buttons.items():
+            button.clicked.connect(lambda _=False, value=step: self._select_step(value))
+
+        self.move_abs_button.clicked.connect(self._handle_move_absolute)
+
+    def _create_header(self) -> QWidget:
         frame = QFrame(self)
         frame.setObjectName("serialDebugHeader")
         frame.setStyleSheet(
@@ -79,38 +254,34 @@ class SerialDebugPage(QWidget):
         layout.setContentsMargins(14, 12, 14, 12)
 
         title_layout = QVBoxLayout()
-        title = QLabel("串口连接与运动系统 / 扫描范围设置", frame)
+        title = QLabel("串口调试与运动控制", frame)
         title.setStyleSheet("font-size: 22px; font-weight: 700;")
-        subtitle = QLabel("负责串口连接、运动平台控制、扫描范围配置（本模块后续独立增强）", frame)
+        subtitle = QLabel("协议命令: $H / ? / G1X..Y..Z..F.. / $I / $", frame)
         subtitle.setStyleSheet("font-size: 14px;")
         title_layout.addWidget(title)
         title_layout.addWidget(subtitle)
 
-        version = QLabel("v0.1.0", frame)
-        version.setStyleSheet("font-size: 14px; font-weight: 600;")
-        version.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.connection_status_label = QLabel("状态：未连接", frame)
+        self.connection_status_label.setStyleSheet("font-size: 14px; font-weight: 600;")
+        self.connection_status_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
         layout.addLayout(title_layout, 1)
-        layout.addWidget(version)
+        layout.addWidget(self.connection_status_label)
         return frame
 
     def _create_protocol_hint(self) -> QWidget:
-        """创建协议说明栏。"""
-
         frame = QFrame(self)
         frame.setFrameShape(QFrame.Shape.StyledPanel)
         layout = QHBoxLayout(frame)
         layout.setContentsMargins(12, 6, 12, 6)
         text = (
-            "协议: 115200 波特率 · 命令: $H(回零) ?(查询) G1X..Z..(运动) · "
-            "坐标范围: X[0~200] Y[0~-300] Z[0~10]"
+            "波特率: 115200 | 范围: X(0~200) Y(0~-300) Z(0~10) | "
+            "单轴点动时自动带 F1000"
         )
         layout.addWidget(QLabel(text, frame))
         return frame
 
     def _create_left_column(self) -> QWidget:
-        """创建左侧串口与运动控制区域。"""
-
         column = QWidget(self)
         layout = QVBoxLayout(column)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -121,8 +292,6 @@ class SerialDebugPage(QWidget):
         return column
 
     def _create_right_column(self) -> QWidget:
-        """创建右侧扫描范围设置区域。"""
-
         column = QWidget(self)
         layout = QVBoxLayout(column)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -133,139 +302,155 @@ class SerialDebugPage(QWidget):
         return column
 
     def _create_serial_group(self) -> QGroupBox:
-        """创建串口连接分组。"""
-
         group = QGroupBox("串口连接", self)
         layout = QFormLayout(group)
 
-        port_combo = QComboBox(group)
-        port_combo.addItems(["COM3 - USB-SERIAL CH340 (可用)", "COM4 - USB Serial Device"])
+        self.port_combo = QComboBox(group)
+        self.port_combo.addItems(["COM3 - USB-SERIAL CH340", "COM4 - USB Serial Device"])
 
-        refresh_button = QPushButton("刷新", group)
-        refresh_button.setMaximumWidth(96)
+        self.refresh_port_button = QPushButton("刷新", group)
+        self.refresh_port_button.setMaximumWidth(96)
 
         row = QWidget(group)
         row_layout = QHBoxLayout(row)
         row_layout.setContentsMargins(0, 0, 0, 0)
-        row_layout.addWidget(port_combo, 1)
-        row_layout.addWidget(refresh_button)
+        row_layout.addWidget(self.port_combo, 1)
+        row_layout.addWidget(self.refresh_port_button)
 
-        connect_button = QPushButton("连接串口", group)
-        read_version_button = QPushButton("读取版本 $I", group)
-        status = QLabel("状态：未连接", group)
+        self.baudrate_combo = QComboBox(group)
+        self.baudrate_combo.addItems(["115200"])
+
+        self.connect_button = QPushButton("连接串口", group)
+        self.version_button = QPushButton("读取版本 $I", group)
+        self.help_button = QPushButton("帮助命令 $", group)
+
+        self.serial_status_label = QLabel("串口状态：未连接", group)
 
         layout.addRow("串口端口", row)
-        layout.addRow("", connect_button)
-        layout.addRow("", read_version_button)
-        layout.addRow("", status)
+        layout.addRow("波特率", self.baudrate_combo)
+        layout.addRow("", self.connect_button)
+        layout.addRow("", self.version_button)
+        layout.addRow("", self.help_button)
+        layout.addRow("", self.serial_status_label)
         return group
 
     def _create_system_command_group(self) -> QGroupBox:
-        """创建系统命令分组。"""
-
         group = QGroupBox("系统命令", self)
         layout = QVBoxLayout(group)
-        button_row = QHBoxLayout()
-        button_row.addWidget(QPushButton("放回零点 $H", group))
-        button_row.addWidget(QPushButton("位置查询 ?", group))
-        button_row.addWidget(QPushButton("紧急停止", group))
 
-        raw_command = QLineEdit(group)
-        raw_command.setPlaceholderText("输入原始命令，如: $I 或 G1X10Y-10Z5F1000")
-        send_button = QPushButton("发送", group)
+        button_row = QHBoxLayout()
+        self.home_button = QPushButton("复位 $H", group)
+        self.query_button = QPushButton("位置查询 ?", group)
+        button_row.addWidget(self.home_button)
+        button_row.addWidget(self.query_button)
+
+        self.raw_command_input = QLineEdit(group)
+        self.raw_command_input.setPlaceholderText("输入原始命令，如: G1X100Y-100Z5F1000")
+        self.send_raw_button = QPushButton("发送", group)
 
         send_row = QHBoxLayout()
-        send_row.addWidget(raw_command, 1)
-        send_row.addWidget(send_button)
+        send_row.addWidget(self.raw_command_input, 1)
+        send_row.addWidget(self.send_raw_button)
 
         layout.addLayout(button_row)
         layout.addLayout(send_row)
         return group
 
     def _create_motion_group(self) -> QGroupBox:
-        """创建运动控制分组。"""
-
         group = QGroupBox("运动控制", self)
         layout = QVBoxLayout(group)
 
         status_row = QHBoxLayout()
         status_row.addWidget(QLabel("当前位置 MPos", group))
         status_row.addStretch(1)
-        status_row.addWidget(QPushButton("刷新状态", group))
+        refresh_status_button = QPushButton("刷新状态", group)
+        refresh_status_button.clicked.connect(lambda: self._send_command("?"))
+        status_row.addWidget(refresh_status_button)
         layout.addLayout(status_row)
 
         position_grid = QGridLayout()
-        position_grid.addWidget(QLabel("X: 0.000", group), 0, 0)
-        position_grid.addWidget(QLabel("Y: 0.000", group), 0, 1)
-        position_grid.addWidget(QLabel("Z: 0.000", group), 0, 2)
-        position_grid.addWidget(QLabel("F: 0", group), 0, 3)
+        self.x_label = QLabel("X: 0.000", group)
+        self.y_label = QLabel("Y: 0.000", group)
+        self.z_label = QLabel("Z: 0.000", group)
+        self.f_label = QLabel("F: 0", group)
+        position_grid.addWidget(self.x_label, 0, 0)
+        position_grid.addWidget(self.y_label, 0, 1)
+        position_grid.addWidget(self.z_label, 0, 2)
+        position_grid.addWidget(self.f_label, 0, 3)
         layout.addLayout(position_grid)
 
         step_row = QHBoxLayout()
         step_row.addWidget(QLabel("点动步距", group))
-        for step in ("0.1", "1.0", "5.0", "10.0"):
-            step_row.addWidget(QPushButton(step, group))
+        self.step_select_buttons: dict[float, QPushButton] = {}
+        for step in (0.1, 1.0, 5.0, 10.0):
+            button = QPushButton(f"{step}", group)
+            self.step_select_buttons[step] = button
+            step_row.addWidget(button)
         step_row.addWidget(QLabel("mm", group))
         step_row.addStretch(1)
         layout.addLayout(step_row)
 
         jog_grid = QGridLayout()
-        jog_grid.addWidget(QPushButton("X +", group), 0, 0)
-        jog_grid.addWidget(QPushButton("Y +", group), 0, 1)
-        jog_grid.addWidget(QPushButton("Z +", group), 0, 2)
-        jog_grid.addWidget(QPushButton("X -", group), 1, 0)
-        jog_grid.addWidget(QPushButton("Y -", group), 1, 1)
-        jog_grid.addWidget(QPushButton("Z -", group), 1, 2)
+        self.step_buttons: dict[str, QPushButton] = {
+            "X+": QPushButton("X +", group),
+            "Y+": QPushButton("Y +", group),
+            "Z+": QPushButton("Z +", group),
+            "X-": QPushButton("X -", group),
+            "Y-": QPushButton("Y -", group),
+            "Z-": QPushButton("Z -", group),
+        }
+        jog_grid.addWidget(self.step_buttons["X+"], 0, 0)
+        jog_grid.addWidget(self.step_buttons["Y+"], 0, 1)
+        jog_grid.addWidget(self.step_buttons["Z+"], 0, 2)
+        jog_grid.addWidget(self.step_buttons["X-"], 1, 0)
+        jog_grid.addWidget(self.step_buttons["Y-"], 1, 1)
+        jog_grid.addWidget(self.step_buttons["Z-"], 1, 2)
         layout.addLayout(jog_grid)
 
+        abs_group = QGroupBox("绝对坐标移动", group)
+        abs_layout = QFormLayout(abs_group)
+
+        self.abs_x_input = QDoubleSpinBox(abs_group)
+        self.abs_x_input.setRange(0.0, 200.0)
+        self.abs_x_input.setDecimals(3)
+
+        self.abs_y_input = QDoubleSpinBox(abs_group)
+        self.abs_y_input.setRange(-300.0, 0.0)
+        self.abs_y_input.setDecimals(3)
+
+        self.abs_z_input = QDoubleSpinBox(abs_group)
+        self.abs_z_input.setRange(0.0, 10.0)
+        self.abs_z_input.setDecimals(3)
+
+        self.abs_f_input = QDoubleSpinBox(abs_group)
+        self.abs_f_input.setRange(1.0, 100000.0)
+        self.abs_f_input.setDecimals(0)
+        self.abs_f_input.setValue(1000.0)
+
+        self.move_abs_button = QPushButton("执行 G1", abs_group)
+
+        abs_layout.addRow("X", self.abs_x_input)
+        abs_layout.addRow("Y", self.abs_y_input)
+        abs_layout.addRow("Z", self.abs_z_input)
+        abs_layout.addRow("F", self.abs_f_input)
+        abs_layout.addRow("", self.move_abs_button)
+
+        layout.addWidget(abs_group)
         return group
 
     def _create_scan_range_group(self) -> QGroupBox:
-        """创建扫描范围配置分组。"""
-
-        group = QGroupBox("扫描范围设置", self)
+        group = QGroupBox("扫描范围设置（联动校验）", self)
         layout = QVBoxLayout(group)
 
         layout.addWidget(self._create_axis_range_group("X 轴范围 (mm)", "0.000", "100.000", "5.000"))
         layout.addWidget(self._create_axis_range_group("Y 轴范围 (mm)", "0.000", "-100.000", "-5.000"))
 
-        z_row = QHBoxLayout()
-        z_row.addWidget(QLabel("Z 轴高度 (mm)", group))
-        z_spin = QSpinBox(group)
-        z_spin.setRange(0, 10)
-        z_spin.setValue(5)
-        z_row.addWidget(z_spin)
-        z_row.addStretch(1)
-        layout.addLayout(z_row)
-
-        settling_row = QHBoxLayout()
-        settling_row.addWidget(QLabel("驻留时间", group))
-        dwell_spin = QSpinBox(group)
-        dwell_spin.setRange(1, 5000)
-        dwell_spin.setValue(100)
-        settling_row.addWidget(dwell_spin)
-        settling_row.addWidget(QLabel("ms", group))
-        settling_row.addSpacing(20)
-        settling_row.addWidget(QLabel("扫描模式", group))
-        mode_combo = QComboBox(group)
-        mode_combo.addItems(["蛇形扫描（推荐）", "栅格扫描"])
-        settling_row.addWidget(mode_combo)
-        layout.addLayout(settling_row)
-
-        summary = QPlainTextEdit(group)
-        summary.setReadOnly(True)
-        summary.setMaximumHeight(80)
-        summary.setPlainText(
-            "路径预览（计算结果）\n"
-            "X: 0→100 步长 5 | Y: 0→-100 步长 -5\n"
-            "预计扫描点数: 441 点"
-        )
-        layout.addWidget(summary)
+        hint = QLabel("说明：Y 方向采用负向坐标；超出 X/Y/Z 约束会拒绝运动命令。", group)
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
         return group
 
     def _create_axis_range_group(self, title: str, start: str, stop: str, step: str) -> QGroupBox:
-        """创建单轴范围设置子分组。"""
-
         group = QGroupBox(title, self)
         layout = QFormLayout(group)
 
@@ -279,8 +464,6 @@ class SerialDebugPage(QWidget):
         return group
 
     def _create_route_preview_group(self) -> QGroupBox:
-        """创建扫描路径预览占位分组。"""
-
         group = QGroupBox("扫描路径预览", self)
         layout = QVBoxLayout(group)
         placeholder = QLabel("路径预览区（后续接入绘图与越界提示）", group)
@@ -291,27 +474,107 @@ class SerialDebugPage(QWidget):
         return group
 
     def _create_log_group(self) -> QGroupBox:
-        """创建底部模块日志分组。"""
-
         group = QGroupBox("模块日志（串口与运动系统）", self)
         layout = QVBoxLayout(group)
 
-        log_view = QPlainTextEdit(group)
-        log_view.setReadOnly(True)
-        log_view.setMinimumHeight(180)
-        log_view.setPlainText(
-            "[15:30:45.123] [INFO] 模块初始化完成\n"
-            "[15:30:45.456] [INFO] 坐标范围: X[0~200] Y[0~-300] Z[0~10]\n"
-            "[15:30:50.000] [WARN] 请先连接串口设备"
-        )
+        self.log_view = QPlainTextEdit(group)
+        self.log_view.setReadOnly(True)
+        self.log_view.setMinimumHeight(180)
+        self.log_view.setPlainText("[INFO] 串口调试模块已初始化（占位实现）")
 
         command_row = QHBoxLayout()
-        command_input = QLineEdit(group)
-        command_input.setPlaceholderText("输入命令直接发送（如: ? 或 $I）")
-        send_button = QPushButton("发送", group)
-        command_row.addWidget(command_input, 1)
-        command_row.addWidget(send_button)
+        self.log_command_input = QLineEdit(group)
+        self.log_command_input.setPlaceholderText("输入命令直接发送（如: ? 或 $I）")
+        self.log_send_button = QPushButton("发送", group)
+        command_row.addWidget(self.log_command_input, 1)
+        command_row.addWidget(self.log_send_button)
 
-        layout.addWidget(log_view)
+        layout.addWidget(self.log_view)
         layout.addLayout(command_row)
         return group
+
+    def _handle_refresh_ports(self) -> None:
+        self._append_log("[SIM] 串口列表刷新完成：COM3 / COM4")
+
+    def _handle_connect_clicked(self) -> None:
+        if self._protocol.connected:
+            _, lines = self._protocol.disconnect()
+            for line in lines:
+                self._append_log(line)
+            self.connect_button.setText("连接串口")
+            self.connection_status_label.setText("状态：未连接")
+            self.serial_status_label.setText("串口状态：未连接")
+            return
+
+        _, lines = self._protocol.connect()
+        for line in lines:
+            self._append_log(line)
+        self.connect_button.setText("断开串口")
+        self.connection_status_label.setText("状态：已连接")
+        self.serial_status_label.setText(f"串口状态：已连接 {self.port_combo.currentText()} @115200")
+
+    def _handle_send_raw_command(self) -> None:
+        self._send_command(self.raw_command_input.text())
+
+    def _handle_send_log_command(self) -> None:
+        self._send_command(self.log_command_input.text())
+
+    def _handle_move_absolute(self) -> None:
+        command = (
+            f"G1X{self.abs_x_input.value():.3f}"
+            f"Y{self.abs_y_input.value():.3f}"
+            f"Z{self.abs_z_input.value():.3f}"
+            f"F{int(self.abs_f_input.value())}"
+        )
+        self._send_command(command)
+
+    def _jog_axis(self, axis: str, direction: float) -> None:
+        status = self._protocol.status
+        x, y, z = status.x, status.y, status.z
+        delta = self._active_step_mm * direction
+
+        if axis == "X":
+            x += delta
+        elif axis == "Y":
+            y += delta
+        elif axis == "Z":
+            z += delta
+
+        command = f"G1X{x:.3f}Y{y:.3f}Z{z:.3f}F1000"
+        self._send_command(command)
+
+    def _select_step(self, step: float) -> None:
+        self._active_step_mm = step
+        self._append_log(f"[UI] 点动步距已设置为 {step} mm")
+
+    def _send_command(self, command: str) -> None:
+        cmd = command.strip()
+        if not cmd:
+            self._append_log("[WARN] 命令为空")
+            return
+
+        self._append_log(f">>> {cmd}")
+        success, lines = self._protocol.execute(cmd)
+        for line in lines:
+            self._append_log(line)
+
+        if success:
+            self.raw_command_input.clear()
+            self.log_command_input.clear()
+            self._sync_position_display()
+
+    def _sync_position_display(self) -> None:
+        status = self._protocol.status
+        self.x_label.setText(f"X: {status.x:.3f}")
+        self.y_label.setText(f"Y: {status.y:.3f}")
+        self.z_label.setText(f"Z: {status.z:.3f}")
+        self.f_label.setText(f"F: {status.feed_rate}")
+
+        self.abs_x_input.setValue(status.x)
+        self.abs_y_input.setValue(status.y)
+        self.abs_z_input.setValue(status.z)
+        self.abs_f_input.setValue(float(max(status.feed_rate, 1000)))
+
+    def _append_log(self, message: str) -> None:
+        now = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        self.log_view.appendPlainText(f"[{now}] {message}")
