@@ -43,6 +43,29 @@ class ScanManager:
 
         return self._current_job
 
+    def get_motion_axis_limits(self) -> dict[str, tuple[float, float]]:
+        """Return the current motion-axis limits for UI display and validation."""
+
+        return self._motion_controller.get_axis_limits()
+
+    def move_to_position(self, x: float, y: float, z: float) -> tuple[bool, str]:
+        """Execute one manual move command if the target position is in range."""
+
+        target_x = float(x)
+        target_y = float(y)
+        target_z = float(z)
+        is_valid, reason = self._motion_controller.validate_target(target_x, target_y, target_z)
+        if not is_valid:
+            return False, reason
+
+        self._motion_controller.connect()
+        try:
+            self._motion_controller.move_to(target_x, target_y, target_z)
+        finally:
+            self._motion_controller.disconnect()
+
+        return True, ""
+
     def start_scan(self) -> bool:
         """Enter placeholder scan-running state."""
 
