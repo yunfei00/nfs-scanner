@@ -191,14 +191,32 @@ class MainWindow(QMainWindow):
         self._append_log("[INFO] Motion controller connect requested")
 
     def _handle_move_command(self) -> None:
-        """Handle the placeholder move command."""
+        """Handle the manual move command with range validation."""
 
-        x_value = self._format_axis_value(self.controls_panel.x_input.text())
-        y_value = self._format_axis_value(self.controls_panel.y_input.text())
-        z_value = self._format_axis_value(self.controls_panel.z_input.text())
+        try:
+            x_value = self._parse_axis_value(self.controls_panel.x_input.text(), "X")
+            y_value = self._parse_axis_value(self.controls_panel.y_input.text(), "Y")
+            z_value = self._parse_axis_value(self.controls_panel.z_input.text(), "Z")
+        except ValueError as error:
+            self.statusBar().showMessage("移动参数无效，命令未执行")
+            self._append_log(f"[WARN] Move command rejected: {error}")
+            return
 
-        self.statusBar().showMessage("移动命令已记录")
-        self._append_log(f"[INFO] Move command X={x_value} Y={y_value} Z={z_value}")
+        is_success, message = self.scan_manager.move_to_position(x_value, y_value, z_value)
+        if not is_success:
+            axis_limits = self.scan_manager.get_motion_axis_limits()
+            self.statusBar().showMessage("目标位置超出运动范围，命令未执行")
+            self._append_log(f"[WARN] Move command rejected: {message}")
+            self._append_log(
+                "[WARN] Motion limits: "
+                f"X[{axis_limits['X'][0]:.1f}, {axis_limits['X'][1]:.1f}] "
+                f"Y[{axis_limits['Y'][0]:.1f}, {axis_limits['Y'][1]:.1f}] "
+                f"Z[{axis_limits['Z'][0]:.1f}, {axis_limits['Z'][1]:.1f}]"
+            )
+            return
+
+        self.statusBar().showMessage("移动命令执行完成")
+        self._append_log(f"[INFO] Move executed to X={x_value:.3f} Y={y_value:.3f} Z={z_value:.3f}")
 
     def _handle_start_scan(self) -> None:
         """Run one mock scan and progressively update the heatmap view."""
@@ -371,11 +389,17 @@ class MainWindow(QMainWindow):
         self._append_log(f"[SCAN] scan mode: {scan_mode}")
         self._append_log(f"[SCAN] dataset save path: {resolved_output_dir}")
 
-    def _format_axis_value(self, value: str) -> str:
-        """Normalize axis input for placeholder command logging."""
+    def _parse_axis_value(self, value: str, axis_name: str) -> float:
+        """Parse one axis value from text input."""
 
         normalized = value.strip()
-        return normalized if normalized else "?"
+        if not normalized:
+            raise ValueError(f"{axis_name} 轴输入为空")
+
+        try:
+            return float(normalized)
+        except ValueError as error:
+            raise ValueError(f"{axis_name} 轴输入不是有效数字: {normalized}") from error
 
     def _update_job_status_display(self, job: ScanJob | None) -> bool:
         """Update the visible job-status summary and report whether it changed."""
