@@ -5,8 +5,9 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QTimer, Qt
+from PySide6.QtCore import QIODevice, QTimer, Qt
 from PySide6.QtGui import QDesktopServices
+from PySide6.QtSerialPort import QSerialPort, QSerialPortInfo
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -59,6 +60,10 @@ class ScanControlPage(QWidget):
         self.current_feed_rate = 1000.0
         self.active_jog_step_mm = 1.0
         self.serial_is_open = False
+        self._serial_port = QSerialPort(self)
+        self._serial_port.readyRead.connect(self._on_serial_ready_read)
+        self._serial_port.errorOccurred.connect(self._on_serial_error)
+        self._serial_read_buffer = ""
 
         self.port_combo: QComboBox
         self.baudrate_combo: QComboBox
@@ -110,7 +115,7 @@ class ScanControlPage(QWidget):
         splitter.addWidget(self._build_right_panel())
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 1)
-        splitter.setSizes([420, 760])
+        splitter.setSizes([320, 860])
 
         root_layout.addWidget(splitter, 1)
         root_layout.addWidget(self._build_status_bar())
@@ -149,7 +154,7 @@ class ScanControlPage(QWidget):
         return container
 
     def _create_serial_setting_group(self) -> QGroupBox:
-        """创建串口设置区域（占位实现，不接入真实串口）。"""
+        """创建串口设置区域。"""
 
         group = QGroupBox("串口设置", self)
         grid = QGridLayout(group)
@@ -157,7 +162,7 @@ class ScanControlPage(QWidget):
         grid.setVerticalSpacing(6)
 
         self.port_combo = QComboBox(group)
-        self.port_combo.addItems(["COM1", "COM2", "COM3", "/dev/ttyUSB0"])
+        self._refresh_available_ports()
 
         self.baudrate_combo = QComboBox(group)
         self.baudrate_combo.addItems(["9600", "57600", "115200", "230400"])
@@ -165,8 +170,8 @@ class ScanControlPage(QWidget):
 
         self.open_serial_button = QPushButton("打开串口", group)
         self.close_serial_button = QPushButton("关闭串口", group)
-        self.open_serial_button.setFixedHeight(30)
-        self.close_serial_button.setFixedHeight(30)
+        self.open_serial_button.setFixedHeight(26)
+        self.close_serial_button.setFixedHeight(26)
         self.open_serial_button.clicked.connect(self.on_open_serial)
         self.close_serial_button.clicked.connect(self.on_close_serial)
 
@@ -196,7 +201,7 @@ class ScanControlPage(QWidget):
         for step_value in (0.01, 0.1, 1.0, 5.0, 10.0, 20.0):
             button = QPushButton(f"{step_value:g}", group)
             button.setCheckable(True)
-            button.setFixedHeight(28)
+            button.setFixedHeight(24)
             button.clicked.connect(lambda _=False, value=step_value: self.on_select_jog_step(value))
             self.jog_step_buttons[step_value] = button
             step_button_layout.addWidget(button)
@@ -220,7 +225,7 @@ class ScanControlPage(QWidget):
             y_minus_button,
             z_minus_button,
         ]:
-            button.setFixedHeight(30)
+            button.setFixedHeight(24)
 
         x_plus_button.clicked.connect(lambda: self._move_axis("X", self.active_jog_step_mm))
         y_plus_button.clicked.connect(lambda: self._move_axis("Y", self.active_jog_step_mm))
@@ -250,7 +255,7 @@ class ScanControlPage(QWidget):
         version_button = QPushButton("读取版本", group)
         help_button = QPushButton("帮助命令", group)
         for button in [home_button, query_button, version_button, help_button]:
-            button.setFixedHeight(30)
+            button.setFixedHeight(24)
 
         home_button.clicked.connect(self.on_home_command)
         query_button.clicked.connect(self.on_query_position_command)
@@ -509,13 +514,25 @@ class ScanControlPage(QWidget):
         self.scan_table.setItem(0, col, QTableWidgetItem(text))
 
     def _move_axis(self, axis: str, delta: float) -> None:
+        target_x = self.current_x
+        target_y = self.current_y
+        target_z = self.current_z
         if axis == "X":
-            self.current_x += delta
+            target_x += delta
         elif axis == "Y":
-            self.current_y += delta
+            target_y += delta
         else:
-            self.current_z += delta
+            target_z += delta
 
+        command = f"G1 X{target_x:.2f} Y{target_y:.2f} Z{target_z:.2f} F{self.current_feed_rate:.0f}"
+        sent, reason = self._send_serial_command(command)
+        if not sent:
+            self.append_log(f"轴移动失败: {reason}")
+            return
+
+        self.current_x = target_x
+        self.current_y = target_y
+        self.current_z = target_z
         self.update_position_status(self.current_x, self.current_y, self.current_z)
         self.append_log(f"轴移动: {axis} {'+' if delta >= 0 else ''}{delta:.2f} mm")
 
@@ -569,11 +586,32 @@ class ScanControlPage(QWidget):
         self._set_scan_button_states(status_text)
 
     def on_open_serial(self) -> None:
+        selected_port = self.port_combo.currentData()
+        if not selected_port:
+            selected_port = self.port_combo.currentText().strip()
+        if not selected_port:
+            self.append_log("未选择可用串口")
+            return
+        self._serial_port.setPortName(selected_port)
+        self._serial_port.setBaudRate(int(self.baudrate_combo.currentText()))
+        self._serial_port.setDataBits(QSerialPort.DataBits.Data8)
+        self._serial_port.setParity(QSerialPort.Parity.NoParity)
+        self._serial_port.setStopBits(QSerialPort.StopBits.OneStop)
+        self._serial_port.setFlowControl(QSerialPort.FlowControl.NoFlowControl)
+
+        if not self._serial_port.open(QIODevice.OpenModeFlag.ReadWrite):
+            self.serial_is_open = False
+            self._sync_serial_buttons()
+            self.append_log(f"串口打开失败: {self._serial_port.errorString()}")
+            return
+
         self.serial_is_open = True
         self._sync_serial_buttons()
         self.append_log(f"串口已打开: {self.port_combo.currentText()} @ {self.baudrate_combo.currentText()}")
 
     def on_close_serial(self) -> None:
+        if self._serial_port.isOpen():
+            self._serial_port.close()
         self.serial_is_open = False
         self._sync_serial_buttons()
         self.append_log("串口已关闭")
@@ -586,6 +624,10 @@ class ScanControlPage(QWidget):
             self.append_log(f"点动步距切换为 {step_value:.2f} mm")
 
     def on_home_command(self) -> None:
+        sent, reason = self._send_serial_command("$H")
+        if not sent:
+            self.append_log(f"发送命令失败: $H（复位），原因: {reason}")
+            return
         self.current_x = 0.0
         self.current_y = 0.0
         self.current_z = 0.0
@@ -593,13 +635,25 @@ class ScanControlPage(QWidget):
         self.append_log("发送命令: $H（复位）")
 
     def on_query_position_command(self) -> None:
-        self.append_log(f"发送命令: ? -> X{self.current_x:.2f} Y{self.current_y:.2f} Z{self.current_z:.2f}")
+        sent, reason = self._send_serial_command("?")
+        if not sent:
+            self.append_log(f"发送命令失败: ?，原因: {reason}")
+            return
+        self.append_log("发送命令: ?（位置查询）")
 
     def on_read_version_command(self) -> None:
-        self.append_log("发送命令: $I -> MockMotion v0.1")
+        sent, reason = self._send_serial_command("$I")
+        if not sent:
+            self.append_log(f"发送命令失败: $I，原因: {reason}")
+            return
+        self.append_log("发送命令: $I（读取版本）")
 
     def on_help_command(self) -> None:
-        self.append_log("发送命令: $ -> 支持命令: $H / ? / $I / G1")
+        sent, reason = self._send_serial_command("$")
+        if not sent:
+            self.append_log(f"发送命令失败: $，原因: {reason}")
+            return
+        self.append_log("发送命令: $（帮助命令）")
 
     def on_execute_absolute_move(self) -> None:
         try:
@@ -611,12 +665,18 @@ class ScanControlPage(QWidget):
             self.append_log("绝对坐标运动输入无效，请输入数字")
             return
 
+        command = f"G1 X{x:.2f} Y{y:.2f} Z{z:.2f} F{f:.0f}"
+        sent, reason = self._send_serial_command(command)
+        if not sent:
+            self.append_log(f"绝对坐标运动发送失败，原因: {reason}")
+            return
+
         self.current_x = x
         self.current_y = y
         self.current_z = z
         self.current_feed_rate = f
         self.update_position_status(self.current_x, self.current_y, self.current_z)
-        self.append_log(f"发送命令: G1 X{x:.2f} Y{y:.2f} Z{z:.2f} F{f:.0f}")
+        self.append_log(f"发送命令: {command}")
 
     def on_set_start_point(self) -> None:
         self._update_table_cell("start_x", self.current_x)
@@ -632,15 +692,27 @@ class ScanControlPage(QWidget):
 
     def on_start_scan(self) -> None:
         self.update_system_status("扫描中")
-        self.append_log("收到开始扫描命令（占位逻辑）")
+        sent, reason = self._send_serial_command("~")
+        if sent:
+            self.append_log("发送命令: ~（开始/继续）")
+        else:
+            self.append_log(f"发送命令失败: ~，原因: {reason}")
 
     def on_pause_scan(self) -> None:
         self.update_system_status("暂停")
-        self.append_log("收到暂停扫描命令（占位逻辑）")
+        sent, reason = self._send_serial_command("!")
+        if sent:
+            self.append_log("发送命令: !（暂停）")
+        else:
+            self.append_log(f"发送命令失败: !，原因: {reason}")
 
     def on_stop_scan(self) -> None:
         self.update_system_status("停止")
-        self.append_log("收到停止扫描命令（占位逻辑）")
+        sent, reason = self._send_serial_command("\x18")
+        if sent:
+            self.append_log("发送命令: Ctrl+X（停止/复位）")
+        else:
+            self.append_log(f"发送命令失败: Ctrl+X，原因: {reason}")
 
     def on_clear_log(self) -> None:
         self.log_edit.clear()
@@ -663,3 +735,72 @@ class ScanControlPage(QWidget):
     def on_show_heatmap(self) -> None:
         QMessageBox.information(self, "占位提示", "热力图显示功能将在后续版本接入。")
         self.append_log("显示热力图操作触发（占位）")
+
+    def _refresh_available_ports(self) -> None:
+        """刷新可用串口列表。"""
+
+        self.port_combo.clear()
+        for info in QSerialPortInfo.availablePorts():
+            description = info.description() or "未知设备"
+            self.port_combo.addItem(f"{info.portName()} - {description}", info.portName())
+
+    def _send_serial_command(self, command: str) -> tuple[bool, str]:
+        """通过串口发送一条命令，自动追加 CRLF。"""
+
+        if not self.serial_is_open or not self._serial_port.isOpen():
+            return False, "串口未打开"
+
+        payload = f"{command}\r\n".encode("utf-8")
+        written = self._serial_port.write(payload)
+        if written <= 0:
+            return False, self._serial_port.errorString() or "写入失败"
+        if not self._serial_port.waitForBytesWritten(300):
+            return False, self._serial_port.errorString() or "写入超时"
+        return True, "发送成功"
+
+    def _on_serial_ready_read(self) -> None:
+        """处理串口返回数据并写入日志。"""
+
+        raw_data = bytes(self._serial_port.readAll())
+        if not raw_data:
+            return
+
+        self._serial_read_buffer += raw_data.decode("utf-8", errors="replace")
+        normalized = self._serial_read_buffer.replace("\r", "\n")
+        lines = normalized.split("\n")
+        pending = lines.pop() if normalized and not normalized.endswith("\n") else ""
+        self._serial_read_buffer = pending
+
+        for line in (item.strip() for item in lines):
+            if not line:
+                continue
+            self.append_log(f"串口返回: {line}")
+            self._try_update_position_from_response(line)
+
+    def _try_update_position_from_response(self, line: str) -> None:
+        """尝试从状态返回中更新坐标显示。"""
+
+        if not line.startswith("<") or "MPos:" not in line:
+            return
+        mpos_segment = line.split("MPos:", 1)[1].split("|", 1)[0]
+        values = mpos_segment.split(",")
+        if len(values) < 3:
+            return
+        try:
+            x_val, y_val, z_val = float(values[0]), float(values[1]), float(values[2])
+        except ValueError:
+            return
+        self.current_x = x_val
+        self.current_y = y_val
+        self.current_z = z_val
+        self.update_position_status(self.current_x, self.current_y, self.current_z)
+
+    def _on_serial_error(self, error: QSerialPort.SerialPortError) -> None:
+        """处理串口底层错误。"""
+
+        if error in (
+            QSerialPort.SerialPortError.NoError,
+            QSerialPort.SerialPortError.TimeoutError,
+        ):
+            return
+        self.append_log(f"串口错误: {self._serial_port.errorString()}")
