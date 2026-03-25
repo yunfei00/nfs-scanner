@@ -203,7 +203,7 @@ class ScanControlPage(QWidget):
 
         grid.addWidget(step_button_container, 0, 1, 1, 5)
         grid.addWidget(QLabel("mm", group), 0, 6)
-        self.on_select_jog_step(1.0)
+        self.on_select_jog_step(1.0, emit_log=False)
 
         x_plus_button = QPushButton("X+", group)
         y_plus_button = QPushButton("Y+", group)
@@ -578,11 +578,12 @@ class ScanControlPage(QWidget):
         self._sync_serial_buttons()
         self.append_log("串口已关闭")
 
-    def on_select_jog_step(self, step_value: float) -> None:
+    def on_select_jog_step(self, step_value: float, *, emit_log: bool = True) -> None:
         self.active_jog_step_mm = step_value
         for value, button in self.jog_step_buttons.items():
             button.setChecked(value == step_value)
-        self.append_log(f"点动步距切换为 {step_value:.2f} mm")
+        if emit_log:
+            self.append_log(f"点动步距切换为 {step_value:.2f} mm")
 
     def on_home_command(self) -> None:
         self.current_x = 0.0
