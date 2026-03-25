@@ -5,7 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QIODevice, QTimer, Qt, Signal
+from PySide6.QtSerialPort import QSerialPort, QSerialPortInfo
 from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
@@ -35,162 +36,137 @@ class MotionStatus:
     state: str = "Idle"
 
 
-class MotionProtocolEmulator:
-    """串口协议占位实现（不接入真实硬件）。
+class SerialTransport(QWidget):
+    """串口传输层，负责端口枚举、连接、发送和接收。"""
 
-    该类用于在当前阶段模拟下位机命令响应，确保页面可调试、可验证。
-    """
+    connected_changed = Signal(bool, str)
+    lines_received = Signal(list)
+    error_occurred = Signal(str)
 
-    X_RANGE = (0.0, 200.0)
-    Y_RANGE = (-300.0, 0.0)
-    Z_RANGE = (0.0, 10.0)
-
-    def __init__(self) -> None:
-        self._connected = False
-        self._status = MotionStatus()
-
-    @property
-    def connected(self) -> bool:
-        """返回当前是否处于“已连接”状态。"""
-
-        return self._connected
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._serial_port = QSerialPort(self)
+        self._serial_port.readyRead.connect(self._on_ready_read)
+        self._serial_port.errorOccurred.connect(self._on_error)
+        self._read_buffer = ""
 
     @property
-    def status(self) -> MotionStatus:
-        """返回当前位置状态。"""
+    def is_connected(self) -> bool:
+        """返回串口是否处于打开状态。"""
 
-        return self._status
+        return self._serial_port.isOpen()
 
-    def connect(self) -> tuple[bool, list[str]]:
-        """模拟串口连接。"""
+    @property
+    def port_name(self) -> str:
+        """返回当前端口名。"""
 
-        self._connected = True
-        return True, ["[SIM] 串口已连接（占位实现）"]
+        return self._serial_port.portName()
 
-    def disconnect(self) -> tuple[bool, list[str]]:
-        """模拟串口断开。"""
+    def list_ports(self) -> list[tuple[str, str]]:
+        """列举可用串口。"""
 
-        self._connected = False
-        return True, ["[SIM] 串口已断开"]
+        ports: list[tuple[str, str]] = []
+        for info in QSerialPortInfo.availablePorts():
+            description = info.description() or "未知设备"
+            ports.append((info.portName(), f"{info.portName()} - {description}"))
+        ports.sort(key=lambda item: item[0])
+        return ports
 
-    def execute(self, command: str) -> tuple[bool, list[str]]:
-        """执行单条串口命令并返回模拟回包。"""
+    def connect_port(self, port_name: str, baudrate: int) -> tuple[bool, str]:
+        """连接指定串口。"""
 
-        cmd = command.strip()
-        if not cmd:
-            return False, ["error: empty command"]
+        if self.is_connected:
+            self.disconnect_port()
 
-        if not self._connected:
-            return False, ["error: serial not connected"]
+        self._serial_port.setPortName(port_name)
+        self._serial_port.setBaudRate(baudrate)
+        self._serial_port.setDataBits(QSerialPort.DataBits.Data8)
+        self._serial_port.setParity(QSerialPort.Parity.NoParity)
+        self._serial_port.setStopBits(QSerialPort.StopBits.OneStop)
+        self._serial_port.setFlowControl(QSerialPort.FlowControl.NoFlowControl)
 
-        if cmd == "$H":
-            self._status.x = 0.0
-            self._status.y = 0.0
-            self._status.z = 0.0
-            self._status.feed_rate = 0
-            return True, ["ok"]
+        if not self._serial_port.open(QIODevice.OpenModeFlag.ReadWrite):
+            message = self._serial_port.errorString() or "打开串口失败"
+            self.error_occurred.emit(message)
+            self.connected_changed.emit(False, "")
+            return False, message
 
-        if cmd == "?":
-            return True, [self._build_position_line(), "ok"]
+        self._read_buffer = ""
+        self.connected_changed.emit(True, port_name)
+        return True, "串口连接成功"
 
-        if cmd == "$I":
-            return True, ["[VER:1.1f.20260325:SIM]", "[OPT:V,15,128]", "ok"]
+    def disconnect_port(self) -> None:
+        """断开当前串口。"""
 
-        if cmd == "$":
-            return True, ["$H $I ? G1X..Y..Z..F..", "ok"]
+        if self.is_connected:
+            self._serial_port.close()
+        self.connected_changed.emit(False, "")
 
-        if cmd.startswith("G1"):
-            return self._execute_move_command(cmd)
+    def send_line(self, command: str) -> tuple[bool, str]:
+        """发送一行命令（自动追加换行）。"""
 
-        return False, [f"error: unsupported command '{cmd}'"]
+        if not self.is_connected:
+            return False, "串口未连接"
 
-    def _execute_move_command(self, command: str) -> tuple[bool, list[str]]:
-        """执行 G1 绝对坐标运动命令。"""
+        payload = f"{command.strip()}\r\n".encode("utf-8")
+        written = self._serial_port.write(payload)
+        if written <= 0:
+            return False, self._serial_port.errorString() or "发送失败"
 
-        payload = command[2:]
-        parsed: dict[str, float] = {}
-        token = ""
-        axis = ""
+        if not self._serial_port.waitForBytesWritten(300):
+            return False, self._serial_port.errorString() or "发送超时"
 
-        for char in payload:
-            if char in "XYZF":
-                if axis and token:
-                    try:
-                        parsed[axis] = float(token)
-                    except ValueError:
-                        return False, ["error: invalid number in G1 command"]
-                axis = char
-                token = ""
-            elif char in "0123456789.-":
-                token += char
-            elif char.isspace():
-                continue
-            else:
-                return False, [f"error: invalid char '{char}'"]
+        return True, "发送成功"
 
-        if axis and token:
-            try:
-                parsed[axis] = float(token)
-            except ValueError:
-                return False, ["error: invalid number in G1 command"]
+    def _on_ready_read(self) -> None:
+        """处理串口接收数据并按行分发。"""
 
-        try:
-            target_x = float(parsed["X"])
-            target_y = float(parsed["Y"])
-            target_z = float(parsed["Z"])
-            target_f = int(parsed["F"])
-        except KeyError as error:
-            return False, [f"error: missing {error.args[0]} in G1 command"]
-        except ValueError:
-            return False, ["error: invalid number in G1 command"]
+        raw_data = bytes(self._serial_port.readAll())
+        if not raw_data:
+            return
 
-        range_error = self._validate_range(target_x, target_y, target_z)
-        if range_error:
-            return False, [range_error]
+        self._read_buffer += raw_data.decode("utf-8", errors="replace")
+        normalized = self._read_buffer.replace("\r", "\n")
+        lines = normalized.split("\n")
 
-        if target_f <= 0:
-            return False, ["error: F must > 0"]
+        pending = lines.pop() if normalized and not normalized.endswith("\n") else ""
+        completed = [line.strip() for line in lines if line.strip()]
+        self._read_buffer = pending
 
-        self._status.x = target_x
-        self._status.y = target_y
-        self._status.z = target_z
-        self._status.feed_rate = target_f
+        if completed:
+            self.lines_received.emit(completed)
 
-        return True, ["ok"]
+    def _on_error(self, error: QSerialPort.SerialPortError) -> None:
+        """处理底层串口错误。"""
 
-    def _validate_range(self, x: float, y: float, z: float) -> str | None:
-        """校验 XYZ 是否在约束范围内。"""
+        if error in (
+            QSerialPort.SerialPortError.NoError,
+            QSerialPort.SerialPortError.TimeoutError,
+        ):
+            return
 
-        if not self.X_RANGE[0] <= x <= self.X_RANGE[1]:
-            return "error: X out of range (0~200)"
-
-        if not self.Y_RANGE[0] <= y <= self.Y_RANGE[1]:
-            return "error: Y out of range (-300~0)"
-
-        if not self.Z_RANGE[0] <= z <= self.Z_RANGE[1]:
-            return "error: Z out of range (0~10)"
-
-        return None
-
-    def _build_position_line(self) -> str:
-        """构建协议约定的位置查询响应。"""
-
-        return (
-            f"<{self._status.state}|MPos:{self._status.x:.3f},{self._status.y:.3f},{self._status.z:.3f}|"
-            f"FS:{self._status.feed_rate},0|WCO:0.000,0.000,0.000>"
-        )
+        message = self._serial_port.errorString() or "未知串口错误"
+        self.error_occurred.emit(message)
 
 
 class SerialDebugPage(QWidget):
     """串口调试页面。"""
 
+    POSITION_PREFIX = "<"
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._protocol = MotionProtocolEmulator()
+        self._transport = SerialTransport(self)
+        self._status = MotionStatus()
         self._active_step_mm = 1.0
+        self._response_timeout_timer = QTimer(self)
+        self._response_timeout_timer.setSingleShot(True)
+        self._response_timeout_timer.timeout.connect(self._handle_response_timeout)
         self._build_ui()
         self._bind_signals()
+        self._handle_refresh_ports()
         self._sync_position_display()
+        self._set_connected_state(False)
 
     def _build_ui(self) -> None:
         root_layout = QVBoxLayout(self)
@@ -231,6 +207,8 @@ class SerialDebugPage(QWidget):
         self.query_button.clicked.connect(lambda: self._send_command("?"))
         self.send_raw_button.clicked.connect(self._handle_send_raw_command)
         self.log_send_button.clicked.connect(self._handle_send_log_command)
+        self.raw_command_input.returnPressed.connect(self._handle_send_raw_command)
+        self.log_command_input.returnPressed.connect(self._handle_send_log_command)
 
         for axis in ("X", "Y", "Z"):
             self.step_buttons[f"{axis}+"].clicked.connect(lambda _=False, a=axis: self._jog_axis(a, +1.0))
@@ -240,6 +218,9 @@ class SerialDebugPage(QWidget):
             button.clicked.connect(lambda _=False, value=step: self._select_step(value))
 
         self.move_abs_button.clicked.connect(self._handle_move_absolute)
+        self._transport.connected_changed.connect(self._on_connected_changed)
+        self._transport.lines_received.connect(self._on_lines_received)
+        self._transport.error_occurred.connect(self._on_transport_error)
 
     def _create_header(self) -> QWidget:
         frame = QFrame(self)
@@ -274,10 +255,7 @@ class SerialDebugPage(QWidget):
         frame.setFrameShape(QFrame.Shape.StyledPanel)
         layout = QHBoxLayout(frame)
         layout.setContentsMargins(12, 6, 12, 6)
-        text = (
-            "波特率: 115200 | 范围: X(0~200) Y(0~-300) Z(0~10) | "
-            "单轴点动时自动带 F1000"
-        )
+        text = "建议参数: 115200 8N1 / CRLF；范围: X(0~200) Y(0~-300) Z(0~10)"
         layout.addWidget(QLabel(text, frame))
         return frame
 
@@ -306,7 +284,6 @@ class SerialDebugPage(QWidget):
         layout = QFormLayout(group)
 
         self.port_combo = QComboBox(group)
-        self.port_combo.addItems(["COM3 - USB-SERIAL CH340", "COM4 - USB Serial Device"])
 
         self.refresh_port_button = QPushButton("刷新", group)
         self.refresh_port_button.setMaximumWidth(96)
@@ -318,7 +295,8 @@ class SerialDebugPage(QWidget):
         row_layout.addWidget(self.refresh_port_button)
 
         self.baudrate_combo = QComboBox(group)
-        self.baudrate_combo.addItems(["115200"])
+        self.baudrate_combo.addItems(["9600", "57600", "115200", "230400"])
+        self.baudrate_combo.setCurrentText("115200")
 
         self.connect_button = QPushButton("连接串口", group)
         self.version_button = QPushButton("读取版本 $I", group)
@@ -480,7 +458,7 @@ class SerialDebugPage(QWidget):
         self.log_view = QPlainTextEdit(group)
         self.log_view.setReadOnly(True)
         self.log_view.setMinimumHeight(180)
-        self.log_view.setPlainText("[INFO] 串口调试模块已初始化（占位实现）")
+        self.log_view.setPlainText("[INFO] 串口调试模块已初始化（真实串口模式）")
 
         command_row = QHBoxLayout()
         self.log_command_input = QLineEdit(group)
@@ -494,24 +472,37 @@ class SerialDebugPage(QWidget):
         return group
 
     def _handle_refresh_ports(self) -> None:
-        self._append_log("[SIM] 串口列表刷新完成：COM3 / COM4")
-
-    def _handle_connect_clicked(self) -> None:
-        if self._protocol.connected:
-            _, lines = self._protocol.disconnect()
-            for line in lines:
-                self._append_log(line)
-            self.connect_button.setText("连接串口")
-            self.connection_status_label.setText("状态：未连接")
-            self.serial_status_label.setText("串口状态：未连接")
+        self.port_combo.clear()
+        ports = self._transport.list_ports()
+        if not ports:
+            self.port_combo.addItem("未发现可用串口", "")
+            self.port_combo.setEnabled(False)
+            self._append_log("[WARN] 未发现可用串口")
             return
 
-        _, lines = self._protocol.connect()
-        for line in lines:
-            self._append_log(line)
-        self.connect_button.setText("断开串口")
-        self.connection_status_label.setText("状态：已连接")
-        self.serial_status_label.setText(f"串口状态：已连接 {self.port_combo.currentText()} @115200")
+        self.port_combo.setEnabled(True)
+        for port_name, display in ports:
+            self.port_combo.addItem(display, port_name)
+        self._append_log(f"[INFO] 串口列表刷新完成，共 {len(ports)} 个")
+
+    def _handle_connect_clicked(self) -> None:
+        if self._transport.is_connected:
+            self._transport.disconnect_port()
+            self._append_log("[INFO] 串口已断开")
+            return
+
+        port_name = self.port_combo.currentData()
+        if not port_name:
+            self._append_log("[WARN] 请先选择有效串口")
+            return
+
+        baudrate = int(self.baudrate_combo.currentText())
+        success, message = self._transport.connect_port(port_name, baudrate)
+        if success:
+            self._append_log(f"[INFO] 已连接 {port_name} @ {baudrate}")
+            self._send_command("?")
+        else:
+            self._append_log(f"[ERROR] {message}")
 
     def _handle_send_raw_command(self) -> None:
         self._send_command(self.raw_command_input.text())
@@ -529,8 +520,7 @@ class SerialDebugPage(QWidget):
         self._send_command(command)
 
     def _jog_axis(self, axis: str, direction: float) -> None:
-        status = self._protocol.status
-        x, y, z = status.x, status.y, status.z
+        x, y, z = self._status.x, self._status.y, self._status.z
         delta = self._active_step_mm * direction
 
         if axis == "X":
@@ -546,6 +536,8 @@ class SerialDebugPage(QWidget):
     def _select_step(self, step: float) -> None:
         self._active_step_mm = step
         self._append_log(f"[UI] 点动步距已设置为 {step} mm")
+        for current_step, button in self.step_select_buttons.items():
+            button.setEnabled(current_step != step)
 
     def _send_command(self, command: str) -> None:
         cmd = command.strip()
@@ -553,28 +545,91 @@ class SerialDebugPage(QWidget):
             self._append_log("[WARN] 命令为空")
             return
 
-        self._append_log(f">>> {cmd}")
-        success, lines = self._protocol.execute(cmd)
-        for line in lines:
-            self._append_log(line)
+        success, message = self._transport.send_line(cmd)
+        if not success:
+            self._append_log(f"[ERROR] {message}")
+            return
 
-        if success:
-            self.raw_command_input.clear()
-            self.log_command_input.clear()
-            self._sync_position_display()
+        self._append_log(f">>> {cmd}")
+        self.raw_command_input.clear()
+        self.log_command_input.clear()
+        self._response_timeout_timer.start(1200)
 
     def _sync_position_display(self) -> None:
-        status = self._protocol.status
-        self.x_label.setText(f"X: {status.x:.3f}")
-        self.y_label.setText(f"Y: {status.y:.3f}")
-        self.z_label.setText(f"Z: {status.z:.3f}")
-        self.f_label.setText(f"F: {status.feed_rate}")
+        self.x_label.setText(f"X: {self._status.x:.3f}")
+        self.y_label.setText(f"Y: {self._status.y:.3f}")
+        self.z_label.setText(f"Z: {self._status.z:.3f}")
+        self.f_label.setText(f"F: {self._status.feed_rate}")
 
-        self.abs_x_input.setValue(status.x)
-        self.abs_y_input.setValue(status.y)
-        self.abs_z_input.setValue(status.z)
-        self.abs_f_input.setValue(float(max(status.feed_rate, 1000)))
+        self.abs_x_input.setValue(self._status.x)
+        self.abs_y_input.setValue(self._status.y)
+        self.abs_z_input.setValue(self._status.z)
+        self.abs_f_input.setValue(float(max(self._status.feed_rate, 1000)))
 
     def _append_log(self, message: str) -> None:
         now = datetime.now().strftime("%H:%M:%S.%f")[:-3]
         self.log_view.appendPlainText(f"[{now}] {message}")
+
+    def _on_connected_changed(self, connected: bool, port_name: str) -> None:
+        self._set_connected_state(connected)
+        if connected:
+            baud = self.baudrate_combo.currentText()
+            self.connection_status_label.setText("状态：已连接")
+            self.serial_status_label.setText(f"串口状态：已连接 {port_name} @{baud}")
+            return
+
+        self.connection_status_label.setText("状态：未连接")
+        self.serial_status_label.setText("串口状态：未连接")
+
+    def _on_lines_received(self, lines: list[str]) -> None:
+        self._response_timeout_timer.stop()
+        for line in lines:
+            self._append_log(line)
+            self._try_parse_status_line(line)
+
+    def _on_transport_error(self, message: str) -> None:
+        self._append_log(f"[ERROR] 串口异常: {message}")
+        if self._transport.is_connected:
+            return
+        self._set_connected_state(False)
+
+    def _set_connected_state(self, connected: bool) -> None:
+        self.connect_button.setText("断开串口" if connected else "连接串口")
+        self.version_button.setEnabled(connected)
+        self.help_button.setEnabled(connected)
+        self.home_button.setEnabled(connected)
+        self.query_button.setEnabled(connected)
+        self.send_raw_button.setEnabled(connected)
+        self.log_send_button.setEnabled(connected)
+        self.move_abs_button.setEnabled(connected)
+        self.raw_command_input.setEnabled(connected)
+        self.log_command_input.setEnabled(connected)
+
+        for button in self.step_buttons.values():
+            button.setEnabled(connected)
+
+    def _handle_response_timeout(self) -> None:
+        self._append_log("[WARN] 等待设备响应超时")
+
+    def _try_parse_status_line(self, line: str) -> None:
+        if not (line.startswith(self.POSITION_PREFIX) and "MPos:" in line):
+            return
+
+        try:
+            state_segment = line[1:].split("|", maxsplit=1)[0]
+            mpos_segment = line.split("MPos:", maxsplit=1)[1].split("|", maxsplit=1)[0]
+            axes = [float(value) for value in mpos_segment.split(",")]
+            feed_segment = 0
+            if "FS:" in line:
+                fs_text = line.split("FS:", maxsplit=1)[1].split("|", maxsplit=1)[0]
+                feed_segment = int(float(fs_text.split(",", maxsplit=1)[0]))
+
+            if len(axes) != 3:
+                return
+
+            self._status.state = state_segment
+            self._status.x, self._status.y, self._status.z = axes
+            self._status.feed_rate = feed_segment
+            self._sync_position_display()
+        except (ValueError, IndexError):
+            self._append_log("[WARN] 状态报文解析失败")
