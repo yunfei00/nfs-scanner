@@ -51,6 +51,9 @@ class ScanControlPage(QWidget):
         "step_y",
         "step_z",
     ]
+    X_RANGE = (0.0, 200.0)
+    Y_RANGE = (-300.0, 0.0)
+    Z_RANGE = (0.0, 10.0)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -64,6 +67,10 @@ class ScanControlPage(QWidget):
         self._serial_port.readyRead.connect(self._on_serial_ready_read)
         self._serial_port.errorOccurred.connect(self._on_serial_error)
         self._serial_read_buffer = ""
+        self._scan_timer = QTimer(self)
+        self._scan_timer.timeout.connect(self._dispatch_next_scan_point)
+        self._scan_points: list[tuple[float, float, float]] = []
+        self._scan_point_index = 0
 
         self.port_combo: QComboBox
         self.baudrate_combo: QComboBox
@@ -524,6 +531,11 @@ class ScanControlPage(QWidget):
         else:
             target_z += delta
 
+        is_valid, reason = self._validate_position(target_x, target_y, target_z)
+        if not is_valid:
+            self.append_log(f"轴移动失败: {reason}")
+            return
+
         command = f"G1 X{target_x:.2f} Y{target_y:.2f} Z{target_z:.2f} F{self.current_feed_rate:.0f}"
         sent, reason = self._send_serial_command(command)
         if not sent:
@@ -665,6 +677,11 @@ class ScanControlPage(QWidget):
             self.append_log("绝对坐标运动输入无效，请输入数字")
             return
 
+        is_valid, reason = self._validate_position(x, y, z)
+        if not is_valid:
+            self.append_log(f"绝对坐标运动发送失败，原因: {reason}")
+            return
+
         command = f"G1 X{x:.2f} Y{y:.2f} Z{z:.2f} F{f:.0f}"
         sent, reason = self._send_serial_command(command)
         if not sent:
@@ -691,15 +708,32 @@ class ScanControlPage(QWidget):
         self.append_log("已将当前坐标设为扫描终点")
 
     def on_start_scan(self) -> None:
+        if not self.serial_is_open:
+            self.append_log("开始扫描失败：串口未打开")
+            return
+
+        try:
+            self._scan_points = self._build_scan_points()
+        except ValueError as error:
+            self.append_log(f"开始扫描失败：{error}")
+            return
+
+        if not self._scan_points:
+            self.append_log("开始扫描失败：扫描路径为空")
+            return
+
+        self._scan_point_index = 0
         self.update_system_status("扫描中")
-        sent, reason = self._send_serial_command("~")
-        if sent:
-            self.append_log("发送命令: ~（开始/继续）")
-        else:
-            self.append_log(f"发送命令失败: ~，原因: {reason}")
+        self.append_log(
+            "扫描开始："
+            f"共 {len(self._scan_points)} 点，顺序为 Z 外层（增大）、Y 中层（减小）、X 内层（增大）"
+        )
+        self._scan_timer.start(120)
+        self._dispatch_next_scan_point()
 
     def on_pause_scan(self) -> None:
         self.update_system_status("暂停")
+        self._scan_timer.stop()
         sent, reason = self._send_serial_command("!")
         if sent:
             self.append_log("发送命令: !（暂停）")
@@ -708,6 +742,9 @@ class ScanControlPage(QWidget):
 
     def on_stop_scan(self) -> None:
         self.update_system_status("停止")
+        self._scan_timer.stop()
+        self._scan_points = []
+        self._scan_point_index = 0
         sent, reason = self._send_serial_command("\x18")
         if sent:
             self.append_log("发送命令: Ctrl+X（停止/复位）")
@@ -804,3 +841,137 @@ class ScanControlPage(QWidget):
         ):
             return
         self.append_log(f"串口错误: {self._serial_port.errorString()}")
+
+    def _dispatch_next_scan_point(self) -> None:
+        """按规划路径逐点发送绝对运动命令。"""
+
+        if self._scan_point_index >= len(self._scan_points):
+            self._scan_timer.stop()
+            self.update_system_status("就绪")
+            self.append_log("扫描结束：全部路径点已发送")
+            return
+
+        x, y, z = self._scan_points[self._scan_point_index]
+        command = f"G1 X{x:.2f} Y{y:.2f} Z{z:.2f} F{self.current_feed_rate:.0f}"
+        sent, reason = self._send_serial_command(command)
+        if not sent:
+            self._scan_timer.stop()
+            self.update_system_status("停止")
+            self.append_log(f"扫描中断：发送失败，原因: {reason}")
+            return
+
+        self.current_x = x
+        self.current_y = y
+        self.current_z = z
+        self.update_position_status(self.current_x, self.current_y, self.current_z)
+        self._scan_point_index += 1
+        self.append_log(f"扫描点 {self._scan_point_index}/{len(self._scan_points)}: {command}")
+
+    def _build_scan_points(self) -> list[tuple[float, float, float]]:
+        """根据起点、终点和步长生成扫描路径。"""
+
+        start_x = self._read_scan_value("start_x")
+        start_y = self._read_scan_value("start_y")
+        start_z = self._read_scan_value("start_z")
+        end_x = self._read_scan_value("end_x")
+        end_y = self._read_scan_value("end_y")
+        end_z = self._read_scan_value("end_z")
+        step_x = self._read_scan_value("step_x")
+        step_y = self._read_scan_value("step_y")
+        step_z = self._read_scan_value("step_z")
+
+        x_values = self._generate_axis_points(
+            axis_name="X",
+            start=start_x,
+            end=end_x,
+            step=step_x,
+            expected_direction="increasing",
+        )
+        y_values = self._generate_axis_points(
+            axis_name="Y",
+            start=start_y,
+            end=end_y,
+            step=step_y,
+            expected_direction="decreasing",
+        )
+        z_values = self._generate_axis_points(
+            axis_name="Z",
+            start=start_z,
+            end=end_z,
+            step=step_z,
+            expected_direction="increasing",
+        )
+
+        points: list[tuple[float, float, float]] = []
+        for z in z_values:
+            for y in y_values:
+                for x in x_values:
+                    is_valid, reason = self._validate_position(x, y, z)
+                    if not is_valid:
+                        raise ValueError(reason)
+                    points.append((x, y, z))
+        return points
+
+    def _read_scan_value(self, field_name: str) -> float:
+        """读取扫描表格中的一个浮点值。"""
+
+        column = self.TABLE_COLUMNS.index(field_name)
+        item = self.scan_table.item(0, column)
+        text = item.text().strip() if item is not None else ""
+        if not text:
+            raise ValueError(f"{field_name} 为空")
+        try:
+            return float(text)
+        except ValueError as error:
+            raise ValueError(f"{field_name} 不是有效数字: {text}") from error
+
+    def _generate_axis_points(
+        self,
+        axis_name: str,
+        start: float,
+        end: float,
+        step: float,
+        expected_direction: str,
+    ) -> list[float]:
+        """按指定方向生成闭区间轴坐标。"""
+
+        if step == 0:
+            raise ValueError(f"{axis_name} 轴步长不能为 0")
+
+        if expected_direction == "increasing" and end < start:
+            raise ValueError(f"{axis_name} 轴要求终点 >= 起点，当前为 {start:.2f} -> {end:.2f}")
+        if expected_direction == "decreasing" and end > start:
+            raise ValueError(f"{axis_name} 轴要求终点 <= 起点，当前为 {start:.2f} -> {end:.2f}")
+
+        step_value = abs(step)
+        if expected_direction == "decreasing":
+            step_value = -step_value
+
+        values: list[float] = []
+        current = start
+        tolerance = 1e-9
+
+        while True:
+            values.append(round(current, 6))
+            if (step_value > 0 and current >= end - tolerance) or (
+                step_value < 0 and current <= end + tolerance
+            ):
+                break
+            current += step_value
+            if (step_value > 0 and current > end):
+                current = end
+            elif step_value < 0 and current < end:
+                current = end
+
+        return values
+
+    def _validate_position(self, x: float, y: float, z: float) -> tuple[bool, str]:
+        """校验坐标是否在工作范围内。"""
+
+        if not (self.X_RANGE[0] <= x <= self.X_RANGE[1]):
+            return False, f"X={x:.2f} 超出范围 [{self.X_RANGE[0]:.2f}, {self.X_RANGE[1]:.2f}]"
+        if not (self.Y_RANGE[0] <= y <= self.Y_RANGE[1]):
+            return False, f"Y={y:.2f} 超出范围 [{self.Y_RANGE[0]:.2f}, {self.Y_RANGE[1]:.2f}]"
+        if not (self.Z_RANGE[0] <= z <= self.Z_RANGE[1]):
+            return False, f"Z={z:.2f} 超出范围 [{self.Z_RANGE[0]:.2f}, {self.Z_RANGE[1]:.2f}]"
+        return True, ""
