@@ -153,6 +153,9 @@ class SerialDebugPage(QWidget):
     """串口调试页面。"""
 
     POSITION_PREFIX = "<"
+    X_RANGE = (0.0, 200.0)
+    Y_RANGE = (-300.0, 0.0)
+    Z_RANGE = (0.0, 10.0)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -511,13 +514,12 @@ class SerialDebugPage(QWidget):
         self._send_command(self.log_command_input.text())
 
     def _handle_move_absolute(self) -> None:
-        command = (
-            f"G1X{self.abs_x_input.value():.3f}"
-            f"Y{self.abs_y_input.value():.3f}"
-            f"Z{self.abs_z_input.value():.3f}"
-            f"F{int(self.abs_f_input.value())}"
+        self._send_motion_command(
+            x=self.abs_x_input.value(),
+            y=self.abs_y_input.value(),
+            z=self.abs_z_input.value(),
+            feed_rate=int(self.abs_f_input.value()),
         )
-        self._send_command(command)
 
     def _jog_axis(self, axis: str, direction: float) -> None:
         x, y, z = self._status.x, self._status.y, self._status.z
@@ -530,8 +532,35 @@ class SerialDebugPage(QWidget):
         elif axis == "Z":
             z += delta
 
-        command = f"G1X{x:.3f}Y{y:.3f}Z{z:.3f}F1000"
-        self._send_command(command)
+        self._send_motion_command(x=x, y=y, z=z, feed_rate=1000)
+
+    def _send_motion_command(self, x: float, y: float, z: float, feed_rate: int) -> None:
+        """发送绝对坐标运动命令，并在本地同步位置用于连续点动。"""
+
+        bounded_x = min(max(x, self.X_RANGE[0]), self.X_RANGE[1])
+        bounded_y = min(max(y, self.Y_RANGE[0]), self.Y_RANGE[1])
+        bounded_z = min(max(z, self.Z_RANGE[0]), self.Z_RANGE[1])
+
+        if (bounded_x, bounded_y, bounded_z) != (x, y, z):
+            self._append_log("[WARN] 目标坐标越界，已自动限制到安全范围")
+
+        command = f"G1X{bounded_x:.3f}Y{bounded_y:.3f}Z{bounded_z:.3f}F{int(feed_rate)}"
+        success, message = self._transport.send_line(command)
+        if not success:
+            self._append_log(f"[ERROR] {message}")
+            return
+
+        # 对于仅上报绝对坐标的控制器，先本地累积坐标，避免重复发送同一目标点。
+        self._status.x = bounded_x
+        self._status.y = bounded_y
+        self._status.z = bounded_z
+        self._status.feed_rate = int(feed_rate)
+        self._sync_position_display()
+
+        self._append_log(f">>> {command}")
+        self.raw_command_input.clear()
+        self.log_command_input.clear()
+        self._response_timeout_timer.start(1200)
 
     def _select_step(self, step: float) -> None:
         self._active_step_mm = step
