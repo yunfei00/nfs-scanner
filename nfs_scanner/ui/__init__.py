@@ -6,6 +6,7 @@ from .log_panel import LogPanel
 from .main_window import MainWindow
 from .serial_debug_page import SerialDebugPage
 from .spectrum_panel import SpectrumPanel
+from .widgets import CollapsibleSection, InstrumentPanel, ScanControlPage
 
 __all__ = [
     "ControlsPanel",
@@ -14,4 +15,7 @@ __all__ = [
     "MainWindow",
     "SerialDebugPage",
     "SpectrumPanel",
+    "CollapsibleSection",
+    "InstrumentPanel",
+    "ScanControlPage",
 ]

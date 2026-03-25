@@ -28,6 +28,7 @@ from nfs_scanner.storage import DatasetManager
 from .controls_panel import ControlsPanel
 from .heatmap_view import HeatmapView
 from .log_panel import LogPanel
+from .widgets import ScanControlPage
 from .serial_debug_page import SerialDebugPage
 from .spectrum_panel import SpectrumPanel
 
@@ -68,6 +69,7 @@ class MainWindow(QMainWindow):
 
         tab_widget = QTabWidget(central_widget)
         tab_widget.addTab(self._create_scan_workspace_page(tab_widget), "扫描主界面")
+        tab_widget.addTab(ScanControlPage(tab_widget), "扫描控制页面")
         self.serial_debug_page = SerialDebugPage(tab_widget)
         tab_widget.addTab(self.serial_debug_page, "串口调试")
         root_layout.addWidget(tab_widget)
