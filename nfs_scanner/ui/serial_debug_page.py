@@ -537,23 +537,28 @@ class SerialDebugPage(QWidget):
     def _send_motion_command(self, x: float, y: float, z: float, feed_rate: int) -> None:
         """发送绝对坐标运动命令，并在本地同步位置用于连续点动。"""
 
-        bounded_x = min(max(x, self.X_RANGE[0]), self.X_RANGE[1])
-        bounded_y = min(max(y, self.Y_RANGE[0]), self.Y_RANGE[1])
-        bounded_z = min(max(z, self.Z_RANGE[0]), self.Z_RANGE[1])
+        invalid_messages: list[str] = []
+        if not (self.X_RANGE[0] <= x <= self.X_RANGE[1]):
+            invalid_messages.append(f"X={x:.3f} 超出范围 [{self.X_RANGE[0]:.3f}, {self.X_RANGE[1]:.3f}]")
+        if not (self.Y_RANGE[0] <= y <= self.Y_RANGE[1]):
+            invalid_messages.append(f"Y={y:.3f} 超出范围 [{self.Y_RANGE[0]:.3f}, {self.Y_RANGE[1]:.3f}]")
+        if not (self.Z_RANGE[0] <= z <= self.Z_RANGE[1]):
+            invalid_messages.append(f"Z={z:.3f} 超出范围 [{self.Z_RANGE[0]:.3f}, {self.Z_RANGE[1]:.3f}]")
 
-        if (bounded_x, bounded_y, bounded_z) != (x, y, z):
-            self._append_log("[WARN] 目标坐标越界，已自动限制到安全范围")
+        if invalid_messages:
+            self._append_log(f"[ERROR] 拒绝发送运动命令：{'；'.join(invalid_messages)}")
+            return
 
-        command = f"G1X{bounded_x:.3f}Y{bounded_y:.3f}Z{bounded_z:.3f}F{int(feed_rate)}"
+        command = f"G1X{x:.3f}Y{y:.3f}Z{z:.3f}F{int(feed_rate)}"
         success, message = self._transport.send_line(command)
         if not success:
             self._append_log(f"[ERROR] {message}")
             return
 
         # 对于仅上报绝对坐标的控制器，先本地累积坐标，避免重复发送同一目标点。
-        self._status.x = bounded_x
-        self._status.y = bounded_y
-        self._status.z = bounded_z
+        self._status.x = x
+        self._status.y = y
+        self._status.z = z
         self._status.feed_rate = int(feed_rate)
         self._sync_position_display()
 
