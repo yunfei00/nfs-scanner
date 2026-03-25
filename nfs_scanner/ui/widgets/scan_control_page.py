@@ -9,6 +9,7 @@ from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QComboBox,
     QFrame,
     QGridLayout,
     QGroupBox,
@@ -55,10 +56,21 @@ class ScanControlPage(QWidget):
         self.current_x = 0.0
         self.current_y = 0.0
         self.current_z = 0.0
+        self.current_feed_rate = 1000.0
+        self.active_jog_step_mm = 1.0
+        self.serial_is_open = False
 
-        self.x_move_step_edit: QLineEdit
-        self.y_move_step_edit: QLineEdit
-        self.z_move_step_edit: QLineEdit
+        self.port_combo: QComboBox
+        self.baudrate_combo: QComboBox
+        self.open_serial_button: QPushButton
+        self.close_serial_button: QPushButton
+
+        self.jog_step_buttons: dict[float, QPushButton] = {}
+        self.abs_x_edit: QLineEdit
+        self.abs_y_edit: QLineEdit
+        self.abs_z_edit: QLineEdit
+        self.abs_f_edit: QLineEdit
+
         self.step_x_edit: QLineEdit
         self.step_y_edit: QLineEdit
         self.step_z_edit: QLineEdit
@@ -115,7 +127,9 @@ class ScanControlPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
+        layout.addWidget(self._create_serial_setting_group())
         layout.addWidget(self._create_motion_control_group())
+        layout.addWidget(self._create_motion_command_group())
         layout.addWidget(self._create_step_config_group())
         layout.addWidget(self._create_test_info_group())
         layout.addWidget(self._create_action_group())
@@ -134,41 +148,141 @@ class ScanControlPage(QWidget):
         layout.addWidget(self._create_log_section(), 1)
         return container
 
+    def _create_serial_setting_group(self) -> QGroupBox:
+        """创建串口设置区域（占位实现，不接入真实串口）。"""
+
+        group = QGroupBox("串口设置", self)
+        grid = QGridLayout(group)
+        grid.setHorizontalSpacing(6)
+        grid.setVerticalSpacing(6)
+
+        self.port_combo = QComboBox(group)
+        self.port_combo.addItems(["COM1", "COM2", "COM3", "/dev/ttyUSB0"])
+
+        self.baudrate_combo = QComboBox(group)
+        self.baudrate_combo.addItems(["9600", "57600", "115200", "230400"])
+        self.baudrate_combo.setCurrentText("115200")
+
+        self.open_serial_button = QPushButton("打开串口", group)
+        self.close_serial_button = QPushButton("关闭串口", group)
+        self.open_serial_button.setFixedHeight(30)
+        self.close_serial_button.setFixedHeight(30)
+        self.open_serial_button.clicked.connect(self.on_open_serial)
+        self.close_serial_button.clicked.connect(self.on_close_serial)
+
+        grid.addWidget(QLabel("端口号", group), 0, 0)
+        grid.addWidget(self.port_combo, 0, 1)
+        grid.addWidget(QLabel("波特率", group), 1, 0)
+        grid.addWidget(self.baudrate_combo, 1, 1)
+        grid.addWidget(self.open_serial_button, 2, 0)
+        grid.addWidget(self.close_serial_button, 2, 1)
+
+        self._sync_serial_buttons()
+        return group
+
     def _create_motion_control_group(self) -> QGroupBox:
         group = QGroupBox("运动控制", self)
         grid = QGridLayout(group)
         grid.setHorizontalSpacing(6)
         grid.setVerticalSpacing(6)
 
-        self.x_move_step_edit = self._default_step_line_edit()
-        self.y_move_step_edit = self._default_step_line_edit()
-        self.z_move_step_edit = self._default_step_line_edit()
+        grid.addWidget(QLabel("点动步距", group), 0, 0)
 
-        self._add_axis_move_row(grid, 0, "X", self.x_move_step_edit)
-        self._add_axis_move_row(grid, 1, "Y", self.y_move_step_edit)
-        self._add_axis_move_row(grid, 2, "Z", self.z_move_step_edit)
+        step_button_container = QWidget(group)
+        step_button_layout = QHBoxLayout(step_button_container)
+        step_button_layout.setContentsMargins(0, 0, 0, 0)
+        step_button_layout.setSpacing(4)
+
+        for step_value in (0.01, 0.1, 1.0, 5.0, 10.0, 20.0):
+            button = QPushButton(f"{step_value:g}", group)
+            button.setCheckable(True)
+            button.setFixedHeight(28)
+            button.clicked.connect(lambda _=False, value=step_value: self.on_select_jog_step(value))
+            self.jog_step_buttons[step_value] = button
+            step_button_layout.addWidget(button)
+
+        grid.addWidget(step_button_container, 0, 1, 1, 5)
+        grid.addWidget(QLabel("mm", group), 0, 6)
+        self.on_select_jog_step(1.0)
+
+        x_plus_button = QPushButton("X+", group)
+        y_plus_button = QPushButton("Y+", group)
+        z_plus_button = QPushButton("Z+", group)
+        x_minus_button = QPushButton("X-", group)
+        y_minus_button = QPushButton("Y-", group)
+        z_minus_button = QPushButton("Z-", group)
+
+        for button in [
+            x_plus_button,
+            y_plus_button,
+            z_plus_button,
+            x_minus_button,
+            y_minus_button,
+            z_minus_button,
+        ]:
+            button.setFixedHeight(30)
+
+        x_plus_button.clicked.connect(lambda: self._move_axis("X", self.active_jog_step_mm))
+        y_plus_button.clicked.connect(lambda: self._move_axis("Y", self.active_jog_step_mm))
+        z_plus_button.clicked.connect(lambda: self._move_axis("Z", self.active_jog_step_mm))
+        x_minus_button.clicked.connect(lambda: self._move_axis("X", -self.active_jog_step_mm))
+        y_minus_button.clicked.connect(lambda: self._move_axis("Y", -self.active_jog_step_mm))
+        z_minus_button.clicked.connect(lambda: self._move_axis("Z", -self.active_jog_step_mm))
+
+        grid.addWidget(x_plus_button, 1, 0, 1, 2)
+        grid.addWidget(y_plus_button, 1, 2, 1, 2)
+        grid.addWidget(z_plus_button, 1, 4, 1, 2)
+        grid.addWidget(x_minus_button, 2, 0, 1, 2)
+        grid.addWidget(y_minus_button, 2, 2, 1, 2)
+        grid.addWidget(z_minus_button, 2, 4, 1, 2)
         return group
 
-    def _add_axis_move_row(self, layout: QGridLayout, row: int, axis: str, step_edit: QLineEdit) -> None:
-        positive_button = QPushButton(f"{axis}+", self)
-        negative_button = QPushButton(f"{axis}-", self)
-        positive_button.setFixedHeight(30)
-        negative_button.setFixedHeight(30)
+    def _create_motion_command_group(self) -> QGroupBox:
+        """创建运动命令区域。"""
 
-        if axis == "X":
-            positive_button.clicked.connect(self.on_move_x_positive)
-            negative_button.clicked.connect(self.on_move_x_negative)
-        elif axis == "Y":
-            positive_button.clicked.connect(self.on_move_y_positive)
-            negative_button.clicked.connect(self.on_move_y_negative)
-        else:
-            positive_button.clicked.connect(self.on_move_z_positive)
-            negative_button.clicked.connect(self.on_move_z_negative)
+        group = QGroupBox("运动命令", self)
+        grid = QGridLayout(group)
+        grid.setHorizontalSpacing(6)
+        grid.setVerticalSpacing(6)
 
-        layout.addWidget(positive_button, row, 0)
-        layout.addWidget(negative_button, row, 1)
-        layout.addWidget(step_edit, row, 2)
-        layout.addWidget(QLabel("mm", self), row, 3)
+        home_button = QPushButton("复位", group)
+        query_button = QPushButton("位置查询", group)
+        version_button = QPushButton("读取版本", group)
+        help_button = QPushButton("帮助命令", group)
+        for button in [home_button, query_button, version_button, help_button]:
+            button.setFixedHeight(30)
+
+        home_button.clicked.connect(self.on_home_command)
+        query_button.clicked.connect(self.on_query_position_command)
+        version_button.clicked.connect(self.on_read_version_command)
+        help_button.clicked.connect(self.on_help_command)
+
+        grid.addWidget(home_button, 0, 0)
+        grid.addWidget(query_button, 0, 1)
+        grid.addWidget(version_button, 1, 0)
+        grid.addWidget(help_button, 1, 1)
+
+        self.abs_x_edit = QLineEdit(group)
+        self.abs_y_edit = QLineEdit(group)
+        self.abs_z_edit = QLineEdit(group)
+        self.abs_f_edit = QLineEdit(group)
+        self.abs_x_edit.setPlaceholderText("X")
+        self.abs_y_edit.setPlaceholderText("Y")
+        self.abs_z_edit.setPlaceholderText("Z")
+        self.abs_f_edit.setPlaceholderText("F")
+        self.abs_f_edit.setText("1000")
+
+        execute_button = QPushButton("执行", group)
+        execute_button.setFixedHeight(30)
+        execute_button.clicked.connect(self.on_execute_absolute_move)
+
+        grid.addWidget(QLabel("绝对坐标", group), 2, 0)
+        grid.addWidget(self.abs_x_edit, 2, 1)
+        grid.addWidget(self.abs_y_edit, 2, 2)
+        grid.addWidget(self.abs_z_edit, 2, 3)
+        grid.addWidget(self.abs_f_edit, 2, 4)
+        grid.addWidget(execute_button, 2, 5)
+        return group
 
     def _create_step_config_group(self) -> QGroupBox:
         group = QGroupBox("步长设置", self)
@@ -394,14 +508,6 @@ class ScanControlPage(QWidget):
         col = self.TABLE_COLUMNS.index(field)
         self.scan_table.setItem(0, col, QTableWidgetItem(text))
 
-    def _safe_step_value(self, edit: QLineEdit) -> float:
-        try:
-            return float(edit.text().strip())
-        except ValueError:
-            self.append_log("输入步长无效，自动回退为 0.00")
-            edit.setText("0.00")
-            return 0.0
-
     def _move_axis(self, axis: str, delta: float) -> None:
         if axis == "X":
             self.current_x += delta
@@ -412,6 +518,10 @@ class ScanControlPage(QWidget):
 
         self.update_position_status(self.current_x, self.current_y, self.current_z)
         self.append_log(f"轴移动: {axis} {'+' if delta >= 0 else ''}{delta:.2f} mm")
+
+    def _sync_serial_buttons(self) -> None:
+        self.open_serial_button.setEnabled(not self.serial_is_open)
+        self.close_serial_button.setEnabled(self.serial_is_open)
 
     def _update_step_values_to_table(self) -> None:
         self._update_table_cell("step_x", self.step_x_edit.text() or "0.00")
@@ -458,23 +568,54 @@ class ScanControlPage(QWidget):
         self.system_status_label.setText(f"状态: {status_text}")
         self._set_scan_button_states(status_text)
 
-    def on_move_x_positive(self) -> None:
-        self._move_axis("X", self._safe_step_value(self.x_move_step_edit))
+    def on_open_serial(self) -> None:
+        self.serial_is_open = True
+        self._sync_serial_buttons()
+        self.append_log(f"串口已打开: {self.port_combo.currentText()} @ {self.baudrate_combo.currentText()}")
 
-    def on_move_x_negative(self) -> None:
-        self._move_axis("X", -self._safe_step_value(self.x_move_step_edit))
+    def on_close_serial(self) -> None:
+        self.serial_is_open = False
+        self._sync_serial_buttons()
+        self.append_log("串口已关闭")
 
-    def on_move_y_positive(self) -> None:
-        self._move_axis("Y", self._safe_step_value(self.y_move_step_edit))
+    def on_select_jog_step(self, step_value: float) -> None:
+        self.active_jog_step_mm = step_value
+        for value, button in self.jog_step_buttons.items():
+            button.setChecked(value == step_value)
+        self.append_log(f"点动步距切换为 {step_value:.2f} mm")
 
-    def on_move_y_negative(self) -> None:
-        self._move_axis("Y", -self._safe_step_value(self.y_move_step_edit))
+    def on_home_command(self) -> None:
+        self.current_x = 0.0
+        self.current_y = 0.0
+        self.current_z = 0.0
+        self.update_position_status(self.current_x, self.current_y, self.current_z)
+        self.append_log("发送命令: $H（复位）")
 
-    def on_move_z_positive(self) -> None:
-        self._move_axis("Z", self._safe_step_value(self.z_move_step_edit))
+    def on_query_position_command(self) -> None:
+        self.append_log(f"发送命令: ? -> X{self.current_x:.2f} Y{self.current_y:.2f} Z{self.current_z:.2f}")
 
-    def on_move_z_negative(self) -> None:
-        self._move_axis("Z", -self._safe_step_value(self.z_move_step_edit))
+    def on_read_version_command(self) -> None:
+        self.append_log("发送命令: $I -> MockMotion v0.1")
+
+    def on_help_command(self) -> None:
+        self.append_log("发送命令: $ -> 支持命令: $H / ? / $I / G1")
+
+    def on_execute_absolute_move(self) -> None:
+        try:
+            x = float(self.abs_x_edit.text().strip())
+            y = float(self.abs_y_edit.text().strip())
+            z = float(self.abs_z_edit.text().strip())
+            f = float(self.abs_f_edit.text().strip() or "1000")
+        except ValueError:
+            self.append_log("绝对坐标运动输入无效，请输入数字")
+            return
+
+        self.current_x = x
+        self.current_y = y
+        self.current_z = z
+        self.current_feed_rate = f
+        self.update_position_status(self.current_x, self.current_y, self.current_z)
+        self.append_log(f"发送命令: G1 X{x:.2f} Y{y:.2f} Z{z:.2f} F{f:.0f}")
 
     def on_set_start_point(self) -> None:
         self._update_table_cell("start_x", self.current_x)
