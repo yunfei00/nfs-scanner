@@ -196,6 +196,13 @@ class ScanControlPage(QWidget):
         grid.addWidget(end_button, 3, 2, 1, 2)
         return group
 
+    def _add_step_row(self, layout: QGridLayout, row: int, label: str, step_edit: QLineEdit) -> None:
+        """Add one configurable scan step row."""
+
+        layout.addWidget(QLabel(label, self), row, 0)
+        layout.addWidget(step_edit, row, 1, 1, 2)
+        layout.addWidget(QLabel("mm", self), row, 3)
+
     def _create_test_info_group(self) -> QGroupBox:
         group = QGroupBox("测试说明", self)
         grid = QGridLayout(group)
