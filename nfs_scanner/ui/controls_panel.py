@@ -28,8 +28,8 @@ class ControlsPanel(QWidget):
     DEFAULT_SCAN_START_X = "0"
     DEFAULT_SCAN_STOP_X = "4"
     DEFAULT_SCAN_STEP_X = "1"
-    DEFAULT_SCAN_START_Y = "0"
-    DEFAULT_SCAN_STOP_Y = "4"
+    DEFAULT_SCAN_START_Y = "-4"
+    DEFAULT_SCAN_STOP_Y = "0"
     DEFAULT_SCAN_STEP_Y = "1"
     DEFAULT_SCAN_MODE = "snake"
 
