@@ -8,9 +8,9 @@ from .base_motion import MotionController
 class MockMotionController(MotionController):
     """In-memory mock motion controller for workflow simulation."""
 
-    X_LIMIT = (-100.0, 100.0)
-    Y_LIMIT = (-100.0, 100.0)
-    Z_LIMIT = (0.0, 100.0)
+    X_LIMIT = (0.0, 200.0)
+    Y_LIMIT = (-300.0, 0.0)
+    Z_LIMIT = (0.0, 10.0)
 
     def __init__(self) -> None:
         self._connected = False
