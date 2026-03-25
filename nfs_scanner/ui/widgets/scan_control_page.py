@@ -28,8 +28,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from nfs_scanner.ui.styles.scan_page_style import build_scan_page_stylesheet
-
 from .collapsible_section import CollapsibleSection
 from .instrument_panel import InstrumentPanel
 
@@ -90,18 +88,17 @@ class ScanControlPage(QWidget):
 
     def _setup_ui(self) -> None:
         self.setObjectName("scanControlRoot")
-        self.setStyleSheet(build_scan_page_stylesheet())
 
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(12, 12, 12, 12)
-        root_layout.setSpacing(10)
+        root_layout.setSpacing(8)
 
         splitter = QSplitter(Qt.Orientation.Horizontal, self)
         splitter.addWidget(self._build_left_panel())
         splitter.addWidget(self._build_right_panel())
         splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 2)
-        splitter.setSizes([420, 900])
+        splitter.setStretchFactor(1, 1)
+        splitter.setSizes([420, 760])
 
         root_layout.addWidget(splitter, 1)
         root_layout.addWidget(self._build_status_bar())
@@ -116,7 +113,7 @@ class ScanControlPage(QWidget):
         container = QWidget(self)
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+        layout.setSpacing(8)
 
         layout.addWidget(self._create_motion_control_group())
         layout.addWidget(self._create_step_config_group())
@@ -129,7 +126,7 @@ class ScanControlPage(QWidget):
         container = QWidget(self)
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+        layout.setSpacing(8)
 
         layout.addWidget(self._create_scan_area_group())
         layout.addWidget(self._create_instrument_section())
@@ -140,8 +137,8 @@ class ScanControlPage(QWidget):
     def _create_motion_control_group(self) -> QGroupBox:
         group = QGroupBox("运动控制", self)
         grid = QGridLayout(group)
-        grid.setHorizontalSpacing(8)
-        grid.setVerticalSpacing(8)
+        grid.setHorizontalSpacing(6)
+        grid.setVerticalSpacing(6)
 
         self.x_move_step_edit = self._default_step_line_edit()
         self.y_move_step_edit = self._default_step_line_edit()
@@ -155,8 +152,8 @@ class ScanControlPage(QWidget):
     def _add_axis_move_row(self, layout: QGridLayout, row: int, axis: str, step_edit: QLineEdit) -> None:
         positive_button = QPushButton(f"{axis}+", self)
         negative_button = QPushButton(f"{axis}-", self)
-        positive_button.setFixedHeight(34)
-        negative_button.setFixedHeight(34)
+        positive_button.setFixedHeight(30)
+        negative_button.setFixedHeight(30)
 
         if axis == "X":
             positive_button.clicked.connect(self.on_move_x_positive)
@@ -176,8 +173,8 @@ class ScanControlPage(QWidget):
     def _create_step_config_group(self) -> QGroupBox:
         group = QGroupBox("步长设置", self)
         grid = QGridLayout(group)
-        grid.setHorizontalSpacing(8)
-        grid.setVerticalSpacing(8)
+        grid.setHorizontalSpacing(6)
+        grid.setVerticalSpacing(6)
 
         self.step_x_edit = self._default_step_line_edit()
         self.step_y_edit = self._default_step_line_edit()
@@ -189,8 +186,8 @@ class ScanControlPage(QWidget):
 
         start_button = QPushButton("设为起点", self)
         end_button = QPushButton("设为终点", self)
-        start_button.setFixedHeight(34)
-        end_button.setFixedHeight(34)
+        start_button.setFixedHeight(30)
+        end_button.setFixedHeight(30)
         start_button.clicked.connect(self.on_set_start_point)
         end_button.clicked.connect(self.on_set_end_point)
         grid.addWidget(start_button, 3, 0, 1, 2)
@@ -207,8 +204,8 @@ class ScanControlPage(QWidget):
     def _create_test_info_group(self) -> QGroupBox:
         group = QGroupBox("测试说明", self)
         grid = QGridLayout(group)
-        grid.setHorizontalSpacing(8)
-        grid.setVerticalSpacing(8)
+        grid.setHorizontalSpacing(6)
+        grid.setVerticalSpacing(6)
 
         self.project_name_edit = QLineEdit(group)
         self.project_name_edit.setPlaceholderText("请输入项目名称")
@@ -224,8 +221,8 @@ class ScanControlPage(QWidget):
     def _create_action_group(self) -> QGroupBox:
         group = QGroupBox("功能操作区", self)
         grid = QGridLayout(group)
-        grid.setHorizontalSpacing(8)
-        grid.setVerticalSpacing(8)
+        grid.setHorizontalSpacing(6)
+        grid.setVerticalSpacing(6)
 
         self.start_button = QPushButton("开始", self)
         self.start_button.setObjectName("primaryButton")
@@ -236,7 +233,7 @@ class ScanControlPage(QWidget):
         search_button = QPushButton("搜索仪表", self)
 
         for button in [self.start_button, self.pause_button, self.stop_button, clear_log_button, search_button]:
-            button.setFixedHeight(36)
+            button.setFixedHeight(32)
 
         self.start_button.clicked.connect(self.on_start_scan)
         self.pause_button.clicked.connect(self.on_pause_scan)
@@ -266,6 +263,10 @@ class ScanControlPage(QWidget):
         self.scan_table.horizontalHeader().setStretchLastSection(True)
         self.scan_table.horizontalHeader().setDefaultSectionSize(100)
         self.scan_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.scan_table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        table_height = self.scan_table.horizontalHeader().height() + self.scan_table.verticalHeader().defaultSectionSize() * 2 + 4
+        self.scan_table.setFixedHeight(table_height)
+        group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         layout.addWidget(self.scan_table)
         return group
 
@@ -323,6 +324,8 @@ class ScanControlPage(QWidget):
         layout.addWidget(self.log_edit)
 
         section = CollapsibleSection("日志区域", body_widget=content, expanded=True, parent=self)
+        section.toggle_button.setVisible(False)
+        section.summary_frame.setVisible(False)
         section.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         self.log_section = section
         return section
@@ -361,7 +364,7 @@ class ScanControlPage(QWidget):
     def _default_step_line_edit(self) -> QLineEdit:
         edit = QLineEdit(self)
         edit.setText("0.50")
-        edit.setFixedWidth(88)
+        edit.setFixedWidth(76)
         return edit
 
     def _populate_scan_table_defaults(self) -> None:
