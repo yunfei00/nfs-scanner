@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
     QGroupBox,
+    QHeaderView,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -264,7 +265,7 @@ class ScanControlPage(QWidget):
         self.scan_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
         self.scan_table.horizontalHeader().setStretchLastSection(True)
         self.scan_table.horizontalHeader().setDefaultSectionSize(100)
-        self.scan_table.horizontalHeader().setSectionResizeMode(self.scan_table.horizontalHeader().Stretch)
+        self.scan_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.scan_table)
         return group
 
