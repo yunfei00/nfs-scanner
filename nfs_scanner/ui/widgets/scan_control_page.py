@@ -71,6 +71,15 @@ class ScanControlPage(QWidget):
     Z_RANGE = (0.0, 10.0)
     PORT_KEYWORDS = ("CH340", "CH341", "wchusbserial")
     INSTRUMENT_SEARCH_LOG_PATH = Path("output") / "instrument_search.log"
+    QUERY_LABELS = {
+        "start_freq": "起始频率",
+        "center_freq": "中心频率",
+        "stop_freq": "终止频率",
+        "span": "Span",
+        "rbw": "RBW",
+        "points": "扫描点数",
+        "scale": "Scale",
+    }
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -504,6 +513,8 @@ class ScanControlPage(QWidget):
         self.instrument_section.toggled.connect(lambda _: self._refresh_layout())
         self.result_section.toggled.connect(lambda _: self._refresh_layout())
         self.log_section.toggled.connect(lambda _: self._refresh_layout())
+        for panel in self.instrument_panels:
+            panel.query_requested.connect(self.on_instrument_query_requested)
 
     def _refresh_layout(self) -> None:
         self.updateGeometry()
@@ -782,6 +793,7 @@ class ScanControlPage(QWidget):
 
         self.search_button.setEnabled(False)
         self.search_button.setText("搜索中...")
+        self.append_log("开始搜索仪表，请稍候...")
         self._write_instrument_search_log("开始搜索仪表（异步任务已启动）")
 
         self._instrument_search_thread = QThread(self)
@@ -804,6 +816,7 @@ class ScanControlPage(QWidget):
             if zna_panel is not None:
                 zna_panel.set_discovered_message("未安装 pyvisa，无法通过 NI MAX 扫描 VISA 设备")
             self._write_instrument_search_log("仪表搜索失败：未安装 pyvisa，请先安装后重试")
+            self.append_log("仪表搜索失败：未安装 pyvisa")
             return
 
         matched = result.matched_resources
@@ -823,12 +836,26 @@ class ScanControlPage(QWidget):
             panel.set_discovered_message("本次仅实现 ZNA67 自动识别")
 
         self._write_instrument_search_log(f"仪表搜索完成：共扫描 {len(result.probes)} 个 VISA 资源")
+        self.append_log(f"仪表搜索完成：共扫描 {len(result.probes)} 个 VISA 资源，详见 output/instrument_search.log")
         for probe in result.probes:
             if probe.error_message:
                 self._write_instrument_search_log(f"VISA 资源探测失败: {probe.resource_name} | {probe.error_message}")
                 continue
             mark = "匹配ZNA67" if probe.is_zna67 else "非ZNA67"
             self._write_instrument_search_log(f"VISA 资源: {probe.resource_name} | *IDN?={probe.idn_text} | {mark}")
+
+    def on_instrument_query_requested(self, instrument_name: str, query_key: str) -> None:
+        """处理仪表参数查询按钮，回填占位查询结果并写入日志。"""
+
+        panel = next((item for item in self.instrument_panels if item.instrument_name == instrument_name), None)
+        if panel is None:
+            return
+
+        value, unit = self._mock_query_value(query_key)
+        panel.set_query_result(query_key, value, unit)
+        label = self.QUERY_LABELS.get(query_key, query_key)
+        suffix = f" {unit}" if unit else ""
+        self.append_log(f"仪表查询: {instrument_name} - {label} = {value}{suffix}")
 
     def _on_instrument_search_thread_finished(self) -> None:
         """重置搜索按钮状态。"""
@@ -846,6 +873,20 @@ class ScanControlPage(QWidget):
         with self.INSTRUMENT_SEARCH_LOG_PATH.open("a", encoding="utf-8") as log_file:
             log_file.write(f"[{timestamp}] {message}\n")
         get_logger(__name__).info("instrument-search | %s", message)
+
+    def _mock_query_value(self, query_key: str) -> tuple[str, str | None]:
+        """返回仪表查询的占位值。"""
+
+        mock_values: dict[str, tuple[str, str | None]] = {
+            "start_freq": ("80.000", "MHz"),
+            "center_freq": ("3040.000", "MHz"),
+            "stop_freq": ("6000.000", "MHz"),
+            "span": ("5920.000", "MHz"),
+            "rbw": ("100.000", "kHz"),
+            "points": ("1601", None),
+            "scale": ("10.000", None),
+        }
+        return mock_values.get(query_key, ("-", None))
 
     def on_open_result_folder(self) -> None:
         path = Path(self.result_path_edit.text().strip())
