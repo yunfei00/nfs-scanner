@@ -106,6 +106,16 @@ class ScanControlPage(QWidget):
         "points": "SWEep:POINts?",
         "scale": "DISPlay:WINDow:TRACe:Y:SCALe:PDIVision?",
     }
+    SET_COMMANDS = {
+        "start_freq": "FREQuency:STARt",
+        "center_freq": "FREQuency:CENTer",
+        "stop_freq": "FREQuency:STOP",
+        "span": "FREQuency:SPAN",
+        "rbw": "BANDwidth:RESolution",
+        "points": "SWEep:POINts",
+        "scale": "DISPlay:WINDow:TRACe:Y:SCALe:PDIVision",
+    }
+    UNIT_SCALE = {"Hz": 1.0, "kHz": 1_000.0, "MHz": 1_000_000.0, "GHz": 1_000_000_000.0}
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -541,6 +551,7 @@ class ScanControlPage(QWidget):
         self.log_section.toggled.connect(lambda _: self._refresh_layout())
         for panel in self.instrument_panels:
             panel.query_requested.connect(self.on_instrument_query_requested)
+            panel.set_requested.connect(self.on_instrument_set_requested)
 
     def _refresh_layout(self) -> None:
         self.updateGeometry()
@@ -955,14 +966,14 @@ class ScanControlPage(QWidget):
         if query_key in {"start_freq", "center_freq", "stop_freq", "span"}:
             try:
                 frequency_hz = float(cleaned_value)
-                return f"{frequency_hz / 1_000_000:.3f}", "MHz"
+                return self._to_preferred_frequency_unit(frequency_hz)
             except ValueError:
                 return cleaned_value, None
 
         if query_key == "rbw":
             try:
                 rbw_hz = float(cleaned_value)
-                return f"{rbw_hz / 1_000:.3f}", "kHz"
+                return self._to_preferred_frequency_unit(rbw_hz)
             except ValueError:
                 return cleaned_value, None
 
@@ -979,6 +990,119 @@ class ScanControlPage(QWidget):
                 return cleaned_value, None
 
         return cleaned_value, None
+
+    def _to_preferred_frequency_unit(self, value_hz: float) -> tuple[str, str]:
+        """把 Hz 值转换为更合适的人类可读单位。"""
+
+        abs_value = abs(value_hz)
+        if abs_value >= 1_000_000_000:
+            return f"{value_hz / 1_000_000_000:.3f}", "GHz"
+        if abs_value >= 1_000_000:
+            return f"{value_hz / 1_000_000:.3f}", "MHz"
+        if abs_value >= 1_000:
+            return f"{value_hz / 1_000:.3f}", "kHz"
+        return f"{value_hz:.3f}", "Hz"
+
+    def on_instrument_set_requested(
+        self,
+        instrument_name: str,
+        query_key: str,
+        value_text: str,
+        unit: str | None,
+    ) -> None:
+        """处理仪表参数设置请求。"""
+
+        label = self.QUERY_LABELS.get(query_key, query_key)
+        if not value_text:
+            self.append_log(f"仪表设置失败: {instrument_name} - {label} 输入为空")
+            return
+
+        command = self._build_set_command(query_key, value_text, unit)
+        if command is None:
+            self.append_log(f"仪表设置失败: {instrument_name} - {label} 数值格式无效")
+            return
+
+        success, reason = self._set_instrument_value(instrument_name, command)
+        if success:
+            suffix = f" {unit}" if unit else ""
+            self.append_log(f"仪表设置成功: {instrument_name} - {label} = {value_text}{suffix}")
+            return
+
+        self.append_log(f"仪表设置失败: {instrument_name} - {label}，原因: {reason}")
+
+    def _build_set_command(self, query_key: str, value_text: str, unit: str | None) -> str | None:
+        """根据输入文本和单位构建 SCPI 设置命令。"""
+
+        command_prefix = self.SET_COMMANDS.get(query_key)
+        if command_prefix is None:
+            return None
+
+        if query_key in {"start_freq", "center_freq", "stop_freq", "span", "rbw"}:
+            if unit is None or unit not in self.UNIT_SCALE:
+                return None
+            try:
+                scaled_value = float(value_text) * self.UNIT_SCALE[unit]
+            except ValueError:
+                return None
+            return f"{command_prefix} {scaled_value:.6f}"
+
+        if query_key == "points":
+            try:
+                return f"{command_prefix} {int(float(value_text))}"
+            except ValueError:
+                return None
+
+        if query_key == "scale":
+            try:
+                return f"{command_prefix} {float(value_text):.6f}"
+            except ValueError:
+                return None
+
+        return None
+
+    def _set_instrument_value(self, instrument_name: str, command: str) -> tuple[bool, str]:
+        """设置仪表参数：优先 VISA，其次串口。"""
+
+        if instrument_name == "ZNA67":
+            visa_ok, visa_reason = self._write_via_visa(command)
+            if visa_ok:
+                return True, ""
+
+            if self.serial_is_open and self._serial_port.isOpen():
+                sent, serial_reason = self._send_serial_command(command)
+                if sent:
+                    return True, ""
+                return False, f"VISA失败({visa_reason})，串口失败({serial_reason})"
+            return False, visa_reason
+
+        return False, "当前仅支持 ZNA67 参数设置"
+
+    def _write_via_visa(self, command: str, timeout_ms: int = 1200) -> tuple[bool, str]:
+        """通过缓存 VISA 资源发送 SCPI 设置命令。"""
+
+        if not _HAS_PYVISA:
+            return False, "未安装 pyvisa"
+
+        resources = self._load_cached_instrument_resources()
+        if not resources:
+            return False, "未找到缓存资源，请先点击“搜索仪表”"
+
+        resource_manager = pyvisa.ResourceManager()
+        try:
+            last_error = ""
+            for resource_name in resources:
+                try:
+                    instrument = resource_manager.open_resource(resource_name)
+                    instrument.timeout = timeout_ms
+                    instrument.write(command)
+                    instrument.close()
+                    return True, ""
+                except Exception as error:
+                    last_error = f"{resource_name}: {error}"
+                    continue
+            return False, last_error or "发送失败"
+        finally:
+            resource_manager.close()
 
     def _on_instrument_search_thread_finished(self) -> None:
         """重置搜索按钮状态。"""

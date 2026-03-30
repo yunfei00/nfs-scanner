@@ -23,6 +23,7 @@ class InstrumentPanel(QWidget):
     """
 
     query_requested = Signal(str, str)
+    set_requested = Signal(str, str, str, str | None)
 
     def __init__(self, instrument_name: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -57,14 +58,16 @@ class InstrumentPanel(QWidget):
         center_freq_unit.setCurrentText("MHz")
 
         start_freq_edit = QLineEdit(self)
-        layout.addWidget(QLabel("起始频率", self), 0, 0)
+        start_set_button = QPushButton("起始频率", self)
+        layout.addWidget(start_set_button, 0, 0)
         layout.addWidget(start_freq_edit, 0, 1)
         layout.addWidget(start_freq_unit, 0, 2)
         start_query_button = QPushButton("查询", self)
         layout.addWidget(start_query_button, 0, 3)
 
         center_freq_edit = QLineEdit(self)
-        layout.addWidget(QLabel("中心频率", self), 0, 4)
+        center_set_button = QPushButton("中心频率", self)
+        layout.addWidget(center_set_button, 0, 4)
         layout.addWidget(center_freq_edit, 0, 5)
         layout.addWidget(center_freq_unit, 0, 6)
         center_query_button = QPushButton("查询", self)
@@ -80,14 +83,16 @@ class InstrumentPanel(QWidget):
         span_unit.setCurrentText("MHz")
 
         stop_freq_edit = QLineEdit(self)
-        layout.addWidget(QLabel("终止频率", self), 1, 0)
+        stop_set_button = QPushButton("终止频率", self)
+        layout.addWidget(stop_set_button, 1, 0)
         layout.addWidget(stop_freq_edit, 1, 1)
         layout.addWidget(stop_freq_unit, 1, 2)
         stop_query_button = QPushButton("查询", self)
         layout.addWidget(stop_query_button, 1, 3)
 
         span_edit = QLineEdit(self)
-        layout.addWidget(QLabel("Span", self), 1, 4)
+        span_set_button = QPushButton("Span", self)
+        layout.addWidget(span_set_button, 1, 4)
         layout.addWidget(span_edit, 1, 5)
         layout.addWidget(span_unit, 1, 6)
         span_query_button = QPushButton("查询", self)
@@ -99,21 +104,24 @@ class InstrumentPanel(QWidget):
         rbw_unit.setCurrentText("kHz")
 
         rbw_edit = QLineEdit(self)
-        layout.addWidget(QLabel("RBW", self), 2, 0)
+        rbw_set_button = QPushButton("RBW", self)
+        layout.addWidget(rbw_set_button, 2, 0)
         layout.addWidget(rbw_edit, 2, 1)
         layout.addWidget(rbw_unit, 2, 2)
         rbw_query_button = QPushButton("查询", self)
         layout.addWidget(rbw_query_button, 2, 3)
 
         points_edit = QLineEdit(self)
-        layout.addWidget(QLabel("扫描点数", self), 2, 4)
+        points_set_button = QPushButton("扫描点数", self)
+        layout.addWidget(points_set_button, 2, 4)
         layout.addWidget(points_edit, 2, 5)
         points_query_button = QPushButton("查询", self)
         layout.addWidget(points_query_button, 2, 6)
 
         # 第 4 行：Scale + Preset + 保存数据
         scale_edit = QLineEdit(self)
-        layout.addWidget(QLabel("Scale", self), 3, 0)
+        scale_set_button = QPushButton("Scale", self)
+        layout.addWidget(scale_set_button, 3, 0)
         layout.addWidget(scale_edit, 3, 1)
         layout.addWidget(QLabel("dB/div", self), 3, 2)
         scale_query_button = QPushButton("查询", self)
@@ -152,6 +160,52 @@ class InstrumentPanel(QWidget):
         rbw_query_button.clicked.connect(lambda: self.query_requested.emit(self.instrument_name, "rbw"))
         points_query_button.clicked.connect(lambda: self.query_requested.emit(self.instrument_name, "points"))
         scale_query_button.clicked.connect(lambda: self.query_requested.emit(self.instrument_name, "scale"))
+        start_set_button.clicked.connect(
+            lambda: self.set_requested.emit(
+                self.instrument_name,
+                "start_freq",
+                start_freq_edit.text().strip(),
+                start_freq_unit.currentText(),
+            )
+        )
+        center_set_button.clicked.connect(
+            lambda: self.set_requested.emit(
+                self.instrument_name,
+                "center_freq",
+                center_freq_edit.text().strip(),
+                center_freq_unit.currentText(),
+            )
+        )
+        stop_set_button.clicked.connect(
+            lambda: self.set_requested.emit(
+                self.instrument_name,
+                "stop_freq",
+                stop_freq_edit.text().strip(),
+                stop_freq_unit.currentText(),
+            )
+        )
+        span_set_button.clicked.connect(
+            lambda: self.set_requested.emit(
+                self.instrument_name,
+                "span",
+                span_edit.text().strip(),
+                span_unit.currentText(),
+            )
+        )
+        rbw_set_button.clicked.connect(
+            lambda: self.set_requested.emit(
+                self.instrument_name,
+                "rbw",
+                rbw_edit.text().strip(),
+                rbw_unit.currentText(),
+            )
+        )
+        points_set_button.clicked.connect(
+            lambda: self.set_requested.emit(self.instrument_name, "points", points_edit.text().strip(), None)
+        )
+        scale_set_button.clicked.connect(
+            lambda: self.set_requested.emit(self.instrument_name, "scale", scale_edit.text().strip(), None)
+        )
 
     def _setup_placeholder_ui(self) -> None:
         """构建非 ZNA 仪表的占位 UI。"""
