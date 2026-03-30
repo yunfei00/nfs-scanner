@@ -23,7 +23,10 @@ class InstrumentPanel(QWidget):
     """
 
     query_requested = Signal(str, str)
-    set_requested = Signal(str, str, str, str | None)
+    # PySide6 的 Signal 参数不支持 `str | None` 这类 typing 语法，
+    # 否则会导致信号参数解析异常（运行时报“参数个数不匹配”）。
+    # 第 4 个参数使用 object，以兼容 str 与 None。
+    set_requested = Signal(str, str, str, object)
 
     def __init__(self, instrument_name: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
