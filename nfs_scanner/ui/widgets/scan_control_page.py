@@ -870,6 +870,7 @@ class ScanControlPage(QWidget):
                 for item in matched:
                     self.append_log(f"已找到{item.resource_name}设备")
                 self._save_cached_instrument_resources([item.resource_name for item in matched])
+                self._refresh_all_instrument_queries("ZNA67")
             else:
                 zna_panel.set_discovered_message("未匹配到 ZNA67 矢网")
 
@@ -899,6 +900,21 @@ class ScanControlPage(QWidget):
         label = self.QUERY_LABELS.get(query_key, query_key)
         suffix = f" {unit}" if unit else ""
         self.append_log(f"仪表查询: {instrument_name} - {label} = {value}{suffix}")
+
+    def _refresh_all_instrument_queries(self, instrument_name: str) -> None:
+        """发送全部查询命令并同步刷新界面字段。"""
+
+        panel = next((item for item in self.instrument_panels if item.instrument_name == instrument_name), None)
+        if panel is None:
+            return
+
+        self.append_log(f"仪表已连接，开始同步全部参数: {instrument_name}")
+        for query_key in self.QUERY_COMMANDS:
+            value, unit = self._query_instrument_value(instrument_name, query_key)
+            panel.set_query_result(query_key, value, unit)
+            label = self.QUERY_LABELS.get(query_key, query_key)
+            suffix = f" {unit}" if unit else ""
+            self.append_log(f"仪表同步: {instrument_name} - {label} = {value}{suffix}")
 
     def _query_instrument_value(self, instrument_name: str, query_key: str) -> tuple[str, str | None]:
         """查询仪表参数：优先真实设备，失败后回退占位值。"""
@@ -1026,6 +1042,7 @@ class ScanControlPage(QWidget):
         if success:
             suffix = f" {unit}" if unit else ""
             self.append_log(f"仪表设置成功: {instrument_name} - {label} = {value_text}{suffix}")
+            self._refresh_all_instrument_queries(instrument_name)
             return
 
         self.append_log(f"仪表设置失败: {instrument_name} - {label}，原因: {reason}")
