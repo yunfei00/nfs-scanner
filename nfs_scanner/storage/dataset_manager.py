@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import logging
 from dataclasses import asdict, dataclass, field
@@ -21,6 +22,7 @@ class ScanDataset:
     positions: list[tuple[float, float, float]] = field(default_factory=list)
     spectrum_data: list[NDArray[np.float64]] = field(default_factory=list)
     images: list[NDArray[np.uint8]] = field(default_factory=list)
+    frequency_axis: NDArray[np.float64] | None = None
 
 
 class DatasetManager:
@@ -47,13 +49,18 @@ class DatasetManager:
         """Append one scan point into the current dataset."""
 
         dataset = self._require_dataset()
-        amplitude_trace = self._extract_amplitude_trace(result)
+        frequency_axis, amplitude_trace = self._extract_trace(result)
         image = self._normalize_image(result.camera_image)
 
         if dataset.spectrum_data and amplitude_trace.shape != dataset.spectrum_data[0].shape:
             raise ValueError("Spectrum trace shape does not match existing dataset entries.")
         if dataset.images and image.shape != dataset.images[0].shape:
             raise ValueError("Image shape does not match existing dataset entries.")
+
+        if dataset.frequency_axis is None:
+            dataset.frequency_axis = frequency_axis
+        elif not np.allclose(dataset.frequency_axis, frequency_axis):
+            raise ValueError("Frequency axis does not match existing dataset entries.")
 
         dataset.positions.append((result.x, result.y, result.z))
         dataset.spectrum_data.append(amplitude_trace)
@@ -79,7 +86,40 @@ class DatasetManager:
         np.save(output_dir / "spectrum.npy", spectrum_array)
         np.save(output_dir / "images.npy", images_array)
 
+        if dataset.frequency_axis is not None:
+            np.save(output_dir / "frequencies.npy", dataset.frequency_axis)
+            self._save_zna_row_format(output_dir, dataset)
+
         self._logger.info("[DATASET] dataset saved")
+
+    def _save_zna_row_format(self, output_dir: Path, dataset: ScanDataset) -> None:
+        """Save one frequency header row + many data rows for ZNA-like exports."""
+
+        if dataset.frequency_axis is None:
+            raise ValueError("Frequency axis is required for row-based export.")
+
+        csv_path = output_dir / "spectrum_rows.csv"
+        metadata_path = output_dir / "spectrum_rows_meta.jsonl"
+
+        with csv_path.open("w", encoding="utf-8", newline="") as csv_file:
+            writer = csv.writer(csv_file)
+            header_row = ["fre", *dataset.frequency_axis.tolist()]
+            writer.writerow(header_row)
+
+            for row_index, amplitude_trace in enumerate(dataset.spectrum_data, start=1):
+                row_key = f"pt_{row_index:06d}"
+                writer.writerow([row_key, *amplitude_trace.tolist()])
+
+        with metadata_path.open("w", encoding="utf-8") as metadata_file:
+            for row_index, position in enumerate(dataset.positions, start=1):
+                row_key = f"pt_{row_index:06d}"
+                metadata = {
+                    "row_key": row_key,
+                    "x": position[0],
+                    "y": position[1],
+                    "z": position[2],
+                }
+                metadata_file.write(json.dumps(metadata, ensure_ascii=False) + "\n")
 
     def _require_dataset(self) -> ScanDataset:
         """Return the active dataset or raise when it is missing."""
@@ -88,14 +128,22 @@ class DatasetManager:
             raise RuntimeError("Dataset has not been created.")
         return self._dataset
 
-    def _extract_amplitude_trace(self, result: ScanPointResult) -> NDArray[np.float64]:
-        """Return the amplitude part of one spectrum trace."""
+    def _extract_trace(
+        self,
+        result: ScanPointResult,
+    ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+        """Return frequency and amplitude arrays from one spectrum trace."""
 
-        _, amplitude = result.spectrum_trace
-        trace = np.asarray(amplitude, dtype=np.float64)
-        if trace.ndim != 1:
+        frequency, amplitude = result.spectrum_trace
+        frequency_array = np.asarray(frequency, dtype=np.float64)
+        amplitude_array = np.asarray(amplitude, dtype=np.float64)
+
+        if frequency_array.ndim != 1 or amplitude_array.ndim != 1:
             raise ValueError("Spectrum trace must be one-dimensional.")
-        return trace
+        if frequency_array.shape != amplitude_array.shape:
+            raise ValueError("Frequency and amplitude trace shapes must match.")
+
+        return frequency_array, amplitude_array
 
     def _normalize_image(self, image: NDArray[np.uint8]) -> NDArray[np.uint8]:
         """Convert one image to a grayscale array for dataset storage."""
