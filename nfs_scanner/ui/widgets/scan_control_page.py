@@ -30,6 +30,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from nfs_scanner.devices.spectrum import discover_zna67_via_visa
+
 from .collapsible_section import CollapsibleSection
 from .instrument_panel import InstrumentPanel
 
@@ -758,9 +760,37 @@ class ScanControlPage(QWidget):
         self.append_log("日志已清空")
 
     def on_search_instruments(self) -> None:
+        result = discover_zna67_via_visa()
+        zna_panel = next((panel for panel in self.instrument_panels if "ZNA" in panel.instrument_name.upper()), None)
+
+        if not result.pyvisa_available:
+            if zna_panel is not None:
+                zna_panel.set_discovered_message("未安装 pyvisa，无法通过 NI MAX 扫描 VISA 设备")
+            self.append_log("仪表搜索失败：未安装 pyvisa，请先安装后重试")
+            return
+
+        matched = result.matched_resources
+        if zna_panel is not None:
+            if matched:
+                summary = "；".join(f"{item.resource_name} -> {item.idn_text}" for item in matched[:2])
+                if len(matched) > 2:
+                    summary += f"；...共 {len(matched)} 台"
+                zna_panel.set_discovered_message(f"已匹配到 ZNA67: {summary}")
+            else:
+                zna_panel.set_discovered_message("未匹配到 ZNA67 矢网")
+
         for panel in self.instrument_panels:
-            panel.set_discovered_message(f"已发现设备: {panel.instrument_name}-MOCK-001")
-        self.append_log("仪表搜索完成，已发现 3 台模拟设备")
+            if panel is zna_panel:
+                continue
+            panel.set_discovered_message("本次仅实现 ZNA67 自动识别")
+
+        self.append_log(f"仪表搜索完成：共扫描 {len(result.probes)} 个 VISA 资源")
+        for probe in result.probes:
+            if probe.error_message:
+                self.append_log(f"VISA 资源探测失败: {probe.resource_name} | {probe.error_message}")
+                continue
+            mark = "匹配ZNA67" if probe.is_zna67 else "非ZNA67"
+            self.append_log(f"VISA 资源: {probe.resource_name} | *IDN?={probe.idn_text} | {mark}")
 
     def on_open_result_folder(self) -> None:
         path = Path(self.result_path_edit.text().strip())
