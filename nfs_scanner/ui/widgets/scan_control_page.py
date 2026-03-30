@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QIODevice, QTimer, Qt
+from PySide6.QtCore import QIODevice, QObject, QThread, QTimer, Qt, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtSerialPort import QSerialPort, QSerialPortInfo
 from PySide6.QtWidgets import (
@@ -30,10 +30,23 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from nfs_scanner.devices.spectrum import discover_zna67_via_visa
+from nfs_scanner.devices.spectrum import ZnaDiscoveryResult, discover_zna67_via_visa
+from nfs_scanner.infra.logging_config import get_logger
 
 from .collapsible_section import CollapsibleSection
 from .instrument_panel import InstrumentPanel
+
+
+class InstrumentSearchWorker(QObject):
+    """在后台线程执行 VISA 搜索，避免阻塞主界面。"""
+
+    finished = Signal(object)
+
+    def run(self) -> None:
+        """执行搜索并发出结果。"""
+
+        result = discover_zna67_via_visa()
+        self.finished.emit(result)
 
 
 class ScanControlPage(QWidget):
@@ -57,6 +70,7 @@ class ScanControlPage(QWidget):
     Y_RANGE = (-300.0, 0.0)
     Z_RANGE = (0.0, 10.0)
     PORT_KEYWORDS = ("CH340", "CH341", "wchusbserial")
+    INSTRUMENT_SEARCH_LOG_PATH = Path("output") / "instrument_search.log"
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -74,6 +88,8 @@ class ScanControlPage(QWidget):
         self._scan_timer.timeout.connect(self._dispatch_next_scan_point)
         self._scan_points: list[tuple[float, float, float]] = []
         self._scan_point_index = 0
+        self._instrument_search_thread: QThread | None = None
+        self._instrument_search_worker: InstrumentSearchWorker | None = None
 
         self.port_combo: QComboBox
         self.baudrate_combo: QComboBox
@@ -94,6 +110,7 @@ class ScanControlPage(QWidget):
         self.start_button: QPushButton
         self.pause_button: QPushButton
         self.stop_button: QPushButton
+        self.search_button: QPushButton
 
         self.scan_table: QTableWidget
         self.instrument_tabs: QTabWidget
@@ -359,22 +376,22 @@ class ScanControlPage(QWidget):
         self.stop_button = QPushButton("停止", self)
         self.stop_button.setObjectName("dangerButton")
         clear_log_button = QPushButton("清除日志", self)
-        search_button = QPushButton("搜索仪表", self)
+        self.search_button = QPushButton("搜索仪表", self)
 
-        for button in [self.start_button, self.pause_button, self.stop_button, clear_log_button, search_button]:
+        for button in [self.start_button, self.pause_button, self.stop_button, clear_log_button, self.search_button]:
             button.setFixedHeight(32)
 
         self.start_button.clicked.connect(self.on_start_scan)
         self.pause_button.clicked.connect(self.on_pause_scan)
         self.stop_button.clicked.connect(self.on_stop_scan)
         clear_log_button.clicked.connect(self.on_clear_log)
-        search_button.clicked.connect(self.on_search_instruments)
+        self.search_button.clicked.connect(self.on_search_instruments)
 
         grid.addWidget(self.start_button, 0, 0)
         grid.addWidget(self.pause_button, 0, 1)
         grid.addWidget(self.stop_button, 1, 0)
         grid.addWidget(clear_log_button, 1, 1)
-        grid.addWidget(search_button, 2, 0, 1, 2)
+        grid.addWidget(self.search_button, 2, 0, 1, 2)
 
         self._set_scan_button_states("就绪")
         return group
@@ -406,7 +423,7 @@ class ScanControlPage(QWidget):
 
         self.instrument_tabs = QTabWidget(content)
         self.instrument_panels = [
-            InstrumentPanel("ZNA Vector Network Analyzer", self),
+            InstrumentPanel("ZNA67", self),
             InstrumentPanel("频谱仪", self),
             InstrumentPanel("接收机", self),
             InstrumentPanel("功率计", self),
@@ -760,13 +777,33 @@ class ScanControlPage(QWidget):
         self.append_log("日志已清空")
 
     def on_search_instruments(self) -> None:
-        result = discover_zna67_via_visa()
-        zna_panel = next((panel for panel in self.instrument_panels if "ZNA" in panel.instrument_name.upper()), None)
+        if self._instrument_search_thread is not None:
+            return
+
+        self.search_button.setEnabled(False)
+        self.search_button.setText("搜索中...")
+        self._write_instrument_search_log("开始搜索仪表（异步任务已启动）")
+
+        self._instrument_search_thread = QThread(self)
+        self._instrument_search_worker = InstrumentSearchWorker()
+        self._instrument_search_worker.moveToThread(self._instrument_search_thread)
+        self._instrument_search_thread.started.connect(self._instrument_search_worker.run)
+        self._instrument_search_worker.finished.connect(self._on_instrument_search_finished)
+        self._instrument_search_worker.finished.connect(self._instrument_search_thread.quit)
+        self._instrument_search_worker.finished.connect(self._instrument_search_worker.deleteLater)
+        self._instrument_search_thread.finished.connect(self._on_instrument_search_thread_finished)
+        self._instrument_search_thread.finished.connect(self._instrument_search_thread.deleteLater)
+        self._instrument_search_thread.start()
+
+    def _on_instrument_search_finished(self, result: ZnaDiscoveryResult) -> None:
+        """处理异步仪表搜索结果，并同步更新 UI。"""
+
+        zna_panel = next((panel for panel in self.instrument_panels if panel.instrument_name == "ZNA67"), None)
 
         if not result.pyvisa_available:
             if zna_panel is not None:
                 zna_panel.set_discovered_message("未安装 pyvisa，无法通过 NI MAX 扫描 VISA 设备")
-            self.append_log("仪表搜索失败：未安装 pyvisa，请先安装后重试")
+            self._write_instrument_search_log("仪表搜索失败：未安装 pyvisa，请先安装后重试")
             return
 
         matched = result.matched_resources
@@ -776,6 +813,7 @@ class ScanControlPage(QWidget):
                 if len(matched) > 2:
                     summary += f"；...共 {len(matched)} 台"
                 zna_panel.set_discovered_message(f"已匹配到 ZNA67: {summary}")
+                self.instrument_tabs.setCurrentWidget(zna_panel)
             else:
                 zna_panel.set_discovered_message("未匹配到 ZNA67 矢网")
 
@@ -784,13 +822,30 @@ class ScanControlPage(QWidget):
                 continue
             panel.set_discovered_message("本次仅实现 ZNA67 自动识别")
 
-        self.append_log(f"仪表搜索完成：共扫描 {len(result.probes)} 个 VISA 资源")
+        self._write_instrument_search_log(f"仪表搜索完成：共扫描 {len(result.probes)} 个 VISA 资源")
         for probe in result.probes:
             if probe.error_message:
-                self.append_log(f"VISA 资源探测失败: {probe.resource_name} | {probe.error_message}")
+                self._write_instrument_search_log(f"VISA 资源探测失败: {probe.resource_name} | {probe.error_message}")
                 continue
             mark = "匹配ZNA67" if probe.is_zna67 else "非ZNA67"
-            self.append_log(f"VISA 资源: {probe.resource_name} | *IDN?={probe.idn_text} | {mark}")
+            self._write_instrument_search_log(f"VISA 资源: {probe.resource_name} | *IDN?={probe.idn_text} | {mark}")
+
+    def _on_instrument_search_thread_finished(self) -> None:
+        """重置搜索按钮状态。"""
+
+        self._instrument_search_thread = None
+        self._instrument_search_worker = None
+        self.search_button.setEnabled(True)
+        self.search_button.setText("搜索仪表")
+
+    def _write_instrument_search_log(self, message: str) -> None:
+        """将仪表搜索日志写入文件，不在界面日志区域显示。"""
+
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.INSTRUMENT_SEARCH_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with self.INSTRUMENT_SEARCH_LOG_PATH.open("a", encoding="utf-8") as log_file:
+            log_file.write(f"[{timestamp}] {message}\n")
+        get_logger(__name__).info("instrument-search | %s", message)
 
     def on_open_result_folder(self) -> None:
         path = Path(self.result_path_edit.text().strip())

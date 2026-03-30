@@ -17,7 +17,7 @@ class InstrumentPanel(QWidget):
     """Instrument configuration panel.
 
     当前阶段支持：
-    - ZNA Vector Network Analyzer 的基础参数编辑骨架
+    - ZNA67 的基础参数编辑骨架
     - 其他仪表的占位信息
     """
 
@@ -28,7 +28,7 @@ class InstrumentPanel(QWidget):
         self._setup_ui()
 
     def _setup_ui(self) -> None:
-        if self.instrument_name == "ZNA Vector Network Analyzer":
+        if self.instrument_name == "ZNA67":
             self._setup_zna_ui()
             return
 
