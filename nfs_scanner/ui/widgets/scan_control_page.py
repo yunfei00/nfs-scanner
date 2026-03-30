@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from importlib.util import find_spec
 from pathlib import Path
 
 from PySide6.QtCore import QIODevice, QObject, QThread, QTimer, Qt, Signal
@@ -36,6 +37,10 @@ from nfs_scanner.infra.logging_config import get_logger
 
 from .collapsible_section import CollapsibleSection
 from .instrument_panel import InstrumentPanel
+
+_HAS_PYVISA = find_spec("pyvisa") is not None
+if _HAS_PYVISA:
+    import pyvisa
 
 
 class InstrumentSearchWorker(QObject):
@@ -91,6 +96,15 @@ class ScanControlPage(QWidget):
         "rbw": "RBW",
         "points": "扫描点数",
         "scale": "Scale",
+    }
+    QUERY_COMMANDS = {
+        "start_freq": "FREQuency:STARt?",
+        "center_freq": "FREQuency:CENTer?",
+        "stop_freq": "FREQuency:STOP?",
+        "span": "FREQuency:SPAN?",
+        "rbw": "BANDwidth:RESolution?",
+        "points": "SWEep:POINts?",
+        "scale": "DISPlay:WINDow:TRACe:Y:SCALe:PDIVision?",
     }
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -863,17 +877,108 @@ class ScanControlPage(QWidget):
             self._write_instrument_search_log(f"VISA 资源: {probe.resource_name} | *IDN?={probe.idn_text} | {mark}")
 
     def on_instrument_query_requested(self, instrument_name: str, query_key: str) -> None:
-        """处理仪表参数查询按钮，回填占位查询结果并写入日志。"""
+        """处理仪表参数查询按钮，优先回填真实查询结果并写入日志。"""
 
         panel = next((item for item in self.instrument_panels if item.instrument_name == instrument_name), None)
         if panel is None:
             return
 
-        value, unit = self._mock_query_value(query_key)
+        value, unit = self._query_instrument_value(instrument_name, query_key)
         panel.set_query_result(query_key, value, unit)
         label = self.QUERY_LABELS.get(query_key, query_key)
         suffix = f" {unit}" if unit else ""
         self.append_log(f"仪表查询: {instrument_name} - {label} = {value}{suffix}")
+
+    def _query_instrument_value(self, instrument_name: str, query_key: str) -> tuple[str, str | None]:
+        """查询仪表参数：优先真实设备，失败后回退占位值。"""
+
+        if instrument_name == "ZNA67":
+            return self._query_zna67_value(query_key)
+        return self._mock_query_value(query_key)
+
+    def _query_zna67_value(self, query_key: str) -> tuple[str, str | None]:
+        """查询 ZNA67 参数。优先走 VISA，其次串口，再回退占位值。"""
+
+        command = self.QUERY_COMMANDS.get(query_key)
+        if command is None:
+            return self._mock_query_value(query_key)
+
+        visa_response, visa_error = self._query_via_visa(command)
+        if visa_response is not None:
+            return self._format_query_value(query_key, visa_response)
+
+        if self.serial_is_open and self._serial_port.isOpen():
+            sent, reason = self._send_serial_command(command)
+            if sent:
+                serial_response = self._read_serial_response_text()
+                if serial_response.strip():
+                    return self._format_query_value(query_key, serial_response)
+            else:
+                self.append_log(f"发送命令失败: {command}，原因: {reason}")
+
+        if visa_error:
+            self.append_log(f"VISA查询失败，已使用占位值: {visa_error}")
+        return self._mock_query_value(query_key)
+
+    def _query_via_visa(self, command: str, timeout_ms: int = 1200) -> tuple[str | None, str]:
+        """通过缓存的 VISA 资源发送 SCPI 查询。"""
+
+        if not _HAS_PYVISA:
+            return None, "未安装 pyvisa"
+
+        resources = self._load_cached_instrument_resources()
+        if not resources:
+            return None, "未找到缓存资源，请先点击“搜索仪表”"
+
+        resource_manager = pyvisa.ResourceManager()
+        try:
+            last_error = ""
+            for resource_name in resources:
+                try:
+                    instrument = resource_manager.open_resource(resource_name)
+                    instrument.timeout = timeout_ms
+                    response_text = str(instrument.query(command)).strip()
+                    instrument.close()
+                    if response_text:
+                        return response_text, ""
+                except Exception as error:
+                    last_error = f"{resource_name}: {error}"
+                    continue
+            return None, last_error or "未读取到有效返回值"
+        finally:
+            resource_manager.close()
+
+    def _format_query_value(self, query_key: str, raw_value: str) -> tuple[str, str | None]:
+        """格式化 SCPI 查询返回值，统一展示单位。"""
+
+        cleaned_value = raw_value.strip()
+        if query_key in {"start_freq", "center_freq", "stop_freq", "span"}:
+            try:
+                frequency_hz = float(cleaned_value)
+                return f"{frequency_hz / 1_000_000:.3f}", "MHz"
+            except ValueError:
+                return cleaned_value, None
+
+        if query_key == "rbw":
+            try:
+                rbw_hz = float(cleaned_value)
+                return f"{rbw_hz / 1_000:.3f}", "kHz"
+            except ValueError:
+                return cleaned_value, None
+
+        if query_key == "points":
+            try:
+                return str(int(float(cleaned_value))), None
+            except ValueError:
+                return cleaned_value, None
+
+        if query_key == "scale":
+            try:
+                return f"{float(cleaned_value):.3f}", None
+            except ValueError:
+                return cleaned_value, None
+
+        return cleaned_value, None
 
     def _on_instrument_search_thread_finished(self) -> None:
         """重置搜索按钮状态。"""
@@ -909,10 +1014,14 @@ class ScanControlPage(QWidget):
         return mock_values.get(query_key, ("-", None))
 
     def _query_start_frequency_value(self) -> tuple[str, str | None]:
-        """查询起始频率并将类似 120000000\\n 的返回值转换为 MHz。"""
+        """查询起始频率并转换为 MHz。"""
 
         command = "FREQuency:STARt?"
         raw_value = "120000000\n"
+        visa_response, _ = self._query_via_visa(command)
+        if visa_response is not None:
+            return self._format_query_value("start_freq", visa_response)
+
         if self.serial_is_open and self._serial_port.isOpen():
             sent, reason = self._send_serial_command(command)
             if sent:
@@ -920,15 +1029,7 @@ class ScanControlPage(QWidget):
             else:
                 self.append_log(f"发送命令失败: {command}，原因: {reason}")
 
-        cleaned_value = raw_value.strip()
-        try:
-            frequency_hz = float(cleaned_value)
-        except ValueError:
-            self.append_log(f"起始频率返回值解析失败: {raw_value!r}")
-            return "-", None
-
-        frequency_mhz = frequency_hz / 1_000_000
-        return f"{frequency_mhz:.3f}", "MHz"
+        return self._format_query_value("start_freq", raw_value)
 
     def _read_serial_response_text(self, timeout_ms: int = 500) -> str:
         """读取一段串口响应文本，优先使用已累积的接收缓存。"""
