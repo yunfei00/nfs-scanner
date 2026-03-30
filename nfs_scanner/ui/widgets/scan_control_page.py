@@ -115,6 +115,9 @@ class ScanControlPage(QWidget):
         "points": "SWEep:POINts",
         "scale": "DISPlay:WINDow:TRACe:Y:SCALe:PDIVision",
     }
+    ACTION_COMMANDS = {
+        "preset": "SYSTem:PRESet",
+    }
     UNIT_SCALE = {"Hz": 1.0, "kHz": 1_000.0, "MHz": 1_000_000.0, "GHz": 1_000_000_000.0}
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -552,6 +555,7 @@ class ScanControlPage(QWidget):
         for panel in self.instrument_panels:
             panel.query_requested.connect(self.on_instrument_query_requested)
             panel.set_requested.connect(self.on_instrument_set_requested)
+            panel.action_requested.connect(self.on_instrument_action_requested)
 
     def _refresh_layout(self) -> None:
         self.updateGeometry()
@@ -1093,6 +1097,26 @@ class ScanControlPage(QWidget):
             return False, visa_reason
 
         return False, "当前仅支持 ZNA67 参数设置"
+
+    def on_instrument_action_requested(self, instrument_name: str, action_key: str) -> None:
+        """处理仪表动作按钮，如 Preset。"""
+
+        if action_key == "save_data":
+            self.append_log(f"仪表动作占位: {instrument_name} - 保存数据（待后续实现）")
+            return
+
+        command = self.ACTION_COMMANDS.get(action_key)
+        if command is None:
+            self.append_log(f"仪表动作失败: {instrument_name} - 不支持的动作 {action_key}")
+            return
+
+        success, reason = self._set_instrument_value(instrument_name, command)
+        if not success:
+            self.append_log(f"仪表动作失败: {instrument_name} - {action_key}，原因: {reason}")
+            return
+
+        self.append_log(f"仪表动作成功: {instrument_name} - {action_key}")
+        self._refresh_all_instrument_queries(instrument_name)
 
     def _write_via_visa(self, command: str, timeout_ms: int = 1200) -> tuple[bool, str]:
         """通过缓存 VISA 资源发送 SCPI 设置命令。"""
