@@ -42,9 +42,21 @@ def discover_zna67_via_visa(timeout_ms: int = 1200) -> ZnaDiscoveryResult:
 
     resource_manager = pyvisa.ResourceManager()
     resources = resource_manager.list_resources()
+    probes = probe_resources(resource_names=resources, timeout_ms=timeout_ms)
+    resource_manager.close()
+    return ZnaDiscoveryResult(probes=probes, pyvisa_available=True)
+
+
+def probe_resources(resource_names: tuple[str, ...], timeout_ms: int = 1200) -> list[InstrumentProbeResult]:
+    """Probe specific VISA resources and return IDN matching results."""
+
+    if not _HAS_PYVISA:
+        return []
+
+    resource_manager = pyvisa.ResourceManager()
     probes: list[InstrumentProbeResult] = []
 
-    for resource_name in resources:
+    for resource_name in resource_names:
         try:
             instrument = resource_manager.open_resource(resource_name)
             instrument.timeout = timeout_ms
@@ -68,4 +80,4 @@ def discover_zna67_via_visa(timeout_ms: int = 1200) -> ZnaDiscoveryResult:
             )
 
     resource_manager.close()
-    return ZnaDiscoveryResult(probes=probes, pyvisa_available=True)
+    return probes

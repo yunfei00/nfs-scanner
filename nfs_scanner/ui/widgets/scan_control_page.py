@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from pathlib import Path
 
@@ -30,7 +31,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from nfs_scanner.devices.spectrum import ZnaDiscoveryResult, discover_zna67_via_visa
+from nfs_scanner.devices.spectrum import ZnaDiscoveryResult, discover_zna67_via_visa, probe_resources
 from nfs_scanner.infra.logging_config import get_logger
 
 from .collapsible_section import CollapsibleSection
@@ -42,9 +43,19 @@ class InstrumentSearchWorker(QObject):
 
     finished = Signal(object)
 
+    def __init__(self, preferred_resources: tuple[str, ...] = ()) -> None:
+        super().__init__()
+        self.preferred_resources = preferred_resources
+
     def run(self) -> None:
         """执行搜索并发出结果。"""
 
+        if self.preferred_resources:
+            cached_probes = probe_resources(resource_names=self.preferred_resources)
+            cached_result = ZnaDiscoveryResult(probes=cached_probes, pyvisa_available=True)
+            if cached_result.matched_resources:
+                self.finished.emit(cached_result)
+                return
         result = discover_zna67_via_visa()
         self.finished.emit(result)
 
@@ -71,6 +82,7 @@ class ScanControlPage(QWidget):
     Z_RANGE = (0.0, 10.0)
     PORT_KEYWORDS = ("CH340", "CH341", "wchusbserial")
     INSTRUMENT_SEARCH_LOG_PATH = Path("output") / "instrument_search.log"
+    INSTRUMENT_CACHE_PATH = Path("config") / "instrument_devices.json"
     QUERY_LABELS = {
         "start_freq": "起始频率",
         "center_freq": "中心频率",
@@ -797,7 +809,10 @@ class ScanControlPage(QWidget):
         self._write_instrument_search_log("开始搜索仪表（异步任务已启动）")
 
         self._instrument_search_thread = QThread(self)
-        self._instrument_search_worker = InstrumentSearchWorker()
+        preferred_resources = self._load_cached_instrument_resources()
+        if preferred_resources:
+            self.append_log(f"读取到缓存设备 {len(preferred_resources)} 台，优先尝试直连识别")
+        self._instrument_search_worker = InstrumentSearchWorker(preferred_resources=preferred_resources)
         self._instrument_search_worker.moveToThread(self._instrument_search_thread)
         self._instrument_search_thread.started.connect(self._instrument_search_worker.run)
         self._instrument_search_worker.finished.connect(self._on_instrument_search_finished)
@@ -827,6 +842,9 @@ class ScanControlPage(QWidget):
                     summary += f"；...共 {len(matched)} 台"
                 zna_panel.set_discovered_message(f"已匹配到 ZNA67: {summary}")
                 self.instrument_tabs.setCurrentWidget(zna_panel)
+                for item in matched:
+                    self.append_log(f"已找到{item.resource_name}设备")
+                self._save_cached_instrument_resources([item.resource_name for item in matched])
             else:
                 zna_panel.set_discovered_message("未匹配到 ZNA67 矢网")
 
@@ -877,8 +895,10 @@ class ScanControlPage(QWidget):
     def _mock_query_value(self, query_key: str) -> tuple[str, str | None]:
         """返回仪表查询的占位值。"""
 
+        if query_key == "start_freq":
+            return self._query_start_frequency_value()
+
         mock_values: dict[str, tuple[str, str | None]] = {
-            "start_freq": ("80.000", "MHz"),
             "center_freq": ("3040.000", "MHz"),
             "stop_freq": ("6000.000", "MHz"),
             "span": ("5920.000", "MHz"),
@@ -887,6 +907,71 @@ class ScanControlPage(QWidget):
             "scale": ("10.000", None),
         }
         return mock_values.get(query_key, ("-", None))
+
+    def _query_start_frequency_value(self) -> tuple[str, str | None]:
+        """查询起始频率并将类似 120000000\\n 的返回值转换为 MHz。"""
+
+        command = "FREQuency:STARt?"
+        raw_value = "120000000\n"
+        if self.serial_is_open and self._serial_port.isOpen():
+            sent, reason = self._send_serial_command(command)
+            if sent:
+                raw_value = self._read_serial_response_text()
+            else:
+                self.append_log(f"发送命令失败: {command}，原因: {reason}")
+
+        cleaned_value = raw_value.strip()
+        try:
+            frequency_hz = float(cleaned_value)
+        except ValueError:
+            self.append_log(f"起始频率返回值解析失败: {raw_value!r}")
+            return "-", None
+
+        frequency_mhz = frequency_hz / 1_000_000
+        return f"{frequency_mhz:.3f}", "MHz"
+
+    def _read_serial_response_text(self, timeout_ms: int = 500) -> str:
+        """读取一段串口响应文本，优先使用已累积的接收缓存。"""
+
+        if self._serial_read_buffer.strip():
+            text = self._serial_read_buffer
+            self._serial_read_buffer = ""
+            return text
+
+        if not self._serial_port.waitForReadyRead(timeout_ms):
+            return ""
+
+        chunks = [bytes(self._serial_port.readAll()).decode("utf-8", errors="replace")]
+        while self._serial_port.waitForReadyRead(80):
+            chunks.append(bytes(self._serial_port.readAll()).decode("utf-8", errors="replace"))
+        return "".join(chunks)
+
+    def _load_cached_instrument_resources(self) -> tuple[str, ...]:
+        """读取上一次保存的仪表资源列表。"""
+
+        if not self.INSTRUMENT_CACHE_PATH.exists():
+            return ()
+        try:
+            payload = json.loads(self.INSTRUMENT_CACHE_PATH.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return ()
+
+        resources = payload.get("resources")
+        if not isinstance(resources, list):
+            return ()
+
+        valid_resources = [item for item in resources if isinstance(item, str) and item.strip()]
+        return tuple(valid_resources)
+
+    def _save_cached_instrument_resources(self, resources: list[str]) -> None:
+        """保存本次识别到的仪表资源，供下次优先尝试。"""
+
+        payload = {"resources": resources, "updated_at": datetime.now().isoformat(timespec="seconds")}
+        self.INSTRUMENT_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        self.INSTRUMENT_CACHE_PATH.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
 
     def on_open_result_folder(self) -> None:
         path = Path(self.result_path_edit.text().strip())
