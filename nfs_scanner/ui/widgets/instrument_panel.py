@@ -27,6 +27,7 @@ class InstrumentPanel(QWidget):
     # 否则会导致信号参数解析异常（运行时报“参数个数不匹配”）。
     # 第 4 个参数使用 object，以兼容 str 与 None。
     set_requested = Signal(str, str, str, object)
+    action_requested = Signal(str, str)
 
     def __init__(self, instrument_name: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -129,8 +130,10 @@ class InstrumentPanel(QWidget):
         layout.addWidget(QLabel("dB/div", self), 3, 2)
         scale_query_button = QPushButton("查询", self)
         layout.addWidget(scale_query_button, 3, 3)
-        layout.addWidget(QPushButton("Preset", self), 3, 4)
-        layout.addWidget(QPushButton("保存数据", self), 3, 5)
+        preset_button = QPushButton("Preset", self)
+        layout.addWidget(preset_button, 3, 4)
+        save_data_button = QPushButton("保存数据", self)
+        layout.addWidget(save_data_button, 3, 5)
 
         self.discovered_label = QLabel("未发现设备", self)
         layout.addWidget(QLabel("设备发现", self), 4, 0)
@@ -209,6 +212,8 @@ class InstrumentPanel(QWidget):
         scale_set_button.clicked.connect(
             lambda: self.set_requested.emit(self.instrument_name, "scale", scale_edit.text().strip(), None)
         )
+        preset_button.clicked.connect(lambda: self.action_requested.emit(self.instrument_name, "preset"))
+        save_data_button.clicked.connect(lambda: self.action_requested.emit(self.instrument_name, "save_data"))
 
     def _setup_placeholder_ui(self) -> None:
         """构建非 ZNA 仪表的占位 UI。"""
