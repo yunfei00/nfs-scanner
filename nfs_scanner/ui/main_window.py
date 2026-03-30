@@ -28,9 +28,8 @@ from nfs_scanner.storage import DatasetManager
 from .controls_panel import ControlsPanel
 from .heatmap_view import HeatmapView
 from .log_panel import LogPanel
-from .widgets import ScanControlPage
-from .serial_debug_page import SerialDebugPage
 from .spectrum_panel import SpectrumPanel
+from .widgets import ScanControlPage
 
 
 class MainWindow(QMainWindow):
@@ -51,7 +50,6 @@ class MainWindow(QMainWindow):
         self.job_status_label: QLabel
         self.job_progress_label: QLabel
         self.log_panel: LogPanel
-        self.serial_debug_page: SerialDebugPage
         self._last_job_display_snapshot: tuple[str, str, str] | None = None
         self.setWindowTitle("近场扫描系统")
         self.resize(1600, 900)
@@ -70,8 +68,6 @@ class MainWindow(QMainWindow):
         tab_widget = QTabWidget(central_widget)
         tab_widget.addTab(self._create_scan_workspace_page(tab_widget), "扫描主界面")
         tab_widget.addTab(ScanControlPage(tab_widget), "扫描控制页面")
-        self.serial_debug_page = SerialDebugPage(tab_widget)
-        tab_widget.addTab(self.serial_debug_page, "串口调试")
         root_layout.addWidget(tab_widget)
         self.setCentralWidget(central_widget)
         self._load_demo_heatmap()
