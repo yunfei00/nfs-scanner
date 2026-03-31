@@ -31,7 +31,7 @@ class InstrumentPanel(QWidget):
         "points",
         "scale",
     )
-    STANDARD_ACTION_KEYS = ("preset", "save_data")
+    STANDARD_ACTION_KEYS = ("preset", "save_data", "save_param_demo")
     FREQUENCY_UNITS = ("Hz", "kHz", "MHz", "GHz")
     RBW_UNITS = ("Hz", "kHz", "MHz")
 
@@ -133,6 +133,12 @@ class InstrumentPanel(QWidget):
         save_data_button = QPushButton("保存数据", self)
         save_data_button.clicked.connect(lambda: self.action_requested.emit(self.instrument_name, "save_data"))
         layout.addWidget(save_data_button, 3, 5)
+
+        save_param_demo_button = QPushButton("参数存储Demo", self)
+        save_param_demo_button.clicked.connect(
+            lambda: self.action_requested.emit(self.instrument_name, "save_param_demo")
+        )
+        layout.addWidget(save_param_demo_button, 3, 6)
 
         self.discovered_label = QLabel("未发现设备", self)
         layout.addWidget(QLabel("设备发现", self), 4, 0)
