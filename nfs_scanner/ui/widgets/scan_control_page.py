@@ -37,6 +37,7 @@ from nfs_scanner.devices.spectrum import (
     SUPPORTED_INSTRUMENTS,
     discover_supported_instruments_via_visa,
     probe_resources,
+    save_zna_trace_csv,
 )
 from nfs_scanner.infra.logging_config import get_logger
 
@@ -99,6 +100,7 @@ class ScanControlPage(QWidget):
     INSTRUMENT_SEARCH_LOG_PATH = Path("output") / "instrument_search.log"
     INSTRUMENT_CACHE_PATH = Path("config") / "instrument_devices.json"
     SNAPSHOT_OUTPUT_DIR = Path("output") / "instrument_snapshots"
+    ZNA67_DEMO_FILE_PATH = Path(r"D:/zna67_demo.csv")
     INSTRUMENT_ORDER = tuple(SUPPORTED_INSTRUMENTS)
     SERIAL_FALLBACK_INSTRUMENTS = frozenset({"ZNA67"})
     INSTRUMENT_PLACEHOLDER_VALUES = {
@@ -1175,6 +1177,23 @@ class ScanControlPage(QWidget):
                 self.append_log(f"仪表保存失败: {instrument_name} - {message}")
             return
 
+        if action_key == "save_param_demo":
+            if instrument_name != "ZNA67":
+                self.append_log(f"参数存储Demo仅支持 ZNA67，当前仪表: {instrument_name}")
+                return
+            saved, message = self._save_zna67_demo_data(
+                x=1.0,
+                y=2.0,
+                z=3.0,
+                delay_time=100,
+                file_name=str(self.ZNA67_DEMO_FILE_PATH),
+            )
+            if saved:
+                self.append_log(f"ZNA67 参数存储Demo成功: {message}")
+            else:
+                self.append_log(f"ZNA67 参数存储Demo失败: {message}")
+            return
+
         command = self.ACTION_COMMANDS.get(action_key)
         if command is None:
             self.append_log(f"仪表动作失败: {instrument_name} - 不支持的动作 {action_key}")
@@ -1217,6 +1236,44 @@ class ScanControlPage(QWidget):
             return False, str(error)
 
         return True, str(snapshot_path)
+
+    def _save_zna67_demo_data(
+        self,
+        *,
+        x: float,
+        y: float,
+        z: float,
+        delay_time: int,
+        file_name: str,
+    ) -> tuple[bool, str]:
+        """执行 ZNA67 行式 trace 存储。
+
+        说明：
+        - 当前为 demo 阶段，真实仪表采集接口由 `_acquire_zna67_raw_text` 预留。
+        - 存储格式支持自动识别 trace 标签数量与名称。
+        """
+
+        target_path = Path(file_name)
+        raw_text = self._acquire_zna67_raw_text(x=x, y=y, z=z, delay_time=delay_time)
+        try:
+            row_count, trace_names = save_zna_trace_csv(raw_text=raw_text, file_path=target_path)
+        except (OSError, ValueError) as error:
+            return False, str(error)
+
+        trace_summary = "、".join(sorted(trace_names))
+        return True, f"{target_path}（共 {row_count} 行，trace: {trace_summary}）"
+
+    def _acquire_zna67_raw_text(self, *, x: float, y: float, z: float, delay_time: int) -> str:
+        """采集 ZNA67 原始文本（当前返回 Demo 数据）。"""
+
+        del delay_time
+        return (
+            "fre,1000000,2000000,3000000,4000000\n"
+            f"{x:g}_{y:g}_{z:g}_Trc1_S21_re 1.2 1.3 1.4 1.5\n"
+            f"{x:g}_{y:g}_{z:g}_Trc1_S21_im -0.2 -0.3 -0.4 -0.5\n"
+            f"{x:g}_{y:g}_{z:g}_Trc2_S31_re 2.2 2.3 2.4 2.5\n"
+            f"{x:g}_{y:g}_{z:g}_Trc2_S31_im -1.2 -1.3 -1.4 -1.5\n"
+        )
 
     def _write_via_visa(
         self,
