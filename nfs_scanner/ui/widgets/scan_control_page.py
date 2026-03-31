@@ -32,7 +32,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from nfs_scanner.devices.spectrum import ZnaDiscoveryResult, discover_zna67_via_visa, probe_resources
+from nfs_scanner.devices.spectrum import (
+    InstrumentDiscoveryResult,
+    SUPPORTED_INSTRUMENTS,
+    discover_supported_instruments_via_visa,
+    probe_resources,
+)
 from nfs_scanner.infra.logging_config import get_logger
 
 from .collapsible_section import CollapsibleSection
@@ -57,11 +62,16 @@ class InstrumentSearchWorker(QObject):
 
         if self.preferred_resources:
             cached_probes = probe_resources(resource_names=self.preferred_resources)
-            cached_result = ZnaDiscoveryResult(probes=cached_probes, pyvisa_available=True)
-            if cached_result.matched_resources:
+            cached_result = InstrumentDiscoveryResult(probes=cached_probes, pyvisa_available=True)
+            cached_matches = {
+                name
+                for name in SUPPORTED_INSTRUMENTS
+                if cached_result.matched_resources_for(name)
+            }
+            if cached_matches == set(SUPPORTED_INSTRUMENTS):
                 self.finished.emit(cached_result)
                 return
-        result = discover_zna67_via_visa()
+        result = discover_supported_instruments_via_visa()
         self.finished.emit(result)
 
 
@@ -88,6 +98,38 @@ class ScanControlPage(QWidget):
     PORT_KEYWORDS = ("CH340", "CH341", "wchusbserial")
     INSTRUMENT_SEARCH_LOG_PATH = Path("output") / "instrument_search.log"
     INSTRUMENT_CACHE_PATH = Path("config") / "instrument_devices.json"
+    SNAPSHOT_OUTPUT_DIR = Path("output") / "instrument_snapshots"
+    INSTRUMENT_ORDER = tuple(SUPPORTED_INSTRUMENTS)
+    SERIAL_FALLBACK_INSTRUMENTS = frozenset({"ZNA67"})
+    INSTRUMENT_PLACEHOLDER_VALUES = {
+        "ZNA67": {
+            "start_freq": ("80.000", "MHz"),
+            "center_freq": ("3040.000", "MHz"),
+            "stop_freq": ("6000.000", "MHz"),
+            "span": ("5920.000", "MHz"),
+            "rbw": ("100.000", "kHz"),
+            "points": ("1601", None),
+            "scale": ("10.000", None),
+        },
+        "N9020A": {
+            "start_freq": ("10.000", "MHz"),
+            "center_freq": ("4005.000", "MHz"),
+            "stop_freq": ("8000.000", "MHz"),
+            "span": ("7990.000", "MHz"),
+            "rbw": ("100.000", "kHz"),
+            "points": ("1001", None),
+            "scale": ("10.000", None),
+        },
+        "FSW": {
+            "start_freq": ("10.000", "MHz"),
+            "center_freq": ("13255.000", "MHz"),
+            "stop_freq": ("26500.000", "MHz"),
+            "span": ("26490.000", "MHz"),
+            "rbw": ("100.000", "kHz"),
+            "points": ("2001", None),
+            "scale": ("10.000", None),
+        },
+    }
     QUERY_LABELS = {
         "start_freq": "起始频率",
         "center_freq": "中心频率",
@@ -470,12 +512,7 @@ class ScanControlPage(QWidget):
         content_layout.setContentsMargins(0, 0, 0, 0)
 
         self.instrument_tabs = QTabWidget(content)
-        self.instrument_panels = [
-            InstrumentPanel("ZNA67", self),
-            InstrumentPanel("频谱仪", self),
-            InstrumentPanel("接收机", self),
-            InstrumentPanel("功率计", self),
-        ]
+        self.instrument_panels = [InstrumentPanel(name, self) for name in self.INSTRUMENT_ORDER]
         for panel in self.instrument_panels:
             self.instrument_tabs.addTab(panel, panel.instrument_name)
         content_layout.addWidget(self.instrument_tabs)
@@ -851,37 +888,46 @@ class ScanControlPage(QWidget):
         self._instrument_search_thread.finished.connect(self._instrument_search_thread.deleteLater)
         self._instrument_search_thread.start()
 
-    def _on_instrument_search_finished(self, result: ZnaDiscoveryResult) -> None:
+    def _on_instrument_search_finished(self, result: InstrumentDiscoveryResult) -> None:
         """处理异步仪表搜索结果，并同步更新 UI。"""
 
-        zna_panel = next((panel for panel in self.instrument_panels if panel.instrument_name == "ZNA67"), None)
-
         if not result.pyvisa_available:
-            if zna_panel is not None:
-                zna_panel.set_discovered_message("未安装 pyvisa，无法通过 NI MAX 扫描 VISA 设备")
+            for panel in self.instrument_panels:
+                panel.set_discovered_message("未安装 pyvisa，无法通过 NI MAX 扫描 VISA 设备")
             self._write_instrument_search_log("仪表搜索失败：未安装 pyvisa，请先安装后重试")
             self.append_log("仪表搜索失败：未安装 pyvisa")
             return
 
-        matched = result.matched_resources
-        if zna_panel is not None:
+        matched_resources: dict[str, list[str]] = {}
+        first_matched_panel: InstrumentPanel | None = None
+
+        for instrument_name in self.INSTRUMENT_ORDER:
+            panel = self._find_instrument_panel(instrument_name)
+            if panel is None:
+                continue
+
+            matched = result.matched_resources_for(instrument_name)
+            matched_resources[instrument_name] = [item.resource_name for item in matched]
             if matched:
                 summary = "；".join(f"{item.resource_name} -> {item.idn_text}" for item in matched[:2])
                 if len(matched) > 2:
                     summary += f"；...共 {len(matched)} 台"
-                zna_panel.set_discovered_message(f"已匹配到 ZNA67: {summary}")
-                self.instrument_tabs.setCurrentWidget(zna_panel)
+                panel.set_discovered_message(f"已匹配到 {instrument_name}: {summary}")
+                if first_matched_panel is None:
+                    first_matched_panel = panel
                 for item in matched:
-                    self.append_log(f"已找到{item.resource_name}设备")
-                self._save_cached_instrument_resources([item.resource_name for item in matched])
-                self._refresh_all_instrument_queries("ZNA67")
+                    self.append_log(f"已找到 {instrument_name} 设备: {item.resource_name}")
             else:
-                zna_panel.set_discovered_message("未匹配到 ZNA67 矢网")
+                panel.set_discovered_message(f"未匹配到 {instrument_name}")
 
-        for panel in self.instrument_panels:
-            if panel is zna_panel:
-                continue
-            panel.set_discovered_message("本次仅实现 ZNA67 自动识别")
+        self._save_cached_instrument_resources(matched_resources)
+
+        if first_matched_panel is not None:
+            self.instrument_tabs.setCurrentWidget(first_matched_panel)
+
+        for instrument_name, resources in matched_resources.items():
+            if resources:
+                self._refresh_all_instrument_queries(instrument_name)
 
         self._write_instrument_search_log(f"仪表搜索完成：共扫描 {len(result.probes)} 个 VISA 资源")
         self.append_log(f"仪表搜索完成：共扫描 {len(result.probes)} 个 VISA 资源，详见 output/instrument_search.log")
@@ -889,13 +935,20 @@ class ScanControlPage(QWidget):
             if probe.error_message:
                 self._write_instrument_search_log(f"VISA 资源探测失败: {probe.resource_name} | {probe.error_message}")
                 continue
-            mark = "匹配ZNA67" if probe.is_zna67 else "非ZNA67"
-            self._write_instrument_search_log(f"VISA 资源: {probe.resource_name} | *IDN?={probe.idn_text} | {mark}")
+            match_text = probe.matched_instrument or "未识别"
+            self._write_instrument_search_log(
+                f"VISA 资源: {probe.resource_name} | *IDN?={probe.idn_text} | {match_text}"
+            )
+
+    def _find_instrument_panel(self, instrument_name: str) -> InstrumentPanel | None:
+        """Return the panel instance for one instrument name."""
+
+        return next((panel for panel in self.instrument_panels if panel.instrument_name == instrument_name), None)
 
     def on_instrument_query_requested(self, instrument_name: str, query_key: str) -> None:
         """处理仪表参数查询按钮，优先回填真实查询结果并写入日志。"""
 
-        panel = next((item for item in self.instrument_panels if item.instrument_name == instrument_name), None)
+        panel = self._find_instrument_panel(instrument_name)
         if panel is None:
             return
 
@@ -906,14 +959,18 @@ class ScanControlPage(QWidget):
         self.append_log(f"仪表查询: {instrument_name} - {label} = {value}{suffix}")
 
     def _refresh_all_instrument_queries(self, instrument_name: str) -> None:
-        """发送全部查询命令并同步刷新界面字段。"""
+        """发送该仪表支持的全部查询命令并同步刷新界面字段。"""
 
-        panel = next((item for item in self.instrument_panels if item.instrument_name == instrument_name), None)
+        panel = self._find_instrument_panel(instrument_name)
         if panel is None:
             return
 
+        query_keys = panel.get_supported_query_keys()
+        if not query_keys:
+            return
+
         self.append_log(f"仪表已连接，开始同步全部参数: {instrument_name}")
-        for query_key in self.QUERY_COMMANDS:
+        for query_key in query_keys:
             value, unit = self._query_instrument_value(instrument_name, query_key)
             panel.set_query_result(query_key, value, unit)
             label = self.QUERY_LABELS.get(query_key, query_key)
@@ -923,22 +980,22 @@ class ScanControlPage(QWidget):
     def _query_instrument_value(self, instrument_name: str, query_key: str) -> tuple[str, str | None]:
         """查询仪表参数：优先真实设备，失败后回退占位值。"""
 
-        if instrument_name == "ZNA67":
-            return self._query_zna67_value(query_key)
-        return self._mock_query_value(query_key)
+        if instrument_name in self.INSTRUMENT_ORDER:
+            return self._query_scpi_instrument_value(instrument_name, query_key)
+        return self._mock_query_value(instrument_name, query_key)
 
-    def _query_zna67_value(self, query_key: str) -> tuple[str, str | None]:
-        """查询 ZNA67 参数。优先走 VISA，其次串口，再回退占位值。"""
+    def _query_scpi_instrument_value(self, instrument_name: str, query_key: str) -> tuple[str, str | None]:
+        """查询支持的 SCPI 仪表参数。优先走 VISA，ZNA67 再尝试串口回退。"""
 
         command = self.QUERY_COMMANDS.get(query_key)
         if command is None:
-            return self._mock_query_value(query_key)
+            return self._mock_query_value(instrument_name, query_key)
 
-        visa_response, visa_error = self._query_via_visa(command)
+        visa_response, visa_error = self._query_via_visa(command, instrument_name=instrument_name)
         if visa_response is not None:
             return self._format_query_value(query_key, visa_response)
 
-        if self.serial_is_open and self._serial_port.isOpen():
+        if instrument_name in self.SERIAL_FALLBACK_INSTRUMENTS and self.serial_is_open and self._serial_port.isOpen():
             sent, reason = self._send_serial_command(command)
             if sent:
                 serial_response = self._read_serial_response_text()
@@ -948,18 +1005,26 @@ class ScanControlPage(QWidget):
                 self.append_log(f"发送命令失败: {command}，原因: {reason}")
 
         if visa_error:
-            self.append_log(f"VISA查询失败，已使用占位值: {visa_error}")
-        return self._mock_query_value(query_key)
+            self.append_log(f"{instrument_name} VISA查询失败，已使用占位值: {visa_error}")
+        return self._mock_query_value(instrument_name, query_key)
 
-    def _query_via_visa(self, command: str, timeout_ms: int = 1200) -> tuple[str | None, str]:
+    def _query_via_visa(
+        self,
+        command: str,
+        *,
+        instrument_name: str | None = None,
+        timeout_ms: int = 1200,
+    ) -> tuple[str | None, str]:
         """通过缓存的 VISA 资源发送 SCPI 查询。"""
 
         if not _HAS_PYVISA:
             return None, "未安装 pyvisa"
 
-        resources = self._load_cached_instrument_resources()
+        resources = self._load_cached_instrument_resources(instrument_name)
         if not resources:
-            return None, "未找到缓存资源，请先点击“搜索仪表”"
+            if instrument_name is None:
+                return None, "未找到缓存资源，请先点击“搜索仪表”"
+            return None, f"未找到 {instrument_name} 的缓存资源，请先点击“搜索仪表”"
 
         resource_manager = pyvisa.ResourceManager()
         try:
@@ -1082,27 +1147,32 @@ class ScanControlPage(QWidget):
         return None
 
     def _set_instrument_value(self, instrument_name: str, command: str) -> tuple[bool, str]:
-        """设置仪表参数：优先 VISA，其次串口。"""
+        """设置仪表参数：优先 VISA，其次是 ZNA67 的串口回退。"""
 
-        if instrument_name == "ZNA67":
-            visa_ok, visa_reason = self._write_via_visa(command)
-            if visa_ok:
+        if instrument_name not in self.INSTRUMENT_ORDER:
+            return False, f"当前暂不支持 {instrument_name} 参数设置"
+
+        visa_ok, visa_reason = self._write_via_visa(command, instrument_name=instrument_name)
+        if visa_ok:
+            return True, ""
+
+        if instrument_name in self.SERIAL_FALLBACK_INSTRUMENTS and self.serial_is_open and self._serial_port.isOpen():
+            sent, serial_reason = self._send_serial_command(command)
+            if sent:
                 return True, ""
+            return False, f"VISA失败({visa_reason})，串口失败({serial_reason})"
 
-            if self.serial_is_open and self._serial_port.isOpen():
-                sent, serial_reason = self._send_serial_command(command)
-                if sent:
-                    return True, ""
-                return False, f"VISA失败({visa_reason})，串口失败({serial_reason})"
-            return False, visa_reason
-
-        return False, "当前仅支持 ZNA67 参数设置"
+        return False, visa_reason
 
     def on_instrument_action_requested(self, instrument_name: str, action_key: str) -> None:
-        """处理仪表动作按钮，如 Preset。"""
+        """处理仪表动作按钮，如 Preset 和保存数据。"""
 
         if action_key == "save_data":
-            self.append_log(f"仪表动作占位: {instrument_name} - 保存数据（待后续实现）")
+            saved, message = self._save_instrument_snapshot(instrument_name)
+            if saved:
+                self.append_log(f"仪表数据已保存: {instrument_name} -> {message}")
+            else:
+                self.append_log(f"仪表保存失败: {instrument_name} - {message}")
             return
 
         command = self.ACTION_COMMANDS.get(action_key)
@@ -1118,15 +1188,53 @@ class ScanControlPage(QWidget):
         self.append_log(f"仪表动作成功: {instrument_name} - {action_key}")
         self._refresh_all_instrument_queries(instrument_name)
 
-    def _write_via_visa(self, command: str, timeout_ms: int = 1200) -> tuple[bool, str]:
+    def _save_instrument_snapshot(self, instrument_name: str) -> tuple[bool, str]:
+        """保存当前仪表参数快照，便于后续调试和比对。"""
+
+        panel = self._find_instrument_panel(instrument_name)
+        if panel is None:
+            return False, "未找到对应仪表面板"
+
+        snapshot_values: dict[str, dict[str, str | None]] = {}
+        for query_key in panel.get_supported_query_keys():
+            value, unit = self._query_instrument_value(instrument_name, query_key)
+            panel.set_query_result(query_key, value, unit)
+            snapshot_values[query_key] = {"value": value, "unit": unit}
+
+        timestamp = datetime.now()
+        snapshot_path = self.SNAPSHOT_OUTPUT_DIR / f"{instrument_name.lower()}_{timestamp.strftime('%Y%m%d_%H%M%S')}.json"
+        payload = {
+            "instrument_name": instrument_name,
+            "saved_at": timestamp.isoformat(timespec="seconds"),
+            "resources": list(self._load_cached_instrument_resources(instrument_name)),
+            "values": snapshot_values,
+        }
+
+        try:
+            self.SNAPSHOT_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+            snapshot_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        except OSError as error:
+            return False, str(error)
+
+        return True, str(snapshot_path)
+
+    def _write_via_visa(
+        self,
+        command: str,
+        *,
+        instrument_name: str | None = None,
+        timeout_ms: int = 1200,
+    ) -> tuple[bool, str]:
         """通过缓存 VISA 资源发送 SCPI 设置命令。"""
 
         if not _HAS_PYVISA:
             return False, "未安装 pyvisa"
 
-        resources = self._load_cached_instrument_resources()
+        resources = self._load_cached_instrument_resources(instrument_name)
         if not resources:
-            return False, "未找到缓存资源，请先点击“搜索仪表”"
+            if instrument_name is None:
+                return False, "未找到缓存资源，请先点击“搜索仪表”"
+            return False, f"未找到 {instrument_name} 的缓存资源，请先点击“搜索仪表”"
 
         resource_manager = pyvisa.ResourceManager()
         try:
@@ -1162,39 +1270,14 @@ class ScanControlPage(QWidget):
             log_file.write(f"[{timestamp}] {message}\n")
         get_logger(__name__).info("instrument-search | %s", message)
 
-    def _mock_query_value(self, query_key: str) -> tuple[str, str | None]:
-        """返回仪表查询的占位值。"""
+    def _mock_query_value(self, instrument_name: str, query_key: str) -> tuple[str, str | None]:
+        """返回对应仪表的占位查询值。"""
 
-        if query_key == "start_freq":
-            return self._query_start_frequency_value()
-
-        mock_values: dict[str, tuple[str, str | None]] = {
-            "center_freq": ("3040.000", "MHz"),
-            "stop_freq": ("6000.000", "MHz"),
-            "span": ("5920.000", "MHz"),
-            "rbw": ("100.000", "kHz"),
-            "points": ("1601", None),
-            "scale": ("10.000", None),
-        }
-        return mock_values.get(query_key, ("-", None))
-
-    def _query_start_frequency_value(self) -> tuple[str, str | None]:
-        """查询起始频率并转换为 MHz。"""
-
-        command = "FREQuency:STARt?"
-        raw_value = "120000000\n"
-        visa_response, _ = self._query_via_visa(command)
-        if visa_response is not None:
-            return self._format_query_value("start_freq", visa_response)
-
-        if self.serial_is_open and self._serial_port.isOpen():
-            sent, reason = self._send_serial_command(command)
-            if sent:
-                raw_value = self._read_serial_response_text()
-            else:
-                self.append_log(f"发送命令失败: {command}，原因: {reason}")
-
-        return self._format_query_value("start_freq", raw_value)
+        instrument_values = self.INSTRUMENT_PLACEHOLDER_VALUES.get(
+            instrument_name,
+            self.INSTRUMENT_PLACEHOLDER_VALUES["ZNA67"],
+        )
+        return instrument_values.get(query_key, ("-", None))
 
     def _read_serial_response_text(self, timeout_ms: int = 500) -> str:
         """读取一段串口响应文本，优先使用已累积的接收缓存。"""
@@ -1212,8 +1295,8 @@ class ScanControlPage(QWidget):
             chunks.append(bytes(self._serial_port.readAll()).decode("utf-8", errors="replace"))
         return "".join(chunks)
 
-    def _load_cached_instrument_resources(self) -> tuple[str, ...]:
-        """读取上一次保存的仪表资源列表。"""
+    def _load_cached_instrument_resources(self, instrument_name: str | None = None) -> tuple[str, ...]:
+        """读取上一次保存的仪表资源缓存。"""
 
         if not self.INSTRUMENT_CACHE_PATH.exists():
             return ()
@@ -1222,17 +1305,73 @@ class ScanControlPage(QWidget):
         except (OSError, json.JSONDecodeError):
             return ()
 
+        resources_by_instrument = payload.get("resources_by_instrument")
+        if isinstance(resources_by_instrument, dict):
+            normalized: dict[str, tuple[str, ...]] = {}
+            for supported_name in self.INSTRUMENT_ORDER:
+                raw_values = resources_by_instrument.get(supported_name, [])
+                if not isinstance(raw_values, list):
+                    normalized[supported_name] = ()
+                    continue
+                valid_values = [
+                    item.strip()
+                    for item in raw_values
+                    if isinstance(item, str) and item.strip()
+                ]
+                normalized[supported_name] = tuple(valid_values)
+
+            if instrument_name is not None:
+                return normalized.get(instrument_name, ())
+
+            deduplicated: list[str] = []
+            seen: set[str] = set()
+            for supported_name in self.INSTRUMENT_ORDER:
+                for resource_name in normalized.get(supported_name, ()):
+                    if resource_name in seen:
+                        continue
+                    seen.add(resource_name)
+                    deduplicated.append(resource_name)
+            return tuple(deduplicated)
+
         resources = payload.get("resources")
         if not isinstance(resources, list):
             return ()
 
-        valid_resources = [item for item in resources if isinstance(item, str) and item.strip()]
-        return tuple(valid_resources)
+        valid_resources = tuple(
+            item.strip()
+            for item in resources
+            if isinstance(item, str) and item.strip()
+        )
+        if instrument_name is None or instrument_name == "ZNA67":
+            return valid_resources
+        return ()
 
-    def _save_cached_instrument_resources(self, resources: list[str]) -> None:
-        """保存本次识别到的仪表资源，供下次优先尝试。"""
+    def _save_cached_instrument_resources(self, resources_by_instrument: dict[str, list[str]]) -> None:
+        """保存本次识别到的仪表资源映射，供下次优先尝试。"""
 
-        payload = {"resources": resources, "updated_at": datetime.now().isoformat(timespec="seconds")}
+        normalized_map: dict[str, list[str]] = {}
+        all_resources: list[str] = []
+        seen: set[str] = set()
+        for instrument_name in self.INSTRUMENT_ORDER:
+            raw_values = resources_by_instrument.get(instrument_name, [])
+            deduplicated_for_instrument: list[str] = []
+            instrument_seen: set[str] = set()
+            for item in raw_values:
+                cleaned = item.strip()
+                if not cleaned or cleaned in instrument_seen:
+                    continue
+                instrument_seen.add(cleaned)
+                deduplicated_for_instrument.append(cleaned)
+                if cleaned not in seen:
+                    seen.add(cleaned)
+                    all_resources.append(cleaned)
+            normalized_map[instrument_name] = deduplicated_for_instrument
+
+        payload = {
+            "resources_by_instrument": normalized_map,
+            "resources": all_resources,
+            "updated_at": datetime.now().isoformat(timespec="seconds"),
+        }
         self.INSTRUMENT_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
         self.INSTRUMENT_CACHE_PATH.write_text(
             json.dumps(payload, ensure_ascii=False, indent=2),

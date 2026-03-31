@@ -15,17 +15,28 @@ from PySide6.QtWidgets import (
 
 
 class InstrumentPanel(QWidget):
-    """Instrument configuration panel.
+    """仪表配置面板。
 
-    当前阶段支持：
-    - ZNA67 的基础参数编辑骨架
-    - 其他仪表的占位信息
+    当前阶段为 `ZNA67`、`N9020A`、`FSW` 提供统一的基础参数编辑界面。
+    其他型号暂时只显示占位信息，避免过早引入不确定字段。
     """
 
+    STANDARD_INSTRUMENTS = frozenset({"ZNA67", "N9020A", "FSW"})
+    STANDARD_QUERY_KEYS = (
+        "start_freq",
+        "center_freq",
+        "stop_freq",
+        "span",
+        "rbw",
+        "points",
+        "scale",
+    )
+    STANDARD_ACTION_KEYS = ("preset", "save_data")
+    FREQUENCY_UNITS = ("Hz", "kHz", "MHz", "GHz")
+    RBW_UNITS = ("Hz", "kHz", "MHz")
+
     query_requested = Signal(str, str)
-    # PySide6 的 Signal 参数不支持 `str | None` 这类 typing 语法，
-    # 否则会导致信号参数解析异常（运行时报“参数个数不匹配”）。
-    # 第 4 个参数使用 object，以兼容 str 与 None。
+    # PySide6 的 Signal 参数定义不支持 `str | None`，因此第 4 个参数使用 object。
     set_requested = Signal(str, str, str, object)
     action_requested = Signal(str, str)
 
@@ -35,188 +46,170 @@ class InstrumentPanel(QWidget):
         self.discovered_label: QLabel
         self._value_inputs: dict[str, QLineEdit] = {}
         self._unit_inputs: dict[str, QComboBox] = {}
+        self._query_keys: tuple[str, ...] = ()
+        self._action_keys: tuple[str, ...] = ()
         self._setup_ui()
 
     def _setup_ui(self) -> None:
-        if self.instrument_name == "ZNA67":
-            self._setup_zna_ui()
+        """Build the panel according to the selected instrument type."""
+
+        if self.instrument_name in self.STANDARD_INSTRUMENTS:
+            self._query_keys = self.STANDARD_QUERY_KEYS
+            self._action_keys = self.STANDARD_ACTION_KEYS
+            self._setup_standard_ui()
             return
 
         self._setup_placeholder_ui()
 
-    def _setup_zna_ui(self) -> None:
-        """构建 ZNA 仪表参数编辑 UI。"""
+    def _setup_standard_ui(self) -> None:
+        """Create the shared query/set UI for supported instruments."""
 
         layout = QGridLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setHorizontalSpacing(8)
         layout.setVerticalSpacing(8)
 
-        # 第 1 行：起始频率 + 中心频率
-        start_freq_unit = QComboBox(self)
-        start_freq_unit.addItems(["Hz", "kHz", "MHz", "GHz"])
-        start_freq_unit.setCurrentText("MHz")
+        self._add_frequency_field(
+            layout=layout,
+            row=0,
+            start_column=0,
+            query_key="start_freq",
+            button_text="起始频率",
+            default_unit="MHz",
+        )
+        self._add_frequency_field(
+            layout=layout,
+            row=0,
+            start_column=4,
+            query_key="center_freq",
+            button_text="中心频率",
+            default_unit="MHz",
+        )
+        self._add_frequency_field(
+            layout=layout,
+            row=1,
+            start_column=0,
+            query_key="stop_freq",
+            button_text="终止频率",
+            default_unit="MHz",
+        )
+        self._add_frequency_field(
+            layout=layout,
+            row=1,
+            start_column=4,
+            query_key="span",
+            button_text="Span",
+            default_unit="MHz",
+        )
+        self._add_frequency_field(
+            layout=layout,
+            row=2,
+            start_column=0,
+            query_key="rbw",
+            button_text="RBW",
+            default_unit="kHz",
+            unit_items=self.RBW_UNITS,
+        )
+        self._add_plain_field(
+            layout=layout,
+            row=2,
+            start_column=4,
+            query_key="points",
+            button_text="扫描点数",
+        )
+        self._add_plain_field(
+            layout=layout,
+            row=3,
+            start_column=0,
+            query_key="scale",
+            button_text="Scale",
+            unit_label="dB/div",
+        )
 
-        center_freq_unit = QComboBox(self)
-        center_freq_unit.addItems(["Hz", "kHz", "MHz", "GHz"])
-        center_freq_unit.setCurrentText("MHz")
-
-        start_freq_edit = QLineEdit(self)
-        start_set_button = QPushButton("起始频率", self)
-        layout.addWidget(start_set_button, 0, 0)
-        layout.addWidget(start_freq_edit, 0, 1)
-        layout.addWidget(start_freq_unit, 0, 2)
-        start_query_button = QPushButton("查询", self)
-        layout.addWidget(start_query_button, 0, 3)
-
-        center_freq_edit = QLineEdit(self)
-        center_set_button = QPushButton("中心频率", self)
-        layout.addWidget(center_set_button, 0, 4)
-        layout.addWidget(center_freq_edit, 0, 5)
-        layout.addWidget(center_freq_unit, 0, 6)
-        center_query_button = QPushButton("查询", self)
-        layout.addWidget(center_query_button, 0, 7)
-
-        # 第 2 行：终止频率 + Span
-        stop_freq_unit = QComboBox(self)
-        stop_freq_unit.addItems(["Hz", "kHz", "MHz", "GHz"])
-        stop_freq_unit.setCurrentText("MHz")
-
-        span_unit = QComboBox(self)
-        span_unit.addItems(["Hz", "kHz", "MHz", "GHz"])
-        span_unit.setCurrentText("MHz")
-
-        stop_freq_edit = QLineEdit(self)
-        stop_set_button = QPushButton("终止频率", self)
-        layout.addWidget(stop_set_button, 1, 0)
-        layout.addWidget(stop_freq_edit, 1, 1)
-        layout.addWidget(stop_freq_unit, 1, 2)
-        stop_query_button = QPushButton("查询", self)
-        layout.addWidget(stop_query_button, 1, 3)
-
-        span_edit = QLineEdit(self)
-        span_set_button = QPushButton("Span", self)
-        layout.addWidget(span_set_button, 1, 4)
-        layout.addWidget(span_edit, 1, 5)
-        layout.addWidget(span_unit, 1, 6)
-        span_query_button = QPushButton("查询", self)
-        layout.addWidget(span_query_button, 1, 7)
-
-        # 第 3 行：RBW + 扫描点数
-        rbw_unit = QComboBox(self)
-        rbw_unit.addItems(["Hz", "kHz", "MHz"])
-        rbw_unit.setCurrentText("kHz")
-
-        rbw_edit = QLineEdit(self)
-        rbw_set_button = QPushButton("RBW", self)
-        layout.addWidget(rbw_set_button, 2, 0)
-        layout.addWidget(rbw_edit, 2, 1)
-        layout.addWidget(rbw_unit, 2, 2)
-        rbw_query_button = QPushButton("查询", self)
-        layout.addWidget(rbw_query_button, 2, 3)
-
-        points_edit = QLineEdit(self)
-        points_set_button = QPushButton("扫描点数", self)
-        layout.addWidget(points_set_button, 2, 4)
-        layout.addWidget(points_edit, 2, 5)
-        points_query_button = QPushButton("查询", self)
-        layout.addWidget(points_query_button, 2, 6)
-
-        # 第 4 行：Scale + Preset + 保存数据
-        scale_edit = QLineEdit(self)
-        scale_set_button = QPushButton("Scale", self)
-        layout.addWidget(scale_set_button, 3, 0)
-        layout.addWidget(scale_edit, 3, 1)
-        layout.addWidget(QLabel("dB/div", self), 3, 2)
-        scale_query_button = QPushButton("查询", self)
-        layout.addWidget(scale_query_button, 3, 3)
         preset_button = QPushButton("Preset", self)
+        preset_button.clicked.connect(lambda: self.action_requested.emit(self.instrument_name, "preset"))
         layout.addWidget(preset_button, 3, 4)
+
         save_data_button = QPushButton("保存数据", self)
+        save_data_button.clicked.connect(lambda: self.action_requested.emit(self.instrument_name, "save_data"))
         layout.addWidget(save_data_button, 3, 5)
 
         self.discovered_label = QLabel("未发现设备", self)
         layout.addWidget(QLabel("设备发现", self), 4, 0)
         layout.addWidget(self.discovered_label, 4, 1, 1, 7)
 
-        for col in (1, 5):
-            layout.setColumnStretch(col, 1)
+        for column in (1, 5):
+            layout.setColumnStretch(column, 1)
 
-        self._value_inputs = {
-            "start_freq": start_freq_edit,
-            "center_freq": center_freq_edit,
-            "stop_freq": stop_freq_edit,
-            "span": span_edit,
-            "rbw": rbw_edit,
-            "points": points_edit,
-            "scale": scale_edit,
-        }
-        self._unit_inputs = {
-            "start_freq": start_freq_unit,
-            "center_freq": center_freq_unit,
-            "stop_freq": stop_freq_unit,
-            "span": span_unit,
-            "rbw": rbw_unit,
-        }
+    def _add_frequency_field(
+        self,
+        *,
+        layout: QGridLayout,
+        row: int,
+        start_column: int,
+        query_key: str,
+        button_text: str,
+        default_unit: str,
+        unit_items: tuple[str, ...] | None = None,
+    ) -> None:
+        """Add one query/set field that has a selectable frequency unit."""
 
-        start_query_button.clicked.connect(lambda: self.query_requested.emit(self.instrument_name, "start_freq"))
-        center_query_button.clicked.connect(lambda: self.query_requested.emit(self.instrument_name, "center_freq"))
-        stop_query_button.clicked.connect(lambda: self.query_requested.emit(self.instrument_name, "stop_freq"))
-        span_query_button.clicked.connect(lambda: self.query_requested.emit(self.instrument_name, "span"))
-        rbw_query_button.clicked.connect(lambda: self.query_requested.emit(self.instrument_name, "rbw"))
-        points_query_button.clicked.connect(lambda: self.query_requested.emit(self.instrument_name, "points"))
-        scale_query_button.clicked.connect(lambda: self.query_requested.emit(self.instrument_name, "scale"))
-        start_set_button.clicked.connect(
+        value_edit = QLineEdit(self)
+        unit_combo = QComboBox(self)
+        unit_combo.addItems(list(unit_items or self.FREQUENCY_UNITS))
+        unit_combo.setCurrentText(default_unit)
+        set_button = QPushButton(button_text, self)
+        query_button = QPushButton("查询", self)
+
+        layout.addWidget(set_button, row, start_column)
+        layout.addWidget(value_edit, row, start_column + 1)
+        layout.addWidget(unit_combo, row, start_column + 2)
+        layout.addWidget(query_button, row, start_column + 3)
+
+        self._value_inputs[query_key] = value_edit
+        self._unit_inputs[query_key] = unit_combo
+
+        query_button.clicked.connect(lambda: self.query_requested.emit(self.instrument_name, query_key))
+        set_button.clicked.connect(
             lambda: self.set_requested.emit(
                 self.instrument_name,
-                "start_freq",
-                start_freq_edit.text().strip(),
-                start_freq_unit.currentText(),
+                query_key,
+                value_edit.text().strip(),
+                unit_combo.currentText(),
             )
         )
-        center_set_button.clicked.connect(
-            lambda: self.set_requested.emit(
-                self.instrument_name,
-                "center_freq",
-                center_freq_edit.text().strip(),
-                center_freq_unit.currentText(),
-            )
+
+    def _add_plain_field(
+        self,
+        *,
+        layout: QGridLayout,
+        row: int,
+        start_column: int,
+        query_key: str,
+        button_text: str,
+        unit_label: str | None = None,
+    ) -> None:
+        """Add one query/set field without a unit selector."""
+
+        value_edit = QLineEdit(self)
+        set_button = QPushButton(button_text, self)
+        query_button = QPushButton("查询", self)
+
+        layout.addWidget(set_button, row, start_column)
+        layout.addWidget(value_edit, row, start_column + 1)
+        if unit_label is not None:
+            layout.addWidget(QLabel(unit_label, self), row, start_column + 2)
+        layout.addWidget(query_button, row, start_column + 3)
+
+        self._value_inputs[query_key] = value_edit
+
+        query_button.clicked.connect(lambda: self.query_requested.emit(self.instrument_name, query_key))
+        set_button.clicked.connect(
+            lambda: self.set_requested.emit(self.instrument_name, query_key, value_edit.text().strip(), None)
         )
-        stop_set_button.clicked.connect(
-            lambda: self.set_requested.emit(
-                self.instrument_name,
-                "stop_freq",
-                stop_freq_edit.text().strip(),
-                stop_freq_unit.currentText(),
-            )
-        )
-        span_set_button.clicked.connect(
-            lambda: self.set_requested.emit(
-                self.instrument_name,
-                "span",
-                span_edit.text().strip(),
-                span_unit.currentText(),
-            )
-        )
-        rbw_set_button.clicked.connect(
-            lambda: self.set_requested.emit(
-                self.instrument_name,
-                "rbw",
-                rbw_edit.text().strip(),
-                rbw_unit.currentText(),
-            )
-        )
-        points_set_button.clicked.connect(
-            lambda: self.set_requested.emit(self.instrument_name, "points", points_edit.text().strip(), None)
-        )
-        scale_set_button.clicked.connect(
-            lambda: self.set_requested.emit(self.instrument_name, "scale", scale_edit.text().strip(), None)
-        )
-        preset_button.clicked.connect(lambda: self.action_requested.emit(self.instrument_name, "preset"))
-        save_data_button.clicked.connect(lambda: self.action_requested.emit(self.instrument_name, "save_data"))
 
     def _setup_placeholder_ui(self) -> None:
-        """构建非 ZNA 仪表的占位 UI。"""
+        """Create a minimal placeholder panel for unsupported instruments."""
 
         layout = QFormLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
@@ -224,28 +217,47 @@ class InstrumentPanel(QWidget):
 
         layout.addRow("仪表名称", QLabel(self.instrument_name, self))
         layout.addRow("连接状态", QLabel("未连接", self))
-        layout.addRow("开始频率", QLabel("80.000 MHz", self))
-        layout.addRow("终止频率", QLabel("6000.000 MHz", self))
-        layout.addRow("RBW", QLabel("100 kHz", self))
+        layout.addRow("说明", QLabel("当前阶段暂未定义该型号参数面板", self))
 
         self.discovered_label = QLabel("未发现设备", self)
         layout.addRow("设备发现", self.discovered_label)
 
+    def get_supported_query_keys(self) -> tuple[str, ...]:
+        """Return the query keys currently exposed by the panel."""
+
+        return self._query_keys
+
+    def get_displayed_values(self) -> dict[str, dict[str, str | None]]:
+        """Return the values currently shown in the panel."""
+
+        snapshot: dict[str, dict[str, str | None]] = {}
+        for query_key, value_input in self._value_inputs.items():
+            unit_value = None
+            if query_key in self._unit_inputs:
+                unit_value = self._unit_inputs[query_key].currentText().strip()
+            snapshot[query_key] = {
+                "value": value_input.text().strip(),
+                "unit": unit_value,
+            }
+        return snapshot
+
     def set_discovered_message(self, message: str) -> None:
-        """Set simulated discovery message shown in the panel."""
+        """Set discovery message shown at the bottom of the panel."""
 
         self.discovered_label.setText(message)
 
     def set_query_result(self, query_key: str, value: str, unit: str | None = None) -> None:
-        """Update one query field with a simulated result."""
+        """Update one query field with the latest value."""
 
-        if query_key not in self._value_inputs:
+        value_input = self._value_inputs.get(query_key)
+        if value_input is None:
             return
 
-        self._value_inputs[query_key].setText(value)
-        if unit is None or query_key not in self._unit_inputs:
+        value_input.setText(value)
+
+        unit_combo = self._unit_inputs.get(query_key)
+        if unit is None or unit_combo is None:
             return
 
-        unit_combo = self._unit_inputs[query_key]
         if unit_combo.findText(unit) >= 0:
             unit_combo.setCurrentText(unit)

@@ -1,9 +1,16 @@
-"""ZNA instrument discovery helpers based on VISA resource scanning."""
+"""Instrument discovery helpers based on VISA resource scanning."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from importlib.util import find_spec
+
+SUPPORTED_INSTRUMENTS = ("ZNA67", "N9020A", "FSW")
+INSTRUMENT_IDN_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "ZNA67": ("ZNA67",),
+    "N9020A": ("N9020A", "CXA"),
+    "FSW": ("FSW",),
+}
 
 _HAS_PYVISA = find_spec("pyvisa") is not None
 if _HAS_PYVISA:
@@ -16,12 +23,18 @@ class InstrumentProbeResult:
 
     resource_name: str
     idn_text: str
-    is_zna67: bool
+    matched_instrument: str | None
     error_message: str = ""
+
+    @property
+    def is_zna67(self) -> bool:
+        """Keep backward compatibility with existing ZNA-specific checks."""
+
+        return self.matched_instrument == "ZNA67"
 
 
 @dataclass(slots=True)
-class ZnaDiscoveryResult:
+class InstrumentDiscoveryResult:
     """Collection of discovery details for UI presentation."""
 
     probes: list[InstrumentProbeResult]
@@ -29,22 +42,49 @@ class ZnaDiscoveryResult:
 
     @property
     def matched_resources(self) -> list[InstrumentProbeResult]:
-        """Return only resources whose *IDN? contains ZNA67."""
+        """Return the detected ZNA67 list for backward compatibility."""
 
-        return [probe for probe in self.probes if probe.is_zna67]
+        return self.matched_resources_for("ZNA67")
+
+    def matched_resources_for(self, instrument_name: str) -> list[InstrumentProbeResult]:
+        """Return all probes matching one instrument model."""
+
+        return [
+            probe
+            for probe in self.probes
+            if probe.matched_instrument == instrument_name
+        ]
+
+    def matched_resource_map(self) -> dict[str, list[InstrumentProbeResult]]:
+        """Return probes grouped by supported instrument model."""
+
+        return {
+            instrument_name: self.matched_resources_for(instrument_name)
+            for instrument_name in SUPPORTED_INSTRUMENTS
+        }
 
 
-def discover_zna67_via_visa(timeout_ms: int = 1200) -> ZnaDiscoveryResult:
-    """Scan VISA resources and identify instruments whose *IDN? includes ``ZNA67``."""
+# Backward-compatible alias used by the existing UI module.
+ZnaDiscoveryResult = InstrumentDiscoveryResult
+
+
+def discover_supported_instruments_via_visa(timeout_ms: int = 1200) -> InstrumentDiscoveryResult:
+    """Scan VISA resources and identify supported instruments from ``*IDN?``."""
 
     if not _HAS_PYVISA:
-        return ZnaDiscoveryResult(probes=[], pyvisa_available=False)
+        return InstrumentDiscoveryResult(probes=[], pyvisa_available=False)
 
     resource_manager = pyvisa.ResourceManager()
     resources = resource_manager.list_resources()
     probes = probe_resources(resource_names=resources, timeout_ms=timeout_ms)
     resource_manager.close()
-    return ZnaDiscoveryResult(probes=probes, pyvisa_available=True)
+    return InstrumentDiscoveryResult(probes=probes, pyvisa_available=True)
+
+
+def discover_zna67_via_visa(timeout_ms: int = 1200) -> InstrumentDiscoveryResult:
+    """Backward-compatible wrapper for existing callers."""
+
+    return discover_supported_instruments_via_visa(timeout_ms=timeout_ms)
 
 
 def probe_resources(resource_names: tuple[str, ...], timeout_ms: int = 1200) -> list[InstrumentProbeResult]:
@@ -66,7 +106,7 @@ def probe_resources(resource_names: tuple[str, ...], timeout_ms: int = 1200) -> 
                 InstrumentProbeResult(
                     resource_name=resource_name,
                     idn_text=idn_text,
-                    is_zna67="ZNA67" in idn_text.upper(),
+                    matched_instrument=_match_instrument_name(idn_text),
                 )
             )
         except Exception as error:  # pragma: no cover - depends on local VISA environment
@@ -74,10 +114,20 @@ def probe_resources(resource_names: tuple[str, ...], timeout_ms: int = 1200) -> 
                 InstrumentProbeResult(
                     resource_name=resource_name,
                     idn_text="",
-                    is_zna67=False,
+                    matched_instrument=None,
                     error_message=str(error),
                 )
             )
 
     resource_manager.close()
     return probes
+
+
+def _match_instrument_name(idn_text: str) -> str | None:
+    """Match one ``*IDN?`` response to a supported instrument model."""
+
+    normalized_idn = idn_text.upper()
+    for instrument_name, keywords in INSTRUMENT_IDN_KEYWORDS.items():
+        if any(keyword.upper() in normalized_idn for keyword in keywords):
+            return instrument_name
+    return None
