@@ -63,6 +63,17 @@ Expected files:
 - `spectrum.npy`
 - `images.npy`
 
+If you run the **扫描控制页面** (serial motion path scan), it now also writes:
+
+- `scan_plan_points.csv` (planned path points)
+- `scan_executed_points.csv` (points already dispatched to the controller)
+- `scan_execution_status.json` (completed flag and point counters)
+
+For instrument storage actions (`保存数据`, `参数存储Demo`), the app now tries to:
+1. send `INIT:CONT OFF` before storage,
+2. perform storage,
+3. send `INIT:CONT ON` after storage.
+
 The folder is created automatically if it does not already exist.
 
 ## Current Limitations

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import csv
 import json
 from datetime import datetime
 from importlib.util import find_spec
 from pathlib import Path
+from typing import Callable
 
 from PySide6.QtCore import QIODevice, QObject, QThread, QTimer, Qt, Signal
 from PySide6.QtGui import QDesktopServices
@@ -182,6 +184,7 @@ class ScanControlPage(QWidget):
         self._scan_timer.timeout.connect(self._dispatch_next_scan_point)
         self._scan_points: list[tuple[float, float, float]] = []
         self._scan_point_index = 0
+        self._executed_scan_points: list[tuple[float, float, float]] = []
         self._instrument_search_thread: QThread | None = None
         self._instrument_search_worker: InstrumentSearchWorker | None = None
 
@@ -837,7 +840,9 @@ class ScanControlPage(QWidget):
             return
 
         self._scan_point_index = 0
+        self._executed_scan_points = []
         self.update_system_status("扫描中")
+        self._save_scan_plan_snapshot()
         self.append_log(
             "扫描开始："
             f"共 {len(self._scan_points)} 点，顺序为 Z 外层（增大）、Y 中层（减小）、X 内层（增大）"
@@ -857,6 +862,7 @@ class ScanControlPage(QWidget):
     def on_stop_scan(self) -> None:
         self.update_system_status("停止")
         self._scan_timer.stop()
+        self._save_scan_execution_snapshot(completed=False)
         self._scan_points = []
         self._scan_point_index = 0
         sent, reason = self._send_serial_command("\x18")
@@ -1172,28 +1178,32 @@ class ScanControlPage(QWidget):
         """处理仪表动作按钮，如 Preset 和保存数据。"""
 
         if action_key == "save_data":
-            saved, message = self._save_instrument_snapshot(instrument_name)
-            if saved:
-                self.append_log(f"仪表数据已保存: {instrument_name} -> {message}")
-            else:
-                self.append_log(f"仪表保存失败: {instrument_name} - {message}")
+            self._run_storage_action_with_continue_control(
+                instrument_name=instrument_name,
+                action_name="保存数据",
+                action=self._save_instrument_snapshot,
+                success_log_prefix="仪表数据已保存",
+                failure_log_prefix="仪表保存失败",
+            )
             return
 
         if action_key == "save_param_demo":
             if instrument_name != "ZNA67":
                 self.append_log(f"参数存储Demo仅支持 ZNA67，当前仪表: {instrument_name}")
                 return
-            saved, message = self._save_zna67_demo_data(
-                x=1.0,
-                y=2.0,
-                z=3.0,
-                delay_time=100,
-                file_name=str(self.ZNA67_DEMO_FILE_PATH),
+            self._run_storage_action_with_continue_control(
+                instrument_name=instrument_name,
+                action_name="参数存储Demo",
+                action=lambda _: self._save_zna67_demo_data(
+                    x=1.0,
+                    y=2.0,
+                    z=3.0,
+                    delay_time=100,
+                    file_name=str(self.ZNA67_DEMO_FILE_PATH),
+                ),
+                success_log_prefix="ZNA67 参数存储Demo成功",
+                failure_log_prefix="ZNA67 参数存储Demo失败",
             )
-            if saved:
-                self.append_log(f"ZNA67 参数存储Demo成功: {message}")
-            else:
-                self.append_log(f"ZNA67 参数存储Demo失败: {message}")
             return
 
         command = self.ACTION_COMMANDS.get(action_key)
@@ -1208,6 +1218,53 @@ class ScanControlPage(QWidget):
 
         self.append_log(f"仪表动作成功: {instrument_name} - {action_key}")
         self._refresh_all_instrument_queries(instrument_name)
+
+    def _run_storage_action_with_continue_control(
+        self,
+        *,
+        instrument_name: str,
+        action_name: str,
+        action: Callable[[str], tuple[bool, str]],
+        success_log_prefix: str,
+        failure_log_prefix: str,
+    ) -> None:
+        """执行存储动作：先关闭 continue，结束后恢复 continue。"""
+
+        paused, pause_reason = self._set_instrument_continue_mode(instrument_name, enabled=False)
+        if paused:
+            self.append_log(f"仪表连续扫描已关闭: {instrument_name}，准备{action_name}")
+        else:
+            self.append_log(f"关闭仪表连续扫描失败: {instrument_name} - {pause_reason}")
+
+        try:
+            saved, message = action(instrument_name)
+        finally:
+            resumed, resume_reason = self._set_instrument_continue_mode(instrument_name, enabled=True)
+            if resumed:
+                self.append_log(f"仪表连续扫描已恢复: {instrument_name}")
+            else:
+                self.append_log(f"恢复仪表连续扫描失败: {instrument_name} - {resume_reason}")
+
+        if saved:
+            self.append_log(f"{success_log_prefix}: {instrument_name} -> {message}")
+        else:
+            self.append_log(f"{failure_log_prefix}: {instrument_name} - {message}")
+
+    def _set_instrument_continue_mode(self, instrument_name: str, *, enabled: bool) -> tuple[bool, str]:
+        """设置仪表 continue 开关：优先 VISA，ZNA67 可回退串口。"""
+
+        command = f"INIT:CONT {'ON' if enabled else 'OFF'}"
+        visa_ok, visa_reason = self._write_via_visa(command, instrument_name=instrument_name)
+        if visa_ok:
+            return True, ""
+
+        if instrument_name in self.SERIAL_FALLBACK_INSTRUMENTS and self.serial_is_open and self._serial_port.isOpen():
+            sent, serial_reason = self._send_serial_command(command)
+            if sent:
+                return True, ""
+            return False, f"VISA失败({visa_reason})，串口失败({serial_reason})"
+
+        return False, visa_reason
 
     def _save_instrument_snapshot(self, instrument_name: str) -> tuple[bool, str]:
         """保存当前仪表参数快照，便于后续调试和比对。"""
@@ -1609,6 +1666,7 @@ class ScanControlPage(QWidget):
         if self._scan_point_index >= len(self._scan_points):
             self._scan_timer.stop()
             self.update_system_status("就绪")
+            self._save_scan_execution_snapshot(completed=True)
             self.append_log("扫描结束：全部路径点已发送")
             return
 
@@ -1618,15 +1676,55 @@ class ScanControlPage(QWidget):
         if not sent:
             self._scan_timer.stop()
             self.update_system_status("停止")
+            self._save_scan_execution_snapshot(completed=False)
             self.append_log(f"扫描中断：发送失败，原因: {reason}")
             return
 
         self.current_x = x
         self.current_y = y
         self.current_z = z
+        self._executed_scan_points.append((x, y, z))
         self.update_position_status(self.current_x, self.current_y, self.current_z)
         self._scan_point_index += 1
         self.append_log(f"扫描点 {self._scan_point_index}/{len(self._scan_points)}: {command}")
+
+    def _save_scan_plan_snapshot(self) -> None:
+        """保存当前扫描规划点，便于回溯与调试。"""
+
+        output_dir = Path(self.result_path_edit.text().strip() or "output/latest_scan")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        plan_file = output_dir / "scan_plan_points.csv"
+
+        with plan_file.open("w", encoding="utf-8", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow(["index", "x", "y", "z"])
+            for index, (x, y, z) in enumerate(self._scan_points, start=1):
+                writer.writerow([index, x, y, z])
+
+        self.append_log(f"已保存扫描规划: {plan_file}")
+
+    def _save_scan_execution_snapshot(self, *, completed: bool) -> None:
+        """保存已执行的扫描点和进度摘要。"""
+
+        output_dir = Path(self.result_path_edit.text().strip() or "output/latest_scan")
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        points_file = output_dir / "scan_executed_points.csv"
+        with points_file.open("w", encoding="utf-8", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow(["index", "x", "y", "z"])
+            for index, (x, y, z) in enumerate(self._executed_scan_points, start=1):
+                writer.writerow([index, x, y, z])
+
+        status_file = output_dir / "scan_execution_status.json"
+        payload = {
+            "completed": completed,
+            "planned_points": len(self._scan_points),
+            "executed_points": len(self._executed_scan_points),
+            "updated_at": datetime.now().isoformat(timespec="seconds"),
+        }
+        status_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        self.append_log(f"已保存扫描执行状态: {status_file}")
 
     def _build_scan_points(self) -> list[tuple[float, float, float]]:
         """根据起点、终点和步长生成扫描路径。"""
