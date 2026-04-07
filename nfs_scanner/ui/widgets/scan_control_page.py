@@ -188,6 +188,7 @@ class ScanControlPage(QWidget):
         self._scan_points: list[tuple[float, float, float]] = []
         self._scan_point_index = 0
         self._executed_scan_points: list[tuple[float, float, float]] = []
+        self._active_scan_output_dir: Path | None = None
         self._instrument_search_thread: QThread | None = None
         self._instrument_search_worker: InstrumentSearchWorker | None = None
 
@@ -546,7 +547,7 @@ class ScanControlPage(QWidget):
 
         row_layout.addWidget(QLabel("结果", content))
         self.result_path_edit = QLineEdit(content)
-        self.result_path_edit.setText("output/latest_scan")
+        self.result_path_edit.setText("output")
         open_button = QPushButton("查看", content)
         heatmap_button = QPushButton("显示热力图", content)
         open_button.clicked.connect(self.on_open_result_folder)
@@ -557,7 +558,7 @@ class ScanControlPage(QWidget):
         row_layout.addWidget(heatmap_button)
 
         section = CollapsibleSection("结果区域", body_widget=content, expanded=True, parent=self)
-        section.update_summary_text("结果路径: output/latest_scan")
+        section.update_summary_text("结果路径: output")
         self.result_section = section
         return section
 
@@ -1547,7 +1548,10 @@ class ScanControlPage(QWidget):
         )
 
     def on_open_result_folder(self) -> None:
-        path = Path(self.result_path_edit.text().strip())
+        if self._active_scan_output_dir is not None and self._active_scan_output_dir.exists():
+            path = self._active_scan_output_dir
+        else:
+            path = Path(self.result_path_edit.text().strip() or "output")
         if path.exists():
             QDesktopServices.openUrl(path.resolve().as_uri())
             self.append_log(f"打开结果目录: {path}")
@@ -1738,7 +1742,9 @@ class ScanControlPage(QWidget):
     def _prepare_scan_storage_workspace(self) -> None:
         """准备扫描过程中的数据存储目录和索引文件。"""
 
-        output_dir = Path(self.result_path_edit.text().strip() or "output/latest_scan")
+        output_dir = self._create_scan_output_dir()
+        self._active_scan_output_dir = output_dir
+        self.result_section.update_summary_text(f"结果路径: {output_dir}")
         data_dir = output_dir / "instrument_scan_data"
         data_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1795,7 +1801,7 @@ class ScanControlPage(QWidget):
     ) -> tuple[bool, str]:
         """按扫描点保存仪表数据文件，并追加索引元数据。"""
 
-        output_dir = Path(self.result_path_edit.text().strip() or "output/latest_scan")
+        output_dir = self._get_current_output_dir()
         data_dir = output_dir / "instrument_scan_data"
         data_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1871,7 +1877,7 @@ class ScanControlPage(QWidget):
     def _save_scan_plan_snapshot(self) -> None:
         """保存当前扫描规划点，便于回溯与调试。"""
 
-        output_dir = Path(self.result_path_edit.text().strip() or "output/latest_scan")
+        output_dir = self._get_current_output_dir()
         output_dir.mkdir(parents=True, exist_ok=True)
         plan_file = output_dir / "scan_plan_points.csv"
 
@@ -1886,7 +1892,7 @@ class ScanControlPage(QWidget):
     def _save_scan_execution_snapshot(self, *, completed: bool) -> None:
         """保存已执行的扫描点和进度摘要。"""
 
-        output_dir = Path(self.result_path_edit.text().strip() or "output/latest_scan")
+        output_dir = self._get_current_output_dir()
         output_dir.mkdir(parents=True, exist_ok=True)
 
         points_file = output_dir / "scan_executed_points.csv"
@@ -1905,6 +1911,52 @@ class ScanControlPage(QWidget):
         }
         status_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         self.append_log(f"已保存扫描执行状态: {status_file}")
+
+    def _create_scan_output_dir(self) -> Path:
+        """创建本次扫描输出目录（按日期时间命名，附加项目/测试名称）。"""
+
+        base_dir = Path(self.result_path_edit.text().strip() or "output")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        path_parts = [timestamp]
+
+        project_name = self._sanitize_path_segment(self.project_name_edit.text())
+        test_name = self._sanitize_path_segment(self.test_name_edit.text())
+        if project_name:
+            path_parts.append(project_name)
+        if test_name:
+            path_parts.append(test_name)
+
+        folder_name = "_".join(path_parts)
+        output_dir = base_dir / folder_name
+        if output_dir.exists():
+            for index in range(1, 1000):
+                candidate = base_dir / f"{folder_name}_{index:03d}"
+                if not candidate.exists():
+                    output_dir = candidate
+                    break
+        output_dir.mkdir(parents=True, exist_ok=False)
+        return output_dir
+
+    def _sanitize_path_segment(self, raw_text: str) -> str:
+        """将用户输入清洗为安全的目录名片段。"""
+
+        cleaned = raw_text.strip()
+        if not cleaned:
+            return ""
+        safe_chars = []
+        for char in cleaned:
+            if char.isalnum() or char in ("-", "_", " "):
+                safe_chars.append(char)
+            else:
+                safe_chars.append("_")
+        return "".join(safe_chars).strip().replace(" ", "_")
+
+    def _get_current_output_dir(self) -> Path:
+        """获取当前扫描输出目录，未开始扫描时回退到界面路径。"""
+
+        if self._active_scan_output_dir is not None:
+            return self._active_scan_output_dir
+        return Path(self.result_path_edit.text().strip() or "output")
 
     def _build_scan_points(self) -> list[tuple[float, float, float]]:
         """根据起点、终点和步长生成扫描路径。"""
