@@ -1,7 +1,14 @@
 """Core application services and data models."""
 
 from .device_manager import DeviceManager
-from .models import ScanConfig, ScanPointResult, SerialConfig, SpectrumConfig
+from .models import (
+    ScanConfig,
+    ScanPointResult,
+    SerialConfig,
+    SpectrumAcquisitionResult,
+    SpectrumConfig,
+    SpectrumFrequencySettings,
+)
 from .scan_manager import ScanManager, ScanRuntimeSnapshot, ScanRuntimeStatus
 
 __all__ = [
@@ -12,5 +19,7 @@ __all__ = [
     "ScanRuntimeSnapshot",
     "ScanRuntimeStatus",
     "SerialConfig",
+    "SpectrumAcquisitionResult",
     "SpectrumConfig",
+    "SpectrumFrequencySettings",
 ]

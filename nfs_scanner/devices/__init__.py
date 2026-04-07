@@ -2,7 +2,7 @@
 
 from .camera import CameraDevice, MockCameraDevice
 from .motion import MockMotionController, MotionController
-from .spectrum import MockSpectrumAnalyzer, SpectrumAnalyzer
+from .spectrum import MockSpectrumAnalyzer, SpectrumAnalyzer, create_spectrum_analyzer
 
 __all__ = [
     "CameraDevice",
@@ -11,4 +11,5 @@ __all__ = [
     "MockSpectrumAnalyzer",
     "MotionController",
     "SpectrumAnalyzer",
+    "create_spectrum_analyzer",
 ]

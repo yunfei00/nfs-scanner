@@ -69,10 +69,11 @@ class ScanControlPageTimingTestCase(unittest.TestCase):
         self.assertEqual(snapshot.status, "running")
         self.assertIsNotNone(snapshot.remaining_seconds)
         self.assertIsNotNone(snapshot.estimated_completion_time)
-        self.assertIn(f"剩余: {snapshot.remaining_seconds} 秒", self.page.time_status_label.text())
+        label_text = self.page.time_status_label.text()
+        self.assertIn(f"剩余: {snapshot.remaining_seconds} 秒", label_text)
         self.assertIn(
             f"预计完成: {snapshot.estimated_completion_time.strftime('%H:%M:%S')}",
-            self.page.time_status_label.text(),
+            label_text,
         )
 
     def test_pause_freezes_eta_and_resume_reanchors_display(self) -> None:
@@ -93,8 +94,9 @@ class ScanControlPageTimingTestCase(unittest.TestCase):
 
         self.clock.advance(10.0)
         self.page._refresh_clock()
+        label_text = self.page.time_status_label.text()
         self.assertEqual(self.scan_manager.get_scan_runtime_snapshot().remaining_seconds, frozen_remaining)
-        self.assertIn(f"剩余: {frozen_remaining} 秒", self.page.time_status_label.text())
+        self.assertIn(f"剩余: {frozen_remaining} 秒", label_text)
 
         self.page._dispatch_next_scan_point = lambda: None
         self.page.on_start_scan()
@@ -102,6 +104,8 @@ class ScanControlPageTimingTestCase(unittest.TestCase):
 
         self.assertEqual(resumed_snapshot.status, "running")
         self.assertEqual(resumed_snapshot.remaining_seconds, frozen_remaining)
+        self.assertIsNotNone(frozen_eta)
+        self.assertIsNotNone(resumed_snapshot.estimated_completion_time)
         self.assertGreater(resumed_snapshot.estimated_completion_time, frozen_eta)
 
     def test_page_no_longer_tracks_scan_timing_locally(self) -> None:

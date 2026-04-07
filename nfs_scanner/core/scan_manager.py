@@ -20,7 +20,7 @@ from nfs_scanner.devices import (
 )
 from nfs_scanner.scan import ScanJob
 
-from .models import ScanConfig, ScanPointResult, SpectrumConfig
+from .models import ScanConfig, ScanPointResult, SpectrumAcquisitionResult, SpectrumConfig
 
 ScanRuntimeStatus = Literal["idle", "running", "paused", "completed", "failed", "stopped"]
 
@@ -118,6 +118,31 @@ class ScanManager:
         """Return a copy of the most recent in-memory scan results."""
 
         return list(self._results)
+
+    def set_spectrum_analyzer(self, spectrum_analyzer: SpectrumAnalyzer) -> None:
+        """Replace the active spectrum adapter used by scan execution."""
+
+        self._spectrum_analyzer = spectrum_analyzer
+
+    def set_spectrum_config(self, spectrum_config: SpectrumConfig) -> None:
+        """Replace the active spectrum acquisition configuration."""
+
+        self._spectrum_config = spectrum_config
+
+    def acquire_spectrum_measurement(
+        self,
+        spectrum_config: SpectrumConfig | None = None,
+    ) -> SpectrumAcquisitionResult:
+        """Acquire one normalized spectrum result from the active adapter."""
+
+        if spectrum_config is not None:
+            self._spectrum_config = spectrum_config
+
+        self._spectrum_analyzer.connect()
+        self._spectrum_analyzer.configure(self._spectrum_config)
+        measurement = self._spectrum_analyzer.acquire_spectrum()
+        self._logger.info("[SCAN] spectrum measurement acquired from %s", measurement.instrument_type)
+        return measurement
 
     @property
     def scan_runtime_snapshot(self) -> ScanRuntimeSnapshot:
@@ -458,7 +483,8 @@ class ScanManager:
                 self._logger.info("[SCAN] move (%s,%s)", x_position, y_position)
                 self._motion_controller.move_to(x_position, y_position, z_position)
 
-                spectrum_trace = self._spectrum_analyzer.acquire_trace()
+                spectrum_result = self._spectrum_analyzer.acquire_spectrum()
+                spectrum_trace = spectrum_result.to_trace()
                 self._logger.info("[SCAN] Spectrum acquired")
 
                 camera_image = self._camera_device.capture_image()
@@ -470,6 +496,7 @@ class ScanManager:
                     z=z_position,
                     spectrum_trace=spectrum_trace,
                     camera_image=camera_image,
+                    spectrum_result=spectrum_result,
                 )
                 self._results.append(point_result)
                 self.record_completed_point()

@@ -5,7 +5,6 @@ from __future__ import annotations
 import csv
 import json
 from datetime import datetime
-from importlib.util import find_spec
 from pathlib import Path
 
 from PySide6.QtCore import QIODevice, QObject, QThread, QTimer, Qt, Signal
@@ -36,22 +35,18 @@ from PySide6.QtWidgets import (
 from nfs_scanner.devices.spectrum import (
     InstrumentDiscoveryResult,
     SUPPORTED_INSTRUMENTS,
+    SpectrumAnalyzerError,
     append_zna_trace_csv,
     convert_zna_mmem_csv_to_row_text,
     discover_supported_instruments_via_visa,
     probe_resources,
     save_zna_trace_csv,
 )
-from nfs_scanner.core import ScanManager, ScanRuntimeSnapshot
+from nfs_scanner.core import DeviceManager, ScanManager, ScanRuntimeSnapshot, SpectrumConfig
 from nfs_scanner.infra.logging_config import get_logger
 
 from .collapsible_section import CollapsibleSection
 from .instrument_panel import InstrumentPanel
-
-_HAS_PYVISA = find_spec("pyvisa") is not None
-if _HAS_PYVISA:
-    import pyvisa
-
 
 class InstrumentSearchWorker(QObject):
     """在后台线程执行 VISA 搜索，避免阻塞主界面。"""
@@ -156,36 +151,14 @@ class ScanControlPage(QWidget):
         "points": "扫描点数",
         "scale": "Scale",
     }
-    QUERY_COMMANDS = {
-        "start_freq": "FREQuency:STARt?",
-        "center_freq": "FREQuency:CENTer?",
-        "stop_freq": "FREQuency:STOP?",
-        "span": "FREQuency:SPAN?",
-        "rbw": "BANDwidth:RESolution?",
-        "points": "SWEep:POINts?",
-        "scale": "DISPlay:WINDow:TRACe:Y:SCALe:PDIVision?",
-    }
-    SET_COMMANDS = {
-        "start_freq": "FREQuency:STARt",
-        "center_freq": "FREQuency:CENTer",
-        "stop_freq": "FREQuency:STOP",
-        "span": "FREQuency:SPAN",
-        "rbw": "BANDwidth:RESolution",
-        "points": "SWEep:POINts",
-        "scale": "DISPlay:WINDow:TRACe:Y:SCALe:PDIVision",
-    }
-    ACTION_COMMANDS = {
-        "preset": "SYSTem:PRESet",
-    }
     UNIT_SCALE = {"Hz": 1.0, "kHz": 1_000.0, "MHz": 1_000_000.0, "GHz": 1_000_000_000.0}
-    CONTINUE_OFF_COMMAND = "INIT:CONT OFF"
-    CONTINUE_ON_COMMAND = "INIT:CONT ON"
 
     def __init__(
         self,
         parent: QWidget | None = None,
         *,
         scan_manager: ScanManager | None = None,
+        device_manager: DeviceManager | None = None,
     ) -> None:
         super().__init__(parent)
         self.current_x = 0.0
@@ -194,6 +167,7 @@ class ScanControlPage(QWidget):
         self.current_feed_rate = 1000.0
         self.active_jog_step_mm = 1.0
         self.scan_manager = scan_manager or ScanManager()
+        self.device_manager = device_manager or DeviceManager()
         self.serial_is_open = False
         self._serial_port = QSerialPort(self)
         self._serial_port.readyRead.connect(self._on_serial_ready_read)
@@ -1118,26 +1092,12 @@ class ScanControlPage(QWidget):
     def _query_scpi_instrument_value(self, instrument_name: str, query_key: str) -> tuple[str, str | None]:
         """查询支持的 SCPI 仪表参数。优先走 VISA，ZNA67 再尝试串口回退。"""
 
-        command = self.QUERY_COMMANDS.get(query_key)
-        if command is None:
+        try:
+            analyzer = self._get_instrument_adapter(instrument_name)
+            return self._format_query_value(query_key, analyzer.query_setting(query_key))
+        except SpectrumAnalyzerError as error:
+            self.append_log(f"{instrument_name} 参数查询失败，已使用占位值: {error}")
             return self._mock_query_value(instrument_name, query_key)
-
-        visa_response, visa_error = self._query_via_visa(command, instrument_name=instrument_name)
-        if visa_response is not None:
-            return self._format_query_value(query_key, visa_response)
-
-        if instrument_name in self.SERIAL_FALLBACK_INSTRUMENTS and self.serial_is_open and self._serial_port.isOpen():
-            sent, reason = self._send_serial_command(command)
-            if sent:
-                serial_response = self._read_serial_response_text()
-                if serial_response.strip():
-                    return self._format_query_value(query_key, serial_response)
-            else:
-                self.append_log(f"发送命令失败: {command}，原因: {reason}")
-
-        if visa_error:
-            self.append_log(f"{instrument_name} VISA查询失败，已使用占位值: {visa_error}")
-        return self._mock_query_value(instrument_name, query_key)
 
     def _query_via_visa(
         self,
@@ -1146,34 +1106,10 @@ class ScanControlPage(QWidget):
         instrument_name: str | None = None,
         timeout_ms: int = 1200,
     ) -> tuple[str | None, str]:
-        """通过缓存的 VISA 资源发送 SCPI 查询。"""
+        """兼容旧入口，实际 VISA 访问已迁移到频谱适配器层。"""
 
-        if not _HAS_PYVISA:
-            return None, "未安装 pyvisa"
-
-        resources = self._load_cached_instrument_resources(instrument_name)
-        if not resources:
-            if instrument_name is None:
-                return None, "未找到缓存资源，请先点击“搜索仪表”"
-            return None, f"未找到 {instrument_name} 的缓存资源，请先点击“搜索仪表”"
-
-        resource_manager = pyvisa.ResourceManager()
-        try:
-            last_error = ""
-            for resource_name in resources:
-                try:
-                    instrument = resource_manager.open_resource(resource_name)
-                    instrument.timeout = timeout_ms
-                    response_text = str(instrument.query(command)).strip()
-                    instrument.close()
-                    if response_text:
-                        return response_text, ""
-                except Exception as error:
-                    last_error = f"{resource_name}: {error}"
-                    continue
-            return None, last_error or "未读取到有效返回值"
-        finally:
-            resource_manager.close()
+        del command, instrument_name, timeout_ms
+        return None, "仪表 VISA 查询已迁移到频谱适配器层"
 
     def _format_query_value(self, query_key: str, raw_value: str) -> tuple[str, str | None]:
         """格式化 SCPI 查询返回值，统一展示单位。"""
@@ -1233,12 +1169,12 @@ class ScanControlPage(QWidget):
             self.append_log(f"仪表设置失败: {instrument_name} - {label} 输入为空")
             return
 
-        command = self._build_set_command(query_key, value_text, unit)
-        if command is None:
+        normalized_value = self._normalize_setting_value(query_key, value_text, unit)
+        if normalized_value is None:
             self.append_log(f"仪表设置失败: {instrument_name} - {label} 数值格式无效")
             return
 
-        success, reason = self._set_instrument_value(instrument_name, command)
+        success, reason = self._set_instrument_value(instrument_name, query_key, normalized_value)
         if success:
             suffix = f" {unit}" if unit else ""
             self.append_log(f"仪表设置成功: {instrument_name} - {label} = {value_text}{suffix}")
@@ -1247,53 +1183,53 @@ class ScanControlPage(QWidget):
 
         self.append_log(f"仪表设置失败: {instrument_name} - {label}，原因: {reason}")
 
-    def _build_set_command(self, query_key: str, value_text: str, unit: str | None) -> str | None:
-        """根据输入文本和单位构建 SCPI 设置命令。"""
-
-        command_prefix = self.SET_COMMANDS.get(query_key)
-        if command_prefix is None:
-            return None
+    def _normalize_setting_value(
+        self,
+        query_key: str,
+        value_text: str,
+        unit: str | None,
+    ) -> str | float | int | None:
+        """将界面输入转换成适配器可直接使用的设置值。"""
 
         if query_key in {"start_freq", "center_freq", "stop_freq", "span", "rbw"}:
             if unit is None or unit not in self.UNIT_SCALE:
                 return None
             try:
-                scaled_value = float(value_text) * self.UNIT_SCALE[unit]
+                return float(value_text) * self.UNIT_SCALE[unit]
             except ValueError:
                 return None
-            return f"{command_prefix} {scaled_value:.6f}"
 
         if query_key == "points":
             try:
-                return f"{command_prefix} {int(float(value_text))}"
+                return int(float(value_text))
             except ValueError:
                 return None
 
         if query_key == "scale":
             try:
-                return f"{command_prefix} {float(value_text):.6f}"
+                return float(value_text)
             except ValueError:
                 return None
 
         return None
 
-    def _set_instrument_value(self, instrument_name: str, command: str) -> tuple[bool, str]:
-        """设置仪表参数：优先 VISA，其次是 ZNA67 的串口回退。"""
+    def _set_instrument_value(
+        self,
+        instrument_name: str,
+        query_key: str,
+        normalized_value: str | float | int,
+    ) -> tuple[bool, str]:
+        """通过核心适配器设置一项仪表参数。"""
 
         if instrument_name not in self.INSTRUMENT_ORDER:
             return False, f"当前暂不支持 {instrument_name} 参数设置"
 
-        visa_ok, visa_reason = self._write_via_visa(command, instrument_name=instrument_name)
-        if visa_ok:
+        try:
+            analyzer = self._get_instrument_adapter(instrument_name)
+            analyzer.set_setting(query_key, normalized_value)
             return True, ""
-
-        if instrument_name in self.SERIAL_FALLBACK_INSTRUMENTS and self.serial_is_open and self._serial_port.isOpen():
-            sent, serial_reason = self._send_serial_command(command)
-            if sent:
-                return True, ""
-            return False, f"VISA失败({visa_reason})，串口失败({serial_reason})"
-
-        return False, visa_reason
+        except SpectrumAnalyzerError as error:
+            return False, str(error)
 
     def on_instrument_action_requested(self, instrument_name: str, action_key: str) -> None:
         """处理仪表动作按钮，如 Preset 和保存数据。"""
@@ -1323,14 +1259,15 @@ class ScanControlPage(QWidget):
                 self.append_log(f"ZNA67 参数存储Demo失败: {message}")
             return
 
-        command = self.ACTION_COMMANDS.get(action_key)
-        if command is None:
+        if action_key != "preset":
             self.append_log(f"仪表动作失败: {instrument_name} - 不支持的动作 {action_key}")
             return
 
-        success, reason = self._set_instrument_value(instrument_name, command)
-        if not success:
-            self.append_log(f"仪表动作失败: {instrument_name} - {action_key}，原因: {reason}")
+        try:
+            analyzer = self._get_instrument_adapter(instrument_name)
+            analyzer.preset()
+        except SpectrumAnalyzerError as error:
+            self.append_log(f"仪表动作失败: {instrument_name} - {action_key}，原因: {error}")
             return
 
         self.append_log(f"仪表动作成功: {instrument_name} - {action_key}")
@@ -1382,8 +1319,9 @@ class ScanControlPage(QWidget):
         - 存储格式支持自动识别 trace 标签数量与名称。
         """
 
+        del delay_time
         target_path = Path(file_name)
-        raw_text = self._acquire_zna67_raw_text(x=x, y=y, z=z, delay_time=delay_time)
+        raw_text = self._acquire_zna67_raw_text(x=x, y=y, z=z, delay_time=0)
         try:
             row_count, trace_names = save_zna_trace_csv(raw_text=raw_text, file_path=target_path)
         except (OSError, ValueError) as error:
@@ -1395,47 +1333,21 @@ class ScanControlPage(QWidget):
     def _acquire_zna67_raw_text(self, *, x: float, y: float, z: float, delay_time: int) -> str:
         """采集 ZNA67 原始文本，并统一转换为行式文本。"""
 
-        mmem_text = self._acquire_zna67_mmem_data(delay_time=delay_time)
-        if mmem_text is not None:
-            return convert_zna_mmem_csv_to_row_text(raw_text=mmem_text, x=x, y=y, z=z)
-
-        return (
-            "fre,1000000,2000000,3000000,4000000\n"
-            f"{x:g}_{y:g}_{z:g}_Trc1_S21_re 1.2 1.3 1.4 1.5\n"
-            f"{x:g}_{y:g}_{z:g}_Trc1_S21_im -0.2 -0.3 -0.4 -0.5\n"
-            f"{x:g}_{y:g}_{z:g}_Trc2_S31_re 2.2 2.3 2.4 2.5\n"
-            f"{x:g}_{y:g}_{z:g}_Trc2_S31_im -1.2 -1.3 -1.4 -1.5\n"
-        )
+        del delay_time
+        measurement = self._acquire_instrument_measurement("ZNA67")
+        mmem_text = measurement.metadata.get("mmem_csv_text")
+        if not isinstance(mmem_text, str) or not mmem_text.strip():
+            raise SpectrumAnalyzerError("ZNA67 未返回 MMEM CSV 文本。")
+        return convert_zna_mmem_csv_to_row_text(raw_text=mmem_text, x=x, y=y, z=z)
 
     def _acquire_zna67_mmem_data(self, *, delay_time: int) -> str | None:
         """通过 ZNA67 的 MMEM 命令获取分号 CSV 文本。"""
 
         del delay_time
-        path_text = self.ZNA67_TEMP_TRACE_PATH
-        store_command = f'MMEM:STOR:TRAC:CHAN 1, "{path_text}"'
-        read_command = f'MMEM:DATA? "{path_text}"'
-        delete_command = f'MMEM:DEL "{path_text}"'
-
-        visa_ok, visa_text = self._run_zna67_mmem_cycle_via_visa(
-            store_command=store_command,
-            read_command=read_command,
-            delete_command=delete_command,
-        )
-        if visa_ok and visa_text:
-            return visa_text
-
-        serial_ok, serial_text = self._run_zna67_mmem_cycle_via_serial(
-            store_command=store_command,
-            read_command=read_command,
-            delete_command=delete_command,
-        )
-        if serial_ok and serial_text:
-            return serial_text
-
-        if visa_text:
-            self.append_log(f"ZNA67 MMEM VISA失败: {visa_text}")
-        if serial_text:
-            self.append_log(f"ZNA67 MMEM 串口失败: {serial_text}")
+        measurement = self._acquire_instrument_measurement("ZNA67")
+        mmem_text = measurement.metadata.get("mmem_csv_text")
+        if isinstance(mmem_text, str) and mmem_text.strip():
+            return mmem_text
         return None
 
     def _run_zna67_mmem_cycle_via_visa(
@@ -1445,17 +1357,10 @@ class ScanControlPage(QWidget):
         read_command: str,
         delete_command: str,
     ) -> tuple[bool, str]:
-        """Run `MMEM:STOR -> MMEM:DATA? -> MMEM:DEL` via VISA."""
+        """兼容旧入口，实际 ZNA67 采集已迁移到统一适配器层。"""
 
-        saved, save_reason = self._write_via_visa(store_command, instrument_name="ZNA67")
-        if not saved:
-            return False, save_reason
-
-        data_text, read_reason = self._query_via_visa(read_command, instrument_name="ZNA67", timeout_ms=6000)
-        self._write_via_visa(delete_command, instrument_name="ZNA67")
-        if data_text is None:
-            return False, read_reason
-        return True, data_text
+        del store_command, read_command, delete_command
+        return False, "ZNA67 MMEM 采集已迁移到统一适配器层"
 
     def _run_zna67_mmem_cycle_via_serial(
         self,
@@ -1464,24 +1369,10 @@ class ScanControlPage(QWidget):
         read_command: str,
         delete_command: str,
     ) -> tuple[bool, str]:
-        """Run `MMEM:STOR -> MMEM:DATA? -> MMEM:DEL` via serial fallback."""
+        """兼容旧入口，真实设备访问已迁移到统一适配器层。"""
 
-        if not self.serial_is_open or not self._serial_port.isOpen():
-            return False, "串口未打开"
-
-        for command in (store_command, read_command):
-            sent, reason = self._send_serial_command(command)
-            if not sent:
-                return False, reason
-            if command == store_command:
-                continue
-            response_text = self._read_serial_response_text(timeout_ms=2500).strip()
-            self._send_serial_command(delete_command)
-            if not response_text:
-                return False, "未读取到 MMEM:DATA 返回文本"
-            return True, response_text
-
-        return False, "未知串口流程错误"
+        del store_command, read_command, delete_command
+        return False, "ZNA67 串口回退尚未迁入统一适配器层"
 
     def _write_via_visa(
         self,
@@ -1490,33 +1381,61 @@ class ScanControlPage(QWidget):
         instrument_name: str | None = None,
         timeout_ms: int = 1200,
     ) -> tuple[bool, str]:
-        """通过缓存 VISA 资源发送 SCPI 设置命令。"""
+        """兼容旧入口，实际 VISA 写操作已迁移到频谱适配器层。"""
 
-        if not _HAS_PYVISA:
-            return False, "未安装 pyvisa"
+        del command, instrument_name, timeout_ms
+        return False, "仪表 VISA 写操作已迁移到频谱适配器层"
 
+    def _get_instrument_adapter(self, instrument_name: str):
+        """Return a connected spectrum adapter for the given instrument tab."""
+
+        if instrument_name not in self.INSTRUMENT_ORDER:
+            raise SpectrumAnalyzerError(f"不支持的仪表类型: {instrument_name}")
         resources = self._load_cached_instrument_resources(instrument_name)
-        if not resources:
-            if instrument_name is None:
-                return False, "未找到缓存资源，请先点击“搜索仪表”"
-            return False, f"未找到 {instrument_name} 的缓存资源，请先点击“搜索仪表”"
+        return self.device_manager.ensure_spectrum_device(
+            instrument_type=instrument_name,
+            resource_names=resources,
+        )
 
-        resource_manager = pyvisa.ResourceManager()
-        try:
-            last_error = ""
-            for resource_name in resources:
-                try:
-                    instrument = resource_manager.open_resource(resource_name)
-                    instrument.timeout = timeout_ms
-                    instrument.write(command)
-                    instrument.close()
-                    return True, ""
-                except Exception as error:
-                    last_error = f"{resource_name}: {error}"
-                    continue
-            return False, last_error or "发送失败"
-        finally:
-            resource_manager.close()
+    def _build_instrument_measurement_config(self, panel: InstrumentPanel) -> SpectrumConfig:
+        """Build one best-effort spectrum config from the current panel values."""
+
+        displayed_values = panel.get_displayed_values()
+
+        def read_field(setting_key: str) -> str | None:
+            payload = displayed_values.get(setting_key, {})
+            raw_value = str(payload.get("value", "")).strip()
+            if not raw_value:
+                return None
+            raw_unit = payload.get("unit")
+            if isinstance(raw_unit, str) and raw_unit.strip():
+                return f"{raw_value}{raw_unit.strip()}"
+            return raw_value
+
+        return SpectrumConfig(
+            start_freq=read_field("start_freq"),
+            stop_freq=read_field("stop_freq"),
+            center_freq=read_field("center_freq"),
+            span=read_field("span"),
+            rbw=read_field("rbw"),
+            vbw=read_field("vbw"),
+            ref_level=read_field("ref_level"),
+            detector=read_field("detector"),
+            trace_mode=read_field("trace_mode"),
+            acquisition_mode="trace",
+        )
+
+    def _acquire_instrument_measurement(self, instrument_name: str):
+        """Acquire one normalized measurement through ``ScanManager``."""
+
+        panel = self._find_instrument_panel(instrument_name)
+        if panel is None:
+            raise SpectrumAnalyzerError(f"未找到 {instrument_name} 面板。")
+
+        analyzer = self._get_instrument_adapter(instrument_name)
+        self.scan_manager.set_spectrum_analyzer(analyzer)
+        self.scan_manager.set_spectrum_config(self._build_instrument_measurement_config(panel))
+        return self.scan_manager.acquire_spectrum_measurement()
 
     def _on_instrument_search_thread_finished(self) -> None:
         """重置搜索按钮状态。"""
@@ -1928,15 +1847,23 @@ class ScanControlPage(QWidget):
     ) -> tuple[bool, str]:
         """按扫描点保存仪表数据文件，并追加索引元数据。"""
 
+        del panel
         output_dir = self._get_current_output_dir()
         data_dir = output_dir / "instrument_scan_data"
         data_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            measurement = self._acquire_instrument_measurement(instrument_name)
+        except SpectrumAnalyzerError as error:
+            return False, str(error)
 
         if instrument_name == "ZNA67":
             data_file = data_dir / f"point_{point_index:06d}_zna67.csv"
             combined_csv_file = data_dir / "all_points.csv"
             try:
-                raw_text = self._acquire_zna67_raw_text(x=x, y=y, z=z, delay_time=100)
+                mmem_text = measurement.metadata.get("mmem_csv_text")
+                if not isinstance(mmem_text, str) or not mmem_text.strip():
+                    return False, "ZNA67 未返回 MMEM CSV 文本"
+                raw_text = convert_zna_mmem_csv_to_row_text(raw_text=mmem_text, x=x, y=y, z=z)
                 row_count, trace_names = save_zna_trace_csv(raw_text=raw_text, file_path=data_file)
                 append_zna_trace_csv(raw_text=raw_text, file_path=combined_csv_file)
             except (OSError, ValueError) as error:
@@ -1947,18 +1874,17 @@ class ScanControlPage(QWidget):
             )
         else:
             data_file = data_dir / f"point_{point_index:06d}_{instrument_name.lower()}_snapshot.json"
-            snapshot = {
-                "instrument_name": instrument_name,
-                "point_index": point_index,
-                "x": x,
-                "y": y,
-                "z": z,
-                "saved_at": datetime.now().isoformat(timespec="seconds"),
-                "values": {},
-            }
-            for query_key in panel.get_supported_query_keys():
-                value, unit = self._query_instrument_value(instrument_name, query_key)
-                snapshot["values"][query_key] = {"value": value, "unit": unit}
+            snapshot = measurement.to_serializable_dict()
+            snapshot.update(
+                {
+                    "instrument_name": instrument_name,
+                    "point_index": point_index,
+                    "x": x,
+                    "y": y,
+                    "z": z,
+                    "saved_at": datetime.now().isoformat(timespec="seconds"),
+                }
+            )
             try:
                 data_file.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
             except OSError as error:
@@ -1984,22 +1910,14 @@ class ScanControlPage(QWidget):
     def _set_instrument_continue(self, instrument_name: str, *, enabled: bool) -> tuple[bool, str]:
         """切换仪表连续扫描状态（INIT:CONT ON/OFF）。"""
 
-        command = self.CONTINUE_ON_COMMAND if enabled else self.CONTINUE_OFF_COMMAND
-        ok, reason = self._write_via_visa(command, instrument_name=instrument_name)
-        if ok:
+        try:
+            analyzer = self._get_instrument_adapter(instrument_name)
+            analyzer.set_continuous(enabled)
             status_text = "开启" if enabled else "关闭"
             self.append_log(f"{instrument_name} continue 已{status_text}")
             return True, ""
-
-        if instrument_name in self.SERIAL_FALLBACK_INSTRUMENTS and self.serial_is_open and self._serial_port.isOpen():
-            sent, serial_reason = self._send_serial_command(command)
-            if sent:
-                status_text = "开启" if enabled else "关闭"
-                self.append_log(f"{instrument_name} continue 已{status_text}（串口）")
-                return True, ""
-            return False, f"VISA失败({reason})，串口失败({serial_reason})"
-
-        return False, reason
+        except SpectrumAnalyzerError as error:
+            return False, str(error)
 
     def _save_scan_plan_snapshot(self) -> None:
         """保存当前扫描规划点，便于回溯与调试。"""

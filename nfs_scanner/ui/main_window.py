@@ -67,7 +67,11 @@ class MainWindow(QMainWindow):
         root_layout.setContentsMargins(12, 12, 12, 12)
         root_layout.setSpacing(12)
 
-        self.scan_control_page = ScanControlPage(central_widget)
+        self.scan_control_page = ScanControlPage(
+            central_widget,
+            scan_manager=self.scan_manager,
+            device_manager=self.device_manager,
+        )
         root_layout.addWidget(self.scan_control_page)
         self.setCentralWidget(central_widget)
 

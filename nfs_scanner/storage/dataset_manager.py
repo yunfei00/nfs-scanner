@@ -266,7 +266,10 @@ class DatasetManager:
     ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
         """Return frequency and amplitude arrays from one spectrum trace."""
 
-        frequency, amplitude = result.spectrum_trace
+        if result.spectrum_result is not None and result.spectrum_result.has_trace_data:
+            frequency, amplitude = result.spectrum_result.to_trace()
+        else:
+            frequency, amplitude = result.spectrum_trace
         frequency_array = np.asarray(frequency, dtype=np.float64)
         amplitude_array = np.asarray(amplitude, dtype=np.float64)
 
