@@ -166,6 +166,8 @@ class ScanControlPage(QWidget):
         "preset": "SYSTem:PRESet",
     }
     UNIT_SCALE = {"Hz": 1.0, "kHz": 1_000.0, "MHz": 1_000_000.0, "GHz": 1_000_000_000.0}
+    CONTINUE_OFF_COMMAND = "INIT:CONT OFF"
+    CONTINUE_ON_COMMAND = "INIT:CONT ON"
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -840,6 +842,7 @@ class ScanControlPage(QWidget):
 
         self._scan_point_index = 0
         self._executed_scan_points = []
+        self._prepare_scan_storage_workspace()
         self.update_system_status("扫描中")
         self._save_scan_plan_snapshot()
         self.append_log(
@@ -1634,6 +1637,143 @@ class ScanControlPage(QWidget):
         self.update_position_status(self.current_x, self.current_y, self.current_z)
         self._scan_point_index += 1
         self.append_log(f"扫描点 {self._scan_point_index}/{len(self._scan_points)}: {command}")
+
+        saved, message = self._capture_and_store_scan_point(
+            x=x,
+            y=y,
+            z=z,
+            point_index=self._scan_point_index,
+        )
+        if not saved:
+            self._scan_timer.stop()
+            self.update_system_status("停止")
+            self._save_scan_execution_snapshot(completed=False)
+            self.append_log(f"扫描中断：测量存储失败，原因: {message}")
+
+    def _prepare_scan_storage_workspace(self) -> None:
+        """准备扫描过程中的数据存储目录和索引文件。"""
+
+        output_dir = Path(self.result_path_edit.text().strip() or "output/latest_scan")
+        data_dir = output_dir / "instrument_scan_data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+
+        index_file = data_dir / "point_index.jsonl"
+        if index_file.exists():
+            index_file.unlink()
+        self.append_log(f"已初始化扫描数据目录: {data_dir}")
+
+    def _capture_and_store_scan_point(
+        self,
+        *,
+        x: float,
+        y: float,
+        z: float,
+        point_index: int,
+    ) -> tuple[bool, str]:
+        """采集并保存单个扫描点仪表数据。"""
+
+        panel = self.instrument_tabs.currentWidget()
+        if not isinstance(panel, InstrumentPanel):
+            return False, "当前未选中有效仪表页签"
+
+        instrument_name = panel.instrument_name
+        continue_disabled, disable_reason = self._set_instrument_continue(instrument_name, enabled=False)
+        if not continue_disabled:
+            return False, f"关闭 continue 失败: {disable_reason}"
+
+        try:
+            return self._save_scan_point_data(
+                instrument_name=instrument_name,
+                panel=panel,
+                x=x,
+                y=y,
+                z=z,
+                point_index=point_index,
+            )
+        finally:
+            continue_enabled, enable_reason = self._set_instrument_continue(instrument_name, enabled=True)
+            if not continue_enabled:
+                self.append_log(f"警告：存储完成后开启 continue 失败: {enable_reason}")
+
+    def _save_scan_point_data(
+        self,
+        *,
+        instrument_name: str,
+        panel: InstrumentPanel,
+        x: float,
+        y: float,
+        z: float,
+        point_index: int,
+    ) -> tuple[bool, str]:
+        """按扫描点保存仪表数据文件，并追加索引元数据。"""
+
+        output_dir = Path(self.result_path_edit.text().strip() or "output/latest_scan")
+        data_dir = output_dir / "instrument_scan_data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+
+        if instrument_name == "ZNA67":
+            data_file = data_dir / f"point_{point_index:06d}_zna67.csv"
+            try:
+                raw_text = self._acquire_zna67_raw_text(x=x, y=y, z=z, delay_time=100)
+                row_count, trace_names = save_zna_trace_csv(raw_text=raw_text, file_path=data_file)
+            except (OSError, ValueError) as error:
+                return False, str(error)
+            summary = f"{data_file.name}（{row_count} 行，trace: {'、'.join(sorted(trace_names))}）"
+        else:
+            data_file = data_dir / f"point_{point_index:06d}_{instrument_name.lower()}_snapshot.json"
+            snapshot = {
+                "instrument_name": instrument_name,
+                "point_index": point_index,
+                "x": x,
+                "y": y,
+                "z": z,
+                "saved_at": datetime.now().isoformat(timespec="seconds"),
+                "values": {},
+            }
+            for query_key in panel.get_supported_query_keys():
+                value, unit = self._query_instrument_value(instrument_name, query_key)
+                snapshot["values"][query_key] = {"value": value, "unit": unit}
+            try:
+                data_file.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
+            except OSError as error:
+                return False, str(error)
+            summary = data_file.name
+
+        index_file = data_dir / "point_index.jsonl"
+        metadata = {
+            "point_index": point_index,
+            "x": x,
+            "y": y,
+            "z": z,
+            "instrument_name": instrument_name,
+            "data_file": data_file.name,
+            "saved_at": datetime.now().isoformat(timespec="seconds"),
+        }
+        with index_file.open("a", encoding="utf-8") as file:
+            file.write(json.dumps(metadata, ensure_ascii=False) + "\n")
+
+        self.append_log(f"扫描点数据已保存: {summary}")
+        return True, str(data_file)
+
+    def _set_instrument_continue(self, instrument_name: str, *, enabled: bool) -> tuple[bool, str]:
+        """切换仪表连续扫描状态（INIT:CONT ON/OFF）。"""
+
+        command = self.CONTINUE_ON_COMMAND if enabled else self.CONTINUE_OFF_COMMAND
+        ok, reason = self._write_via_visa(command, instrument_name=instrument_name)
+        if ok:
+            status_text = "开启" if enabled else "关闭"
+            self.append_log(f"{instrument_name} continue 已{status_text}")
+            return True, ""
+
+        if instrument_name in self.SERIAL_FALLBACK_INSTRUMENTS and self.serial_is_open and self._serial_port.isOpen():
+            sent, serial_reason = self._send_serial_command(command)
+            if sent:
+                status_text = "开启" if enabled else "关闭"
+                self.append_log(f"{instrument_name} continue 已{status_text}（串口）")
+                return True, ""
+            return False, f"VISA失败({reason})，串口失败({serial_reason})"
+
+        return False, reason
 
     def _save_scan_plan_snapshot(self) -> None:
         """保存当前扫描规划点，便于回溯与调试。"""
