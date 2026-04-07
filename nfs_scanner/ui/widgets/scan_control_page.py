@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import csv
 import json
-from datetime import datetime
+import math
+import time
+from datetime import datetime, timedelta
 from importlib.util import find_spec
 from pathlib import Path
 
@@ -108,6 +110,7 @@ class ScanControlPage(QWidget):
     INSTRUMENT_ORDER = tuple(SUPPORTED_INSTRUMENTS)
     SERIAL_FALLBACK_INSTRUMENTS = frozenset({"ZNA67"})
     SCAN_AREA_CONFIG_PATH = Path("config") / "scan_area_config.json"
+    SCAN_DISPATCH_INTERVAL_MS = 120
     INSTRUMENT_PLACEHOLDER_VALUES = {
         "ZNA67": {
             "start_freq": ("80.000", "MHz"),
@@ -188,6 +191,12 @@ class ScanControlPage(QWidget):
         self._scan_points: list[tuple[float, float, float]] = []
         self._scan_point_index = 0
         self._executed_scan_points: list[tuple[float, float, float]] = []
+        self._scan_started_monotonic: float | None = None
+        self._scan_elapsed_seconds = 0.0
+        self._remaining_seconds_estimate: int | None = None
+        self._estimated_completion_time: datetime | None = None
+        self._scan_paused = False
+        self._is_updating_scan_table = False
         self._active_scan_output_dir: Path | None = None
         self._instrument_search_thread: QThread | None = None
         self._instrument_search_worker: InstrumentSearchWorker | None = None
@@ -511,7 +520,11 @@ class ScanControlPage(QWidget):
         self.scan_table.setHorizontalHeaderLabels(self.TABLE_COLUMNS)
         self.scan_table.verticalHeader().setVisible(False)
         self.scan_table.setAlternatingRowColors(True)
-        self.scan_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.scan_table.setEditTriggers(
+            QAbstractItemView.EditTrigger.DoubleClicked
+            | QAbstractItemView.EditTrigger.SelectedClicked
+            | QAbstractItemView.EditTrigger.EditKeyPressed
+        )
         self.scan_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
         self.scan_table.horizontalHeader().setStretchLastSection(True)
         self.scan_table.horizontalHeader().setDefaultSectionSize(100)
@@ -610,6 +623,7 @@ class ScanControlPage(QWidget):
             panel.query_requested.connect(self.on_instrument_query_requested)
             panel.set_requested.connect(self.on_instrument_set_requested)
             panel.action_requested.connect(self.on_instrument_action_requested)
+        self.scan_table.itemChanged.connect(self._on_scan_table_item_changed)
 
     def _refresh_layout(self) -> None:
         self.updateGeometry()
@@ -645,7 +659,11 @@ class ScanControlPage(QWidget):
             return
         text = f"{value:.2f}" if isinstance(value, float) else str(value)
         col = self.TABLE_COLUMNS.index(field)
-        self.scan_table.setItem(0, col, QTableWidgetItem(text))
+        self._is_updating_scan_table = True
+        try:
+            self.scan_table.setItem(0, col, QTableWidgetItem(text))
+        finally:
+            self._is_updating_scan_table = False
 
     def _move_axis(self, axis: str, delta: float) -> None:
         target_x = self.current_x
@@ -688,14 +706,17 @@ class ScanControlPage(QWidget):
 
     def _set_scan_button_states(self, state: str) -> None:
         if state == "扫描中":
+            self.start_button.setText("开始")
             self.start_button.setEnabled(False)
             self.pause_button.setEnabled(True)
             self.stop_button.setEnabled(True)
         elif state == "暂停":
+            self.start_button.setText("恢复")
             self.start_button.setEnabled(True)
             self.pause_button.setEnabled(False)
             self.stop_button.setEnabled(True)
         else:
+            self.start_button.setText("开始")
             self.start_button.setEnabled(True)
             self.pause_button.setEnabled(False)
             self.stop_button.setEnabled(False)
@@ -707,7 +728,28 @@ class ScanControlPage(QWidget):
         self._refresh_clock()
 
     def _refresh_clock(self) -> None:
-        self.time_status_label.setText(f"时间: {datetime.now().strftime('%H:%M:%S')}")
+        time_text = f"时间: {datetime.now().strftime('%H:%M:%S')}"
+        remaining_seconds = self._get_display_remaining_seconds()
+        if remaining_seconds is None:
+            remaining_text = "剩余: --"
+        else:
+            remaining_text = f"剩余: {remaining_seconds} 秒"
+        if self._estimated_completion_time is None:
+            eta_text = "预计完成: --"
+        else:
+            eta_text = f"预计完成: {self._estimated_completion_time.strftime('%H:%M:%S')}"
+        self.time_status_label.setText(f"{time_text} | {remaining_text} | {eta_text}")
+
+    def _get_display_remaining_seconds(self) -> int | None:
+        """返回界面当前应显示的剩余秒数。"""
+
+        if self._remaining_seconds_estimate is None:
+            return None
+        if self._scan_paused or self._scan_started_monotonic is None or self._estimated_completion_time is None:
+            return self._remaining_seconds_estimate
+
+        remaining_seconds = math.ceil((self._estimated_completion_time - datetime.now()).total_seconds())
+        return max(remaining_seconds, 0)
 
     def append_log(self, message: str) -> None:
         """Append a timestamped message to the log area."""
@@ -849,6 +891,10 @@ class ScanControlPage(QWidget):
         self.append_log("已将当前坐标设为扫描终点")
 
     def on_start_scan(self) -> None:
+        if self._scan_paused:
+            self._resume_scan()
+            return
+
         if not self.serial_is_open:
             self.append_log("开始扫描失败：串口未打开")
             return
@@ -865,6 +911,10 @@ class ScanControlPage(QWidget):
 
         self._scan_point_index = 0
         self._executed_scan_points = []
+        self._scan_started_monotonic = time.monotonic()
+        self._scan_elapsed_seconds = 0.0
+        self._scan_paused = False
+        self._update_remaining_time_estimate()
         self._prepare_scan_storage_workspace()
         self.update_system_status("扫描中")
         self._save_scan_plan_snapshot()
@@ -872,12 +922,20 @@ class ScanControlPage(QWidget):
             "扫描开始："
             f"共 {len(self._scan_points)} 点，顺序为 Z 外层（增大）、Y 中层（减小）、X 内层（增大）"
         )
-        self._scan_timer.start(120)
+        self._scan_timer.start(self.SCAN_DISPATCH_INTERVAL_MS)
         self._dispatch_next_scan_point()
 
     def on_pause_scan(self) -> None:
-        self.update_system_status("暂停")
+        if not self._scan_points or self._scan_point_index >= len(self._scan_points):
+            self.append_log("暂停扫描失败：当前没有进行中的任务")
+            return
+
+        self._freeze_remaining_time_estimate()
         self._scan_timer.stop()
+        self._accumulate_scan_elapsed_time()
+        self._scan_paused = True
+        self.update_system_status("暂停")
+        self._refresh_clock()
         sent, reason = self._send_serial_command("!")
         if sent:
             self.append_log("发送命令: !（暂停）")
@@ -887,14 +945,45 @@ class ScanControlPage(QWidget):
     def on_stop_scan(self) -> None:
         self.update_system_status("停止")
         self._scan_timer.stop()
+        self._accumulate_scan_elapsed_time()
         self._save_scan_execution_snapshot(completed=False)
         self._scan_points = []
         self._scan_point_index = 0
+        self._reset_scan_runtime_state()
+        self._clear_remaining_time_estimate()
         sent, reason = self._send_serial_command("\x18")
         if sent:
             self.append_log("发送命令: Ctrl+X（停止/复位）")
         else:
             self.append_log(f"发送命令失败: Ctrl+X，原因: {reason}")
+
+    def _resume_scan(self) -> None:
+        """恢复已暂停的扫描任务。"""
+
+        if not self.serial_is_open:
+            self.append_log("恢复扫描失败：串口未打开")
+            return
+        if not self._scan_points or self._scan_point_index >= len(self._scan_points):
+            self.append_log("恢复扫描失败：当前没有可恢复的任务")
+            self._scan_paused = False
+            self.update_system_status("就绪")
+            return
+
+        sent, reason = self._send_serial_command("~")
+        if not sent:
+            self.append_log(f"发送命令失败: ~，原因: {reason}")
+            return
+
+        self._scan_started_monotonic = time.monotonic()
+        self._scan_paused = False
+        if self._remaining_seconds_estimate is not None:
+            self._estimated_completion_time = datetime.now() + timedelta(seconds=self._remaining_seconds_estimate)
+        self.update_system_status("扫描中")
+        self._refresh_clock()
+        self.append_log("发送命令: ~（恢复）")
+        self.append_log(f"恢复扫描：剩余 {len(self._scan_points) - self._scan_point_index} 点")
+        self._scan_timer.start(self.SCAN_DISPATCH_INTERVAL_MS)
+        self._dispatch_next_scan_point()
 
     def on_clear_log(self) -> None:
         self.log_edit.clear()
@@ -1631,13 +1720,36 @@ class ScanControlPage(QWidget):
     def _apply_scan_area_values(self, values: dict[str, str]) -> None:
         """应用扫描区域配置到界面。"""
 
-        for col, field_name in enumerate(self.TABLE_COLUMNS):
-            if field_name in values:
-                self.scan_table.setItem(0, col, QTableWidgetItem(str(values[field_name])))
+        self._is_updating_scan_table = True
+        try:
+            for col, field_name in enumerate(self.TABLE_COLUMNS):
+                if field_name in values:
+                    self.scan_table.setItem(0, col, QTableWidgetItem(str(values[field_name])))
+        finally:
+            self._is_updating_scan_table = False
 
         self.step_x_edit.setText(values.get("step_x", self.step_x_edit.text()))
         self.step_y_edit.setText(values.get("step_y", self.step_y_edit.text()))
         self.step_z_edit.setText(values.get("step_z", self.step_z_edit.text()))
+
+    def _on_scan_table_item_changed(self, item: QTableWidgetItem) -> None:
+        """响应扫描区域表格编辑并同步步长输入框与配置。"""
+
+        if self._is_updating_scan_table:
+            return
+        if item.row() != 0:
+            return
+
+        field_name = self.TABLE_COLUMNS[item.column()]
+        value = item.text().strip()
+        if field_name == "step_x" and self.step_x_edit.text() != value:
+            self.step_x_edit.setText(value)
+        elif field_name == "step_y" and self.step_y_edit.text() != value:
+            self.step_y_edit.setText(value)
+        elif field_name == "step_z" and self.step_z_edit.text() != value:
+            self.step_z_edit.setText(value)
+
+        self._save_scan_area_config()
 
     def _send_serial_command(self, command: str) -> tuple[bool, str]:
         """通过串口发送一条命令，自动追加 CRLF。"""
@@ -1706,7 +1818,10 @@ class ScanControlPage(QWidget):
         if self._scan_point_index >= len(self._scan_points):
             self._scan_timer.stop()
             self.update_system_status("就绪")
+            self._accumulate_scan_elapsed_time()
             self._save_scan_execution_snapshot(completed=True)
+            self._reset_scan_runtime_state()
+            self._set_remaining_time_estimate(0)
             self.append_log("扫描结束：全部路径点已发送")
             return
 
@@ -1716,6 +1831,9 @@ class ScanControlPage(QWidget):
         if not sent:
             self._scan_timer.stop()
             self.update_system_status("停止")
+            self._accumulate_scan_elapsed_time()
+            self._reset_scan_runtime_state()
+            self._clear_remaining_time_estimate()
             self.append_log(f"扫描中断：发送失败，原因: {reason}")
             return
 
@@ -1725,6 +1843,7 @@ class ScanControlPage(QWidget):
         self._executed_scan_points.append((x, y, z))
         self.update_position_status(self.current_x, self.current_y, self.current_z)
         self._scan_point_index += 1
+        self._update_remaining_time_estimate()
         self.append_log(f"扫描点 {self._scan_point_index}/{len(self._scan_points)}: {command}")
 
         saved, message = self._capture_and_store_scan_point(
@@ -1736,8 +1855,89 @@ class ScanControlPage(QWidget):
         if not saved:
             self._scan_timer.stop()
             self.update_system_status("停止")
+            self._accumulate_scan_elapsed_time()
             self._save_scan_execution_snapshot(completed=False)
+            self._reset_scan_runtime_state()
+            self._clear_remaining_time_estimate()
             self.append_log(f"扫描中断：测量存储失败，原因: {message}")
+
+    def _update_remaining_time_estimate(self) -> None:
+        """按已执行点位平均耗时估算剩余秒数。"""
+
+        total_points = len(self._scan_points)
+        if self._scan_started_monotonic is None or total_points <= 0:
+            self._clear_remaining_time_estimate()
+            return
+
+        remaining_points = max(total_points - self._scan_point_index, 0)
+        if remaining_points == 0:
+            self._set_remaining_time_estimate(0)
+            return
+
+        avg_seconds_per_point = self._get_estimated_seconds_per_point()
+        remaining_seconds = math.ceil(avg_seconds_per_point * remaining_points)
+        self._set_remaining_time_estimate(remaining_seconds)
+
+    def _get_estimated_seconds_per_point(self) -> float:
+        """返回当前扫描任务估算的单点耗时。"""
+
+        minimum_seconds = self.SCAN_DISPATCH_INTERVAL_MS / 1000
+        if self._scan_point_index <= 0:
+            return minimum_seconds
+
+        elapsed_seconds = self._get_elapsed_scan_seconds()
+        if elapsed_seconds <= 0:
+            return minimum_seconds
+        return max(elapsed_seconds / self._scan_point_index, minimum_seconds)
+
+    def _set_remaining_time_estimate(self, remaining_seconds: int | None) -> None:
+        """更新剩余时间和预计完成时刻。"""
+
+        if remaining_seconds is None:
+            self._remaining_seconds_estimate = None
+            self._estimated_completion_time = None
+        else:
+            self._remaining_seconds_estimate = max(remaining_seconds, 0)
+            self._estimated_completion_time = datetime.now() + timedelta(
+                seconds=self._remaining_seconds_estimate
+            )
+        self._refresh_clock()
+
+    def _freeze_remaining_time_estimate(self) -> None:
+        """冻结当前 ETA，便于暂停后保持显示稳定。"""
+
+        self._remaining_seconds_estimate = self._get_display_remaining_seconds()
+        if self._remaining_seconds_estimate is None:
+            self._estimated_completion_time = None
+
+    def _clear_remaining_time_estimate(self) -> None:
+        """清空剩余时间估算显示。"""
+
+        self._set_remaining_time_estimate(None)
+
+    def _reset_scan_runtime_state(self) -> None:
+        """重置扫描运行态，不清空显示用 ETA。"""
+
+        self._scan_started_monotonic = None
+        self._scan_elapsed_seconds = 0.0
+        self._scan_paused = False
+
+    def _accumulate_scan_elapsed_time(self) -> None:
+        """累计当前扫描段的有效运行时间。"""
+
+        if self._scan_started_monotonic is None:
+            return
+
+        self._scan_elapsed_seconds = self._get_elapsed_scan_seconds()
+        self._scan_started_monotonic = None
+
+    def _get_elapsed_scan_seconds(self) -> float:
+        """返回当前扫描任务已累计的有效运行秒数。"""
+
+        elapsed_seconds = self._scan_elapsed_seconds
+        if self._scan_started_monotonic is not None:
+            elapsed_seconds += max(time.monotonic() - self._scan_started_monotonic, 0.0)
+        return max(elapsed_seconds, 0.0)
 
     def _prepare_scan_storage_workspace(self) -> None:
         """准备扫描过程中的数据存储目录和索引文件。"""
