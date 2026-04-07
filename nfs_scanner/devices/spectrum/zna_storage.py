@@ -1,9 +1,10 @@
 """ZNA67 trace storage helpers.
 
-当前阶段先提供可运行的 Demo 存储能力：
-1. 支持解析 `fre,...` + `x_y_z_trace_re/im ...` 行式文本
-2. 自动识别 trace 标签（支持 `trace1` / `Trc1_S21` 等）
-3. 统一落盘到 CSV，便于后续与真实仪表接口对接
+当前阶段提供两种输入格式：
+1. 行式文本：`fre,...` + `x_y_z_trace_re/im ...`
+2. ZNA `MMEM:DATA?` 导出的分号 CSV：`freq[Hz];re:Trc1_xxx;im:Trc1_xxx;...`
+
+最终统一落盘为行式 CSV，便于后续热力图和数据处理模块复用。
 """
 
 from __future__ import annotations
@@ -78,6 +79,45 @@ def parse_zna_trace_text(raw_text: str) -> tuple[list[float], list[ZnaTraceRow]]
     return frequencies, rows
 
 
+def convert_zna_mmem_csv_to_row_text(*, raw_text: str, x: float, y: float, z: float) -> str:
+    """Convert ZNA `MMEM:DATA?` semicolon CSV into row-style text.
+
+    输入示例：
+    `freq[Hz];re:Trc1_S21;im:Trc1_S21;re:Trc2_S31;im:Trc2_S31;`
+    """
+
+    lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+    if len(lines) < 2:
+        raise ValueError("MMEM 数据为空或不完整")
+
+    header = [item.strip() for item in lines[0].split(";") if item.strip()]
+    if len(header) < 2 or not header[0].lower().startswith("freq"):
+        raise ValueError("MMEM 首行格式错误，应以 freq[Hz] 开头")
+
+    trace_columns = [_parse_trace_header_item(item) for item in header[1:]]
+    if not trace_columns:
+        raise ValueError("MMEM 首行未包含 trace 列")
+
+    frequencies: list[float] = []
+    value_columns: list[list[float]] = [[] for _ in trace_columns]
+    for line in lines[1:]:
+        parts = [item.strip() for item in line.split(";") if item.strip()]
+        if len(parts) < 1 + len(trace_columns):
+            continue
+        frequencies.append(float(parts[0]))
+        for index, _ in enumerate(trace_columns):
+            value_columns[index].append(float(parts[index + 1]))
+
+    if not frequencies:
+        raise ValueError("MMEM 数据体中未解析到频点")
+
+    normalized_lines = ["fre," + ",".join(f"{value:g}" for value in frequencies)]
+    for column_name, values in zip(trace_columns, value_columns, strict=True):
+        value_text = " ".join(f"{value:g}" for value in values)
+        normalized_lines.append(f"{x:g}_{y:g}_{z:g}_{column_name} {value_text}")
+    return "\n".join(normalized_lines) + "\n"
+
+
 def save_zna_trace_csv(*, raw_text: str, file_path: Path) -> tuple[int, set[str]]:
     """Save parsed ZNA trace text into CSV and return row/trace statistics."""
 
@@ -114,3 +154,13 @@ def _split_label_and_values(line: str) -> tuple[str, str]:
         return parts[0], ""
     return parts[0], parts[1]
 
+
+def _parse_trace_header_item(item: str) -> str:
+    """Normalize one MMEM CSV trace header cell to `<trace_name>_<re|im>`."""
+
+    lowered = item.lower()
+    if lowered.startswith("re:"):
+        return f"{item[3:].strip()}_re"
+    if lowered.startswith("im:"):
+        return f"{item[3:].strip()}_im"
+    raise ValueError(f"不支持的 MMEM trace 列: {item}")
