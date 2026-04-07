@@ -13,7 +13,6 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
-    QTabWidget,
     QSplitter,
     QVBoxLayout,
     QWidget,
@@ -56,8 +55,9 @@ class MainWindow(QMainWindow):
         self.resize(1600, 900)
         self._resolved_output_dir = self._resolve_default_output_dir()
         self._setup_ui()
-        self._load_persistent_config()
-        self._connect_signals()
+        if hasattr(self, "controls_panel"):
+            self._load_persistent_config()
+            self._connect_signals()
 
     def _setup_ui(self) -> None:
         """Assemble the main application layout from UI components."""
@@ -67,17 +67,11 @@ class MainWindow(QMainWindow):
         root_layout.setContentsMargins(12, 12, 12, 12)
         root_layout.setSpacing(12)
 
-        tab_widget = QTabWidget(central_widget)
-        tab_widget.addTab(self._create_scan_workspace_page(tab_widget), "扫描主界面")
-        tab_widget.addTab(ScanControlPage(tab_widget), "扫描控制页面")
-        root_layout.addWidget(tab_widget)
+        self.scan_control_page = ScanControlPage(central_widget)
+        root_layout.addWidget(self.scan_control_page)
         self.setCentralWidget(central_widget)
-        self._load_demo_heatmap()
-        self._update_job_status_display(None)
 
         self.statusBar().showMessage("系统就绪")
-        self._append_log("[INFO] Application UI initialized")
-        self._append_log(f"[DATASET] default output dir: {self._resolved_output_dir}")
 
     def _create_scan_workspace_page(self, parent: QWidget) -> QWidget:
         """Create the original scan workspace as one tab page."""

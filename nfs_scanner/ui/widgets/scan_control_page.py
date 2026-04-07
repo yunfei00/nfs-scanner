@@ -106,6 +106,7 @@ class ScanControlPage(QWidget):
     ZNA67_TEMP_TRACE_PATH = r"C:\temp\data.csv"
     INSTRUMENT_ORDER = tuple(SUPPORTED_INSTRUMENTS)
     SERIAL_FALLBACK_INSTRUMENTS = frozenset({"ZNA67"})
+    SCAN_AREA_CONFIG_PATH = Path("config") / "scan_area_config.json"
     INSTRUMENT_PLACEHOLDER_VALUES = {
         "ZNA67": {
             "start_freq": ("80.000", "MHz"),
@@ -193,6 +194,7 @@ class ScanControlPage(QWidget):
         self.baudrate_combo: QComboBox
         self.open_serial_button: QPushButton
         self.close_serial_button: QPushButton
+        self.refresh_ports_button: QPushButton
 
         self.jog_step_buttons: dict[float, QPushButton] = {}
         self.abs_x_edit: QLineEdit
@@ -226,6 +228,7 @@ class ScanControlPage(QWidget):
 
         self._setup_ui()
         self._connect_signals()
+        self._load_scan_area_config()
         self._start_clock()
 
     def _setup_ui(self) -> None:
@@ -295,10 +298,13 @@ class ScanControlPage(QWidget):
 
         self.open_serial_button = QPushButton("打开串口", group)
         self.close_serial_button = QPushButton("关闭串口", group)
+        self.refresh_ports_button = QPushButton("刷新串口", group)
         self.open_serial_button.setFixedHeight(26)
         self.close_serial_button.setFixedHeight(26)
+        self.refresh_ports_button.setFixedHeight(26)
         self.open_serial_button.clicked.connect(self.on_open_serial)
         self.close_serial_button.clicked.connect(self.on_close_serial)
+        self.refresh_ports_button.clicked.connect(self.on_refresh_serial_ports)
 
         grid.addWidget(QLabel("端口号", group), 0, 0)
         grid.addWidget(self.port_combo, 0, 1)
@@ -306,6 +312,7 @@ class ScanControlPage(QWidget):
         grid.addWidget(self.baudrate_combo, 1, 1)
         grid.addWidget(self.open_serial_button, 2, 0)
         grid.addWidget(self.close_serial_button, 2, 1)
+        grid.addWidget(self.refresh_ports_button, 3, 0, 1, 2)
 
         self._sync_serial_buttons()
         return group
@@ -674,6 +681,7 @@ class ScanControlPage(QWidget):
         self._update_table_cell("step_x", self.step_x_edit.text() or "0.00")
         self._update_table_cell("step_y", self.step_y_edit.text() or "0.00")
         self._update_table_cell("step_z", self.step_z_edit.text() or "0.00")
+        self._save_scan_area_config()
 
     def _set_scan_button_states(self, state: str) -> None:
         if state == "扫描中":
@@ -738,6 +746,16 @@ class ScanControlPage(QWidget):
         self.serial_is_open = True
         self._sync_serial_buttons()
         self.append_log(f"串口已打开: {self.port_combo.currentText()} @ {self.baudrate_combo.currentText()}")
+
+    def on_refresh_serial_ports(self) -> None:
+        """刷新可用串口并保留用户当前选择。"""
+
+        selected_port = self.port_combo.currentData()
+        found_count = self._refresh_available_ports(selected_port=selected_port)
+        if found_count == 0:
+            self.append_log("串口列表已刷新：未发现匹配设备")
+            return
+        self.append_log(f"串口列表已刷新：共发现 {found_count} 个匹配设备")
 
     def on_close_serial(self) -> None:
         if self._serial_port.isOpen():
@@ -817,12 +835,14 @@ class ScanControlPage(QWidget):
         self._update_table_cell("start_x", self.current_x)
         self._update_table_cell("start_y", self.current_y)
         self._update_table_cell("start_z", self.current_z)
+        self._save_scan_area_config()
         self.append_log("已将当前坐标设为扫描起点")
 
     def on_set_end_point(self) -> None:
         self._update_table_cell("end_x", self.current_x)
         self._update_table_cell("end_y", self.current_y)
         self._update_table_cell("end_z", self.current_z)
+        self._save_scan_area_config()
         self.append_log("已将当前坐标设为扫描终点")
 
     def on_start_scan(self) -> None:
@@ -1537,10 +1557,12 @@ class ScanControlPage(QWidget):
         QMessageBox.information(self, "占位提示", "热力图显示功能将在后续版本接入。")
         self.append_log("显示热力图操作触发（占位）")
 
-    def _refresh_available_ports(self) -> None:
+    def _refresh_available_ports(self, selected_port: str | None = None) -> int:
         """刷新可用串口列表，仅显示目标关键词设备。"""
 
+        previous_port = selected_port or self.port_combo.currentData()
         self.port_combo.clear()
+        matched_ports: list[tuple[str, str]] = []
         for info in QSerialPortInfo.availablePorts():
             description = info.description() or "未知设备"
             manufacturer = info.manufacturer() or ""
@@ -1548,7 +1570,68 @@ class ScanControlPage(QWidget):
             identity_text = f"{port_name} {description} {manufacturer}".lower()
             if not any(keyword.lower() in identity_text for keyword in self.PORT_KEYWORDS):
                 continue
-            self.port_combo.addItem(f"{info.portName()} - {description}", info.portName())
+            matched_ports.append((info.portName(), f"{info.portName()} - {description}"))
+
+        for port_name, display_name in sorted(matched_ports, key=lambda item: item[0]):
+            self.port_combo.addItem(display_name, port_name)
+
+        if previous_port:
+            index = self.port_combo.findData(previous_port)
+            if index >= 0:
+                self.port_combo.setCurrentIndex(index)
+        return len(matched_ports)
+
+    def _load_scan_area_config(self) -> None:
+        """加载上次保存的扫描区域配置。"""
+
+        payload: dict[str, str] = {}
+        try:
+            if self.SCAN_AREA_CONFIG_PATH.exists():
+                raw_data = json.loads(self.SCAN_AREA_CONFIG_PATH.read_text(encoding="utf-8"))
+                if isinstance(raw_data, dict):
+                    payload = {key: str(value) for key, value in raw_data.items() if key in self.TABLE_COLUMNS}
+        except (OSError, json.JSONDecodeError):
+            payload = {}
+
+        if not payload:
+            self.append_log("扫描区域使用默认配置")
+            return
+
+        self._apply_scan_area_values(payload)
+        self.append_log("已加载上次扫描区域配置")
+
+    def _save_scan_area_config(self) -> None:
+        """保存当前扫描区域配置，供下次启动时加载。"""
+
+        payload = self._collect_scan_area_values()
+        try:
+            self.SCAN_AREA_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+            self.SCAN_AREA_CONFIG_PATH.write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except OSError:
+            return
+
+    def _collect_scan_area_values(self) -> dict[str, str]:
+        """采集扫描区域配置值。"""
+
+        values: dict[str, str] = {}
+        for col, field_name in enumerate(self.TABLE_COLUMNS):
+            item = self.scan_table.item(0, col)
+            values[field_name] = item.text().strip() if item is not None else "0.00"
+        return values
+
+    def _apply_scan_area_values(self, values: dict[str, str]) -> None:
+        """应用扫描区域配置到界面。"""
+
+        for col, field_name in enumerate(self.TABLE_COLUMNS):
+            if field_name in values:
+                self.scan_table.setItem(0, col, QTableWidgetItem(str(values[field_name])))
+
+        self.step_x_edit.setText(values.get("step_x", self.step_x_edit.text()))
+        self.step_y_edit.setText(values.get("step_y", self.step_y_edit.text()))
+        self.step_z_edit.setText(values.get("step_z", self.step_z_edit.text()))
 
     def _send_serial_command(self, command: str) -> tuple[bool, str]:
         """通过串口发送一条命令，自动追加 CRLF。"""
