@@ -230,6 +230,14 @@ class MainWindow(QMainWindow):
             return
 
         self.dataset_manager.create_dataset(scan_config)
+        output_dir = self._default_output_dir()
+        try:
+            self.dataset_manager.prepare_realtime_storage(output_dir)
+        except (OSError, RuntimeError, ValueError) as error:
+            self.statusBar().showMessage("扫描未开始，实时存储初始化失败")
+            self._append_log(f"[WARN] Realtime dataset init failed: {error}")
+            return
+
         self.heatmap_view.set_status_text("热力图视图（扫描中）")
         self.statusBar().showMessage("扫描执行中")
         self._append_log(f"[UI] scan mode selected: {scan_config.scan_mode}")
@@ -248,7 +256,6 @@ class MainWindow(QMainWindow):
             self._update_job_status_display(self.scan_manager.current_job)
             return
 
-        output_dir = self._default_output_dir()
         try:
             self.dataset_manager.save_dataset(output_dir)
         except (OSError, RuntimeError, ValueError) as error:
