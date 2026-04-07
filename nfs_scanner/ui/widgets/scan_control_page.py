@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 from datetime import datetime
 from importlib.util import find_spec
@@ -182,6 +183,7 @@ class ScanControlPage(QWidget):
         self._scan_timer.timeout.connect(self._dispatch_next_scan_point)
         self._scan_points: list[tuple[float, float, float]] = []
         self._scan_point_index = 0
+        self._executed_scan_points: list[tuple[float, float, float]] = []
         self._instrument_search_thread: QThread | None = None
         self._instrument_search_worker: InstrumentSearchWorker | None = None
 
@@ -837,7 +839,9 @@ class ScanControlPage(QWidget):
             return
 
         self._scan_point_index = 0
+        self._executed_scan_points = []
         self.update_system_status("扫描中")
+        self._save_scan_plan_snapshot()
         self.append_log(
             "扫描开始："
             f"共 {len(self._scan_points)} 点，顺序为 Z 外层（增大）、Y 中层（减小）、X 内层（增大）"
@@ -857,6 +861,7 @@ class ScanControlPage(QWidget):
     def on_stop_scan(self) -> None:
         self.update_system_status("停止")
         self._scan_timer.stop()
+        self._save_scan_execution_snapshot(completed=False)
         self._scan_points = []
         self._scan_point_index = 0
         sent, reason = self._send_serial_command("\x18")
@@ -1609,6 +1614,7 @@ class ScanControlPage(QWidget):
         if self._scan_point_index >= len(self._scan_points):
             self._scan_timer.stop()
             self.update_system_status("就绪")
+            self._save_scan_execution_snapshot(completed=True)
             self.append_log("扫描结束：全部路径点已发送")
             return
 
@@ -1624,9 +1630,48 @@ class ScanControlPage(QWidget):
         self.current_x = x
         self.current_y = y
         self.current_z = z
+        self._executed_scan_points.append((x, y, z))
         self.update_position_status(self.current_x, self.current_y, self.current_z)
         self._scan_point_index += 1
         self.append_log(f"扫描点 {self._scan_point_index}/{len(self._scan_points)}: {command}")
+
+    def _save_scan_plan_snapshot(self) -> None:
+        """保存当前扫描规划点，便于回溯与调试。"""
+
+        output_dir = Path(self.result_path_edit.text().strip() or "output/latest_scan")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        plan_file = output_dir / "scan_plan_points.csv"
+
+        with plan_file.open("w", encoding="utf-8", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow(["index", "x", "y", "z"])
+            for index, (x, y, z) in enumerate(self._scan_points, start=1):
+                writer.writerow([index, x, y, z])
+
+        self.append_log(f"已保存扫描规划: {plan_file}")
+
+    def _save_scan_execution_snapshot(self, *, completed: bool) -> None:
+        """保存已执行的扫描点和进度摘要。"""
+
+        output_dir = Path(self.result_path_edit.text().strip() or "output/latest_scan")
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        points_file = output_dir / "scan_executed_points.csv"
+        with points_file.open("w", encoding="utf-8", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow(["index", "x", "y", "z"])
+            for index, (x, y, z) in enumerate(self._executed_scan_points, start=1):
+                writer.writerow([index, x, y, z])
+
+        status_file = output_dir / "scan_execution_status.json"
+        payload = {
+            "completed": completed,
+            "planned_points": len(self._scan_points),
+            "executed_points": len(self._executed_scan_points),
+            "updated_at": datetime.now().isoformat(timespec="seconds"),
+        }
+        status_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        self.append_log(f"已保存扫描执行状态: {status_file}")
 
     def _build_scan_points(self) -> list[tuple[float, float, float]]:
         """根据起点、终点和步长生成扫描路径。"""
