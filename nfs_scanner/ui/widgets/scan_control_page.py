@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+import time
 from datetime import datetime
 from importlib.util import find_spec
 from pathlib import Path
@@ -188,6 +189,9 @@ class ScanControlPage(QWidget):
         self._scan_points: list[tuple[float, float, float]] = []
         self._scan_point_index = 0
         self._executed_scan_points: list[tuple[float, float, float]] = []
+        self._scan_started_monotonic: float | None = None
+        self._remaining_seconds_estimate: int | None = None
+        self._is_updating_scan_table = False
         self._active_scan_output_dir: Path | None = None
         self._instrument_search_thread: QThread | None = None
         self._instrument_search_worker: InstrumentSearchWorker | None = None
@@ -511,7 +515,11 @@ class ScanControlPage(QWidget):
         self.scan_table.setHorizontalHeaderLabels(self.TABLE_COLUMNS)
         self.scan_table.verticalHeader().setVisible(False)
         self.scan_table.setAlternatingRowColors(True)
-        self.scan_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.scan_table.setEditTriggers(
+            QAbstractItemView.EditTrigger.DoubleClicked
+            | QAbstractItemView.EditTrigger.SelectedClicked
+            | QAbstractItemView.EditTrigger.EditKeyPressed
+        )
         self.scan_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
         self.scan_table.horizontalHeader().setStretchLastSection(True)
         self.scan_table.horizontalHeader().setDefaultSectionSize(100)
@@ -610,6 +618,7 @@ class ScanControlPage(QWidget):
             panel.query_requested.connect(self.on_instrument_query_requested)
             panel.set_requested.connect(self.on_instrument_set_requested)
             panel.action_requested.connect(self.on_instrument_action_requested)
+        self.scan_table.itemChanged.connect(self._on_scan_table_item_changed)
 
     def _refresh_layout(self) -> None:
         self.updateGeometry()
@@ -645,7 +654,11 @@ class ScanControlPage(QWidget):
             return
         text = f"{value:.2f}" if isinstance(value, float) else str(value)
         col = self.TABLE_COLUMNS.index(field)
-        self.scan_table.setItem(0, col, QTableWidgetItem(text))
+        self._is_updating_scan_table = True
+        try:
+            self.scan_table.setItem(0, col, QTableWidgetItem(text))
+        finally:
+            self._is_updating_scan_table = False
 
     def _move_axis(self, axis: str, delta: float) -> None:
         target_x = self.current_x
@@ -707,7 +720,12 @@ class ScanControlPage(QWidget):
         self._refresh_clock()
 
     def _refresh_clock(self) -> None:
-        self.time_status_label.setText(f"时间: {datetime.now().strftime('%H:%M:%S')}")
+        time_text = f"时间: {datetime.now().strftime('%H:%M:%S')}"
+        if self._remaining_seconds_estimate is None:
+            remaining_text = "剩余: --"
+        else:
+            remaining_text = f"剩余: {self._remaining_seconds_estimate} 秒"
+        self.time_status_label.setText(f"{time_text} | {remaining_text}")
 
     def append_log(self, message: str) -> None:
         """Append a timestamped message to the log area."""
@@ -865,6 +883,8 @@ class ScanControlPage(QWidget):
 
         self._scan_point_index = 0
         self._executed_scan_points = []
+        self._scan_started_monotonic = time.monotonic()
+        self._remaining_seconds_estimate = None
         self._prepare_scan_storage_workspace()
         self.update_system_status("扫描中")
         self._save_scan_plan_snapshot()
@@ -890,6 +910,9 @@ class ScanControlPage(QWidget):
         self._save_scan_execution_snapshot(completed=False)
         self._scan_points = []
         self._scan_point_index = 0
+        self._scan_started_monotonic = None
+        self._remaining_seconds_estimate = None
+        self._refresh_clock()
         sent, reason = self._send_serial_command("\x18")
         if sent:
             self.append_log("发送命令: Ctrl+X（停止/复位）")
@@ -1631,13 +1654,36 @@ class ScanControlPage(QWidget):
     def _apply_scan_area_values(self, values: dict[str, str]) -> None:
         """应用扫描区域配置到界面。"""
 
-        for col, field_name in enumerate(self.TABLE_COLUMNS):
-            if field_name in values:
-                self.scan_table.setItem(0, col, QTableWidgetItem(str(values[field_name])))
+        self._is_updating_scan_table = True
+        try:
+            for col, field_name in enumerate(self.TABLE_COLUMNS):
+                if field_name in values:
+                    self.scan_table.setItem(0, col, QTableWidgetItem(str(values[field_name])))
+        finally:
+            self._is_updating_scan_table = False
 
         self.step_x_edit.setText(values.get("step_x", self.step_x_edit.text()))
         self.step_y_edit.setText(values.get("step_y", self.step_y_edit.text()))
         self.step_z_edit.setText(values.get("step_z", self.step_z_edit.text()))
+
+    def _on_scan_table_item_changed(self, item: QTableWidgetItem) -> None:
+        """响应扫描区域表格编辑并同步步长输入框与配置。"""
+
+        if self._is_updating_scan_table:
+            return
+        if item.row() != 0:
+            return
+
+        field_name = self.TABLE_COLUMNS[item.column()]
+        value = item.text().strip()
+        if field_name == "step_x" and self.step_x_edit.text() != value:
+            self.step_x_edit.setText(value)
+        elif field_name == "step_y" and self.step_y_edit.text() != value:
+            self.step_y_edit.setText(value)
+        elif field_name == "step_z" and self.step_z_edit.text() != value:
+            self.step_z_edit.setText(value)
+
+        self._save_scan_area_config()
 
     def _send_serial_command(self, command: str) -> tuple[bool, str]:
         """通过串口发送一条命令，自动追加 CRLF。"""
@@ -1707,6 +1753,9 @@ class ScanControlPage(QWidget):
             self._scan_timer.stop()
             self.update_system_status("就绪")
             self._save_scan_execution_snapshot(completed=True)
+            self._scan_started_monotonic = None
+            self._remaining_seconds_estimate = 0
+            self._refresh_clock()
             self.append_log("扫描结束：全部路径点已发送")
             return
 
@@ -1725,6 +1774,7 @@ class ScanControlPage(QWidget):
         self._executed_scan_points.append((x, y, z))
         self.update_position_status(self.current_x, self.current_y, self.current_z)
         self._scan_point_index += 1
+        self._update_remaining_time_estimate()
         self.append_log(f"扫描点 {self._scan_point_index}/{len(self._scan_points)}: {command}")
 
         saved, message = self._capture_and_store_scan_point(
@@ -1737,7 +1787,28 @@ class ScanControlPage(QWidget):
             self._scan_timer.stop()
             self.update_system_status("停止")
             self._save_scan_execution_snapshot(completed=False)
+            self._scan_started_monotonic = None
             self.append_log(f"扫描中断：测量存储失败，原因: {message}")
+
+    def _update_remaining_time_estimate(self) -> None:
+        """按已执行点位平均耗时估算剩余秒数。"""
+
+        if self._scan_started_monotonic is None or self._scan_point_index <= 0:
+            self._remaining_seconds_estimate = None
+            self._refresh_clock()
+            return
+
+        total_points = len(self._scan_points)
+        remaining_points = max(total_points - self._scan_point_index, 0)
+        if remaining_points == 0:
+            self._remaining_seconds_estimate = 0
+            self._refresh_clock()
+            return
+
+        elapsed_seconds = max(time.monotonic() - self._scan_started_monotonic, 0.0)
+        avg_seconds_per_point = elapsed_seconds / self._scan_point_index
+        self._remaining_seconds_estimate = int(round(avg_seconds_per_point * remaining_points))
+        self._refresh_clock()
 
     def _prepare_scan_storage_workspace(self) -> None:
         """准备扫描过程中的数据存储目录和索引文件。"""
