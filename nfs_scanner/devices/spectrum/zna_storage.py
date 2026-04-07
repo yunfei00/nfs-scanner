@@ -42,7 +42,7 @@ class ZnaTraceRow:
 def parse_zna_trace_text(raw_text: str) -> tuple[list[float], list[ZnaTraceRow]]:
     """Parse ZNA row-style text into frequency axis and trace rows."""
 
-    lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+    lines = _normalize_non_comment_lines(raw_text)
     if not lines:
         raise ValueError("输入数据为空")
 
@@ -86,7 +86,7 @@ def convert_zna_mmem_csv_to_row_text(*, raw_text: str, x: float, y: float, z: fl
     `freq[Hz];re:Trc1_S21;im:Trc1_S21;re:Trc2_S31;im:Trc2_S31;`
     """
 
-    lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+    lines = _normalize_non_comment_lines(raw_text)
     if len(lines) < 2:
         raise ValueError("MMEM 数据为空或不完整")
 
@@ -164,3 +164,15 @@ def _parse_trace_header_item(item: str) -> str:
     if lowered.startswith("im:"):
         return f"{item[3:].strip()}_im"
     raise ValueError(f"不支持的 MMEM trace 列: {item}")
+
+
+def _normalize_non_comment_lines(raw_text: str) -> list[str]:
+    """Return non-empty lines excluding `#`-prefixed comment lines."""
+
+    normalized_lines: list[str] = []
+    for raw_line in raw_text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        normalized_lines.append(line)
+    return normalized_lines
