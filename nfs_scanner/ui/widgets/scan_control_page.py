@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (
 from nfs_scanner.devices.spectrum import (
     InstrumentDiscoveryResult,
     SUPPORTED_INSTRUMENTS,
+    convert_zna_mmem_csv_to_row_text,
     discover_supported_instruments_via_visa,
     probe_resources,
     save_zna_trace_csv,
@@ -101,6 +102,7 @@ class ScanControlPage(QWidget):
     INSTRUMENT_CACHE_PATH = Path("config") / "instrument_devices.json"
     SNAPSHOT_OUTPUT_DIR = Path("output") / "instrument_snapshots"
     ZNA67_DEMO_FILE_PATH = Path(r"D:/zna67_demo.csv")
+    ZNA67_TEMP_TRACE_PATH = r"C:\temp\data.csv"
     INSTRUMENT_ORDER = tuple(SUPPORTED_INSTRUMENTS)
     SERIAL_FALLBACK_INSTRUMENTS = frozenset({"ZNA67"})
     INSTRUMENT_PLACEHOLDER_VALUES = {
@@ -1264,9 +1266,12 @@ class ScanControlPage(QWidget):
         return True, f"{target_path}（共 {row_count} 行，trace: {trace_summary}）"
 
     def _acquire_zna67_raw_text(self, *, x: float, y: float, z: float, delay_time: int) -> str:
-        """采集 ZNA67 原始文本（当前返回 Demo 数据）。"""
+        """采集 ZNA67 原始文本，并统一转换为行式文本。"""
 
-        del delay_time
+        mmem_text = self._acquire_zna67_mmem_data(delay_time=delay_time)
+        if mmem_text is not None:
+            return convert_zna_mmem_csv_to_row_text(raw_text=mmem_text, x=x, y=y, z=z)
+
         return (
             "fre,1000000,2000000,3000000,4000000\n"
             f"{x:g}_{y:g}_{z:g}_Trc1_S21_re 1.2 1.3 1.4 1.5\n"
@@ -1274,6 +1279,82 @@ class ScanControlPage(QWidget):
             f"{x:g}_{y:g}_{z:g}_Trc2_S31_re 2.2 2.3 2.4 2.5\n"
             f"{x:g}_{y:g}_{z:g}_Trc2_S31_im -1.2 -1.3 -1.4 -1.5\n"
         )
+
+    def _acquire_zna67_mmem_data(self, *, delay_time: int) -> str | None:
+        """通过 ZNA67 的 MMEM 命令获取分号 CSV 文本。"""
+
+        del delay_time
+        path_text = self.ZNA67_TEMP_TRACE_PATH
+        store_command = f'MMEM:STOR:TRAC:CHAN 1, "{path_text}"'
+        read_command = f'MMEM:DATA? "{path_text}"'
+        delete_command = f'MMEM:DEL "{path_text}"'
+
+        visa_ok, visa_text = self._run_zna67_mmem_cycle_via_visa(
+            store_command=store_command,
+            read_command=read_command,
+            delete_command=delete_command,
+        )
+        if visa_ok and visa_text:
+            return visa_text
+
+        serial_ok, serial_text = self._run_zna67_mmem_cycle_via_serial(
+            store_command=store_command,
+            read_command=read_command,
+            delete_command=delete_command,
+        )
+        if serial_ok and serial_text:
+            return serial_text
+
+        if visa_text:
+            self.append_log(f"ZNA67 MMEM VISA失败: {visa_text}")
+        if serial_text:
+            self.append_log(f"ZNA67 MMEM 串口失败: {serial_text}")
+        return None
+
+    def _run_zna67_mmem_cycle_via_visa(
+        self,
+        *,
+        store_command: str,
+        read_command: str,
+        delete_command: str,
+    ) -> tuple[bool, str]:
+        """Run `MMEM:STOR -> MMEM:DATA? -> MMEM:DEL` via VISA."""
+
+        saved, save_reason = self._write_via_visa(store_command, instrument_name="ZNA67")
+        if not saved:
+            return False, save_reason
+
+        data_text, read_reason = self._query_via_visa(read_command, instrument_name="ZNA67", timeout_ms=6000)
+        self._write_via_visa(delete_command, instrument_name="ZNA67")
+        if data_text is None:
+            return False, read_reason
+        return True, data_text
+
+    def _run_zna67_mmem_cycle_via_serial(
+        self,
+        *,
+        store_command: str,
+        read_command: str,
+        delete_command: str,
+    ) -> tuple[bool, str]:
+        """Run `MMEM:STOR -> MMEM:DATA? -> MMEM:DEL` via serial fallback."""
+
+        if not self.serial_is_open or not self._serial_port.isOpen():
+            return False, "串口未打开"
+
+        for command in (store_command, read_command):
+            sent, reason = self._send_serial_command(command)
+            if not sent:
+                return False, reason
+            if command == store_command:
+                continue
+            response_text = self._read_serial_response_text(timeout_ms=2500).strip()
+            self._send_serial_command(delete_command)
+            if not response_text:
+                return False, "未读取到 MMEM:DATA 返回文本"
+            return True, response_text
+
+        return False, "未知串口流程错误"
 
     def _write_via_visa(
         self,
