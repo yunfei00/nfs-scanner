@@ -36,6 +36,7 @@ from PySide6.QtWidgets import (
 from nfs_scanner.devices.spectrum import (
     InstrumentDiscoveryResult,
     SUPPORTED_INSTRUMENTS,
+    append_zna_trace_csv,
     convert_zna_mmem_csv_to_row_text,
     discover_supported_instruments_via_visa,
     probe_resources,
@@ -250,7 +251,7 @@ class ScanControlPage(QWidget):
 
         self._populate_scan_table_defaults()
         self._append_sample_logs()
-        self._update_step_values_to_table()
+        self._update_step_values_to_table(save_config=False)
         self.update_position_status(self.current_x, self.current_y, self.current_z)
         self.update_system_status("就绪")
 
@@ -677,11 +678,12 @@ class ScanControlPage(QWidget):
         self.open_serial_button.setEnabled(not self.serial_is_open)
         self.close_serial_button.setEnabled(self.serial_is_open)
 
-    def _update_step_values_to_table(self) -> None:
+    def _update_step_values_to_table(self, *, save_config: bool = True) -> None:
         self._update_table_cell("step_x", self.step_x_edit.text() or "0.00")
         self._update_table_cell("step_y", self.step_y_edit.text() or "0.00")
         self._update_table_cell("step_z", self.step_z_edit.text() or "0.00")
-        self._save_scan_area_config()
+        if save_config:
+            self._save_scan_area_config()
 
     def _set_scan_button_states(self, state: str) -> None:
         if state == "扫描中":
@@ -1743,6 +1745,9 @@ class ScanControlPage(QWidget):
         index_file = data_dir / "point_index.jsonl"
         if index_file.exists():
             index_file.unlink()
+        combined_csv_file = data_dir / "all_points.csv"
+        if combined_csv_file.exists():
+            combined_csv_file.unlink()
         self.append_log(f"已初始化扫描数据目录: {data_dir}")
 
     def _capture_and_store_scan_point(
@@ -1796,12 +1801,17 @@ class ScanControlPage(QWidget):
 
         if instrument_name == "ZNA67":
             data_file = data_dir / f"point_{point_index:06d}_zna67.csv"
+            combined_csv_file = data_dir / "all_points.csv"
             try:
                 raw_text = self._acquire_zna67_raw_text(x=x, y=y, z=z, delay_time=100)
                 row_count, trace_names = save_zna_trace_csv(raw_text=raw_text, file_path=data_file)
+                append_zna_trace_csv(raw_text=raw_text, file_path=combined_csv_file)
             except (OSError, ValueError) as error:
                 return False, str(error)
-            summary = f"{data_file.name}（{row_count} 行，trace: {'、'.join(sorted(trace_names))}）"
+            summary = (
+                f"{data_file.name}（{row_count} 行，trace: {'、'.join(sorted(trace_names))}，"
+                f"汇总: {combined_csv_file.name}）"
+            )
         else:
             data_file = data_dir / f"point_{point_index:06d}_{instrument_name.lower()}_snapshot.json"
             snapshot = {

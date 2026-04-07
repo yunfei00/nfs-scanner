@@ -136,6 +136,25 @@ def save_zna_trace_csv(*, raw_text: str, file_path: Path) -> tuple[int, set[str]
     return len(rows), trace_names
 
 
+def append_zna_trace_csv(*, raw_text: str, file_path: Path) -> tuple[int, set[str]]:
+    """Append parsed ZNA trace rows into one combined CSV file."""
+
+    frequencies, rows = parse_zna_trace_text(raw_text)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not file_path.exists():
+        header = "fre," + ",".join(f"{value:g}" for value in frequencies)
+        with file_path.open("w", encoding="utf-8", newline="") as csv_file:
+            csv_file.write(f"{header}\n")
+    with file_path.open("a", encoding="utf-8", newline="") as csv_file:
+        for row in rows:
+            value_text = ",".join(f"{value:g}" for value in row.values)
+            csv_file.write(f"{row.label},{value_text}\n")
+
+    trace_names = {row.trace_name for row in rows}
+    return len(rows), trace_names
+
+
 def _parse_frequency_line(line: str) -> list[float]:
     """Parse `fre, ...` line to frequency points (Hz)."""
 
