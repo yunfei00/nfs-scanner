@@ -50,9 +50,11 @@ class MainWindow(QMainWindow):
         self.job_status_label: QLabel
         self.job_progress_label: QLabel
         self.log_panel: LogPanel
+        self._resolved_output_dir: Path
         self._last_job_display_snapshot: tuple[str, str, str] | None = None
         self.setWindowTitle("近场扫描系统")
         self.resize(1600, 900)
+        self._resolved_output_dir = self._resolve_default_output_dir()
         self._setup_ui()
         self._load_persistent_config()
         self._connect_signals()
@@ -75,6 +77,7 @@ class MainWindow(QMainWindow):
 
         self.statusBar().showMessage("系统就绪")
         self._append_log("[INFO] Application UI initialized")
+        self._append_log(f"[DATASET] default output dir: {self._resolved_output_dir}")
 
     def _create_scan_workspace_page(self, parent: QWidget) -> QWidget:
         """Create the original scan workspace as one tab page."""
@@ -240,6 +243,7 @@ class MainWindow(QMainWindow):
 
         self.heatmap_view.set_status_text("热力图视图（扫描中）")
         self.statusBar().showMessage("扫描执行中")
+        self._append_log(f"[DATASET] realtime output dir: {output_dir.resolve()}")
         self._append_log(f"[UI] scan mode selected: {scan_config.scan_mode}")
         self._append_log(f"[SCAN] mode={scan_config.scan_mode}")
         self._append_log("[SCAN] start scan")
@@ -264,7 +268,9 @@ class MainWindow(QMainWindow):
             return
 
         self.heatmap_view.set_status_text("热力图视图（扫描完成）")
-        self.statusBar().showMessage("扫描完成，结果已保存到 output/latest_scan")
+        resolved_output_dir = output_dir.resolve()
+        self.statusBar().showMessage(f"扫描完成，结果已保存到 {resolved_output_dir}")
+        self._append_log(f"[DATASET] output dir: {resolved_output_dir}")
         self._append_log("[SCAN] scan finished")
         self._log_scan_completion_summary(
             job=self.scan_manager.current_job,
@@ -466,7 +472,22 @@ class MainWindow(QMainWindow):
     def _default_output_dir(self) -> Path:
         """Return the default dataset output directory for trial scans."""
 
-        return self.DEFAULT_OUTPUT_DIR
+        return self._resolved_output_dir
+
+    def _resolve_default_output_dir(self) -> Path:
+        """Resolve one writable dataset output directory for the current runtime."""
+
+        repo_path = Path(__file__).resolve().parents[2] / self.DEFAULT_OUTPUT_DIR
+        cwd_path = Path.cwd() / self.DEFAULT_OUTPUT_DIR
+
+        for candidate in (repo_path, cwd_path):
+            try:
+                candidate.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                continue
+            return candidate
+
+        return repo_path
 
     def _get_persistent_scan_inputs(self) -> tuple[QLineEdit, ...]:
         """Return scan inputs that should trigger config persistence."""
