@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from nfs_scanner.core.models import ScanConfig
 
-ScanJobStatus = Literal["pending", "running", "paused", "completed", "failed"]
+ScanJobStatus = Literal["pending", "running", "paused", "completed", "failed", "stopped"]
 
 
 @dataclass(slots=True)
@@ -52,6 +52,11 @@ class ScanJob:
         """Mark the job as failed."""
 
         self.status = "failed"
+
+    def mark_stopped(self) -> None:
+        """Mark the job as stopped by the operator."""
+
+        self.status = "stopped"
 
     def update_progress(self, completed_points: int, total_points: int) -> None:
         """Update fractional progress for the current job."""

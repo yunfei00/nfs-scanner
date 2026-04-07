@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
-import math
-import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from importlib.util import find_spec
 from pathlib import Path
 
@@ -44,6 +42,7 @@ from nfs_scanner.devices.spectrum import (
     probe_resources,
     save_zna_trace_csv,
 )
+from nfs_scanner.core import ScanManager, ScanRuntimeSnapshot
 from nfs_scanner.infra.logging_config import get_logger
 
 from .collapsible_section import CollapsibleSection
@@ -111,6 +110,14 @@ class ScanControlPage(QWidget):
     SERIAL_FALLBACK_INSTRUMENTS = frozenset({"ZNA67"})
     SCAN_AREA_CONFIG_PATH = Path("config") / "scan_area_config.json"
     SCAN_DISPATCH_INTERVAL_MS = 120
+    RUNTIME_STATUS_LABELS = {
+        "idle": "就绪",
+        "running": "扫描中",
+        "paused": "暂停",
+        "completed": "完成",
+        "failed": "失败",
+        "stopped": "停止",
+    }
     INSTRUMENT_PLACEHOLDER_VALUES = {
         "ZNA67": {
             "start_freq": ("80.000", "MHz"),
@@ -174,13 +181,19 @@ class ScanControlPage(QWidget):
     CONTINUE_OFF_COMMAND = "INIT:CONT OFF"
     CONTINUE_ON_COMMAND = "INIT:CONT ON"
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        scan_manager: ScanManager | None = None,
+    ) -> None:
         super().__init__(parent)
         self.current_x = 0.0
         self.current_y = 0.0
         self.current_z = 0.0
         self.current_feed_rate = 1000.0
         self.active_jog_step_mm = 1.0
+        self.scan_manager = scan_manager or ScanManager()
         self.serial_is_open = False
         self._serial_port = QSerialPort(self)
         self._serial_port.readyRead.connect(self._on_serial_ready_read)
@@ -191,11 +204,6 @@ class ScanControlPage(QWidget):
         self._scan_points: list[tuple[float, float, float]] = []
         self._scan_point_index = 0
         self._executed_scan_points: list[tuple[float, float, float]] = []
-        self._scan_started_monotonic: float | None = None
-        self._scan_elapsed_seconds = 0.0
-        self._remaining_seconds_estimate: int | None = None
-        self._estimated_completion_time: datetime | None = None
-        self._scan_paused = False
         self._is_updating_scan_table = False
         self._active_scan_output_dir: Path | None = None
         self._instrument_search_thread: QThread | None = None
@@ -728,28 +736,24 @@ class ScanControlPage(QWidget):
         self._refresh_clock()
 
     def _refresh_clock(self) -> None:
+        snapshot = self._get_scan_runtime_snapshot()
         time_text = f"时间: {datetime.now().strftime('%H:%M:%S')}"
-        remaining_seconds = self._get_display_remaining_seconds()
+        remaining_seconds = snapshot.remaining_seconds
         if remaining_seconds is None:
             remaining_text = "剩余: --"
         else:
             remaining_text = f"剩余: {remaining_seconds} 秒"
-        if self._estimated_completion_time is None:
+        if snapshot.estimated_completion_time is None:
             eta_text = "预计完成: --"
         else:
-            eta_text = f"预计完成: {self._estimated_completion_time.strftime('%H:%M:%S')}"
+            eta_text = f"预计完成: {snapshot.estimated_completion_time.strftime('%H:%M:%S')}"
         self.time_status_label.setText(f"{time_text} | {remaining_text} | {eta_text}")
+        self.update_system_status(self.RUNTIME_STATUS_LABELS[snapshot.status])
 
-    def _get_display_remaining_seconds(self) -> int | None:
-        """返回界面当前应显示的剩余秒数。"""
+    def _get_scan_runtime_snapshot(self) -> ScanRuntimeSnapshot:
+        """返回当前扫描运行态快照。"""
 
-        if self._remaining_seconds_estimate is None:
-            return None
-        if self._scan_paused or self._scan_started_monotonic is None or self._estimated_completion_time is None:
-            return self._remaining_seconds_estimate
-
-        remaining_seconds = math.ceil((self._estimated_completion_time - datetime.now()).total_seconds())
-        return max(remaining_seconds, 0)
+        return self.scan_manager.get_scan_runtime_snapshot()
 
     def append_log(self, message: str) -> None:
         """Append a timestamped message to the log area."""
@@ -891,7 +895,7 @@ class ScanControlPage(QWidget):
         self.append_log("已将当前坐标设为扫描终点")
 
     def on_start_scan(self) -> None:
-        if self._scan_paused:
+        if self._get_scan_runtime_snapshot().status == "paused":
             self._resume_scan()
             return
 
@@ -911,12 +915,16 @@ class ScanControlPage(QWidget):
 
         self._scan_point_index = 0
         self._executed_scan_points = []
-        self._scan_started_monotonic = time.monotonic()
-        self._scan_elapsed_seconds = 0.0
-        self._scan_paused = False
-        self._update_remaining_time_estimate()
+        try:
+            self.scan_manager.begin_scan(
+                total_points=len(self._scan_points),
+                minimum_point_seconds=self.SCAN_DISPATCH_INTERVAL_MS / 1000,
+            )
+        except RuntimeError as error:
+            self.append_log(f"开始扫描失败：{error}")
+            return
         self._prepare_scan_storage_workspace()
-        self.update_system_status("扫描中")
+        self._refresh_clock()
         self._save_scan_plan_snapshot()
         self.append_log(
             "扫描开始："
@@ -926,15 +934,17 @@ class ScanControlPage(QWidget):
         self._dispatch_next_scan_point()
 
     def on_pause_scan(self) -> None:
-        if not self._scan_points or self._scan_point_index >= len(self._scan_points):
+        snapshot = self._get_scan_runtime_snapshot()
+        if snapshot.status != "running" or not self._scan_points or self._scan_point_index >= len(self._scan_points):
             self.append_log("暂停扫描失败：当前没有进行中的任务")
             return
 
-        self._freeze_remaining_time_estimate()
         self._scan_timer.stop()
-        self._accumulate_scan_elapsed_time()
-        self._scan_paused = True
-        self.update_system_status("暂停")
+        try:
+            self.scan_manager.pause_scan()
+        except RuntimeError as error:
+            self.append_log(f"暂停扫描失败：{error}")
+            return
         self._refresh_clock()
         sent, reason = self._send_serial_command("!")
         if sent:
@@ -943,14 +953,12 @@ class ScanControlPage(QWidget):
             self.append_log(f"发送命令失败: !，原因: {reason}")
 
     def on_stop_scan(self) -> None:
-        self.update_system_status("停止")
         self._scan_timer.stop()
-        self._accumulate_scan_elapsed_time()
         self._save_scan_execution_snapshot(completed=False)
         self._scan_points = []
         self._scan_point_index = 0
-        self._reset_scan_runtime_state()
-        self._clear_remaining_time_estimate()
+        self.scan_manager.stop_scan()
+        self._refresh_clock()
         sent, reason = self._send_serial_command("\x18")
         if sent:
             self.append_log("发送命令: Ctrl+X（停止/复位）")
@@ -965,8 +973,7 @@ class ScanControlPage(QWidget):
             return
         if not self._scan_points or self._scan_point_index >= len(self._scan_points):
             self.append_log("恢复扫描失败：当前没有可恢复的任务")
-            self._scan_paused = False
-            self.update_system_status("就绪")
+            self._refresh_clock()
             return
 
         sent, reason = self._send_serial_command("~")
@@ -974,11 +981,11 @@ class ScanControlPage(QWidget):
             self.append_log(f"发送命令失败: ~，原因: {reason}")
             return
 
-        self._scan_started_monotonic = time.monotonic()
-        self._scan_paused = False
-        if self._remaining_seconds_estimate is not None:
-            self._estimated_completion_time = datetime.now() + timedelta(seconds=self._remaining_seconds_estimate)
-        self.update_system_status("扫描中")
+        try:
+            self.scan_manager.resume_scan()
+        except RuntimeError as error:
+            self.append_log(f"恢复扫描失败：{error}")
+            return
         self._refresh_clock()
         self.append_log("发送命令: ~（恢复）")
         self.append_log(f"恢复扫描：剩余 {len(self._scan_points) - self._scan_point_index} 点")
@@ -1817,11 +1824,9 @@ class ScanControlPage(QWidget):
 
         if self._scan_point_index >= len(self._scan_points):
             self._scan_timer.stop()
-            self.update_system_status("就绪")
-            self._accumulate_scan_elapsed_time()
             self._save_scan_execution_snapshot(completed=True)
-            self._reset_scan_runtime_state()
-            self._set_remaining_time_estimate(0)
+            self.scan_manager.complete_scan()
+            self._refresh_clock()
             self.append_log("扫描结束：全部路径点已发送")
             return
 
@@ -1830,114 +1835,36 @@ class ScanControlPage(QWidget):
         sent, reason = self._send_serial_command(command)
         if not sent:
             self._scan_timer.stop()
-            self.update_system_status("停止")
-            self._accumulate_scan_elapsed_time()
-            self._reset_scan_runtime_state()
-            self._clear_remaining_time_estimate()
+            self._save_scan_execution_snapshot(completed=False)
+            self.scan_manager.fail_scan(reason)
+            self._refresh_clock()
             self.append_log(f"扫描中断：发送失败，原因: {reason}")
             return
 
         self.current_x = x
         self.current_y = y
         self.current_z = z
-        self._executed_scan_points.append((x, y, z))
         self.update_position_status(self.current_x, self.current_y, self.current_z)
-        self._scan_point_index += 1
-        self._update_remaining_time_estimate()
-        self.append_log(f"扫描点 {self._scan_point_index}/{len(self._scan_points)}: {command}")
 
         saved, message = self._capture_and_store_scan_point(
             x=x,
             y=y,
             z=z,
-            point_index=self._scan_point_index,
+            point_index=self._scan_point_index + 1,
         )
         if not saved:
             self._scan_timer.stop()
-            self.update_system_status("停止")
-            self._accumulate_scan_elapsed_time()
             self._save_scan_execution_snapshot(completed=False)
-            self._reset_scan_runtime_state()
-            self._clear_remaining_time_estimate()
+            self.scan_manager.fail_scan(message)
+            self._refresh_clock()
             self.append_log(f"扫描中断：测量存储失败，原因: {message}")
-
-    def _update_remaining_time_estimate(self) -> None:
-        """按已执行点位平均耗时估算剩余秒数。"""
-
-        total_points = len(self._scan_points)
-        if self._scan_started_monotonic is None or total_points <= 0:
-            self._clear_remaining_time_estimate()
             return
 
-        remaining_points = max(total_points - self._scan_point_index, 0)
-        if remaining_points == 0:
-            self._set_remaining_time_estimate(0)
-            return
-
-        avg_seconds_per_point = self._get_estimated_seconds_per_point()
-        remaining_seconds = math.ceil(avg_seconds_per_point * remaining_points)
-        self._set_remaining_time_estimate(remaining_seconds)
-
-    def _get_estimated_seconds_per_point(self) -> float:
-        """返回当前扫描任务估算的单点耗时。"""
-
-        minimum_seconds = self.SCAN_DISPATCH_INTERVAL_MS / 1000
-        if self._scan_point_index <= 0:
-            return minimum_seconds
-
-        elapsed_seconds = self._get_elapsed_scan_seconds()
-        if elapsed_seconds <= 0:
-            return minimum_seconds
-        return max(elapsed_seconds / self._scan_point_index, minimum_seconds)
-
-    def _set_remaining_time_estimate(self, remaining_seconds: int | None) -> None:
-        """更新剩余时间和预计完成时刻。"""
-
-        if remaining_seconds is None:
-            self._remaining_seconds_estimate = None
-            self._estimated_completion_time = None
-        else:
-            self._remaining_seconds_estimate = max(remaining_seconds, 0)
-            self._estimated_completion_time = datetime.now() + timedelta(
-                seconds=self._remaining_seconds_estimate
-            )
+        self._executed_scan_points.append((x, y, z))
+        self._scan_point_index += 1
+        self.scan_manager.record_completed_point()
         self._refresh_clock()
-
-    def _freeze_remaining_time_estimate(self) -> None:
-        """冻结当前 ETA，便于暂停后保持显示稳定。"""
-
-        self._remaining_seconds_estimate = self._get_display_remaining_seconds()
-        if self._remaining_seconds_estimate is None:
-            self._estimated_completion_time = None
-
-    def _clear_remaining_time_estimate(self) -> None:
-        """清空剩余时间估算显示。"""
-
-        self._set_remaining_time_estimate(None)
-
-    def _reset_scan_runtime_state(self) -> None:
-        """重置扫描运行态，不清空显示用 ETA。"""
-
-        self._scan_started_monotonic = None
-        self._scan_elapsed_seconds = 0.0
-        self._scan_paused = False
-
-    def _accumulate_scan_elapsed_time(self) -> None:
-        """累计当前扫描段的有效运行时间。"""
-
-        if self._scan_started_monotonic is None:
-            return
-
-        self._scan_elapsed_seconds = self._get_elapsed_scan_seconds()
-        self._scan_started_monotonic = None
-
-    def _get_elapsed_scan_seconds(self) -> float:
-        """返回当前扫描任务已累计的有效运行秒数。"""
-
-        elapsed_seconds = self._scan_elapsed_seconds
-        if self._scan_started_monotonic is not None:
-            elapsed_seconds += max(time.monotonic() - self._scan_started_monotonic, 0.0)
-        return max(elapsed_seconds, 0.0)
+        self.append_log(f"扫描点 {self._scan_point_index}/{len(self._scan_points)}: {command}")
 
     def _prepare_scan_storage_workspace(self) -> None:
         """准备扫描过程中的数据存储目录和索引文件。"""

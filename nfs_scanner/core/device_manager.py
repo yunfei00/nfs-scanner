@@ -9,7 +9,9 @@ class DeviceManager:
     """Manage hardware device connection requests.
 
     The current implementation only records placeholder connection state and
-    does not talk to any real hardware.
+    does not talk to any real hardware. Scan lifecycle and ETA state are
+    owned by ``ScanManager``; this service is kept as a lightweight device
+    connection registry for future integration work.
     """
 
     def __init__(self, logger: logging.Logger | None = None) -> None:
