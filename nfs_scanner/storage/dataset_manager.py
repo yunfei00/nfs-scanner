@@ -65,6 +65,7 @@ class DatasetManager:
             output_dir / "images.npy",
             output_dir / "spectrum_rows.csv",
             output_dir / "spectrum_rows_meta.jsonl",
+            output_dir / "scan_points.csv",
         ):
             if stale_file.exists():
                 stale_file.unlink()
@@ -117,6 +118,7 @@ class DatasetManager:
         if dataset.frequency_axis is not None:
             np.save(output_dir / "frequencies.npy", dataset.frequency_axis)
             self._save_zna_row_format(output_dir, dataset)
+            self._save_single_csv_dataset(output_dir, dataset)
 
         self._logger.info("[DATASET] dataset saved")
 
@@ -179,6 +181,13 @@ class DatasetManager:
         with metadata_path.open("a", encoding="utf-8") as metadata_file:
             metadata = {"row_key": row_key, "x": x_value, "y": y_value, "z": z_value}
             metadata_file.write(json.dumps(metadata, ensure_ascii=False) + "\n")
+        self._append_single_csv_row(
+            output_dir=output_dir,
+            point_index=point_index,
+            position=(x_value, y_value, z_value),
+            frequency_axis=dataset.frequency_axis,
+            amplitude_trace=amplitude_trace,
+        )
 
         positions_array = np.asarray(dataset.positions, dtype=np.float64).reshape(-1, 3)
         spectrum_array = np.asarray(dataset.spectrum_data, dtype=np.float64)
@@ -187,6 +196,62 @@ class DatasetManager:
         np.save(output_dir / "positions.npy", positions_array)
         np.save(output_dir / "spectrum.npy", spectrum_array)
         np.save(output_dir / "images.npy", images_array)
+
+    def _save_single_csv_dataset(self, output_dir: Path, dataset: ScanDataset) -> None:
+        """Save the complete scan results to one CSV file."""
+
+        if dataset.frequency_axis is None:
+            raise ValueError("Frequency axis is required for single CSV export.")
+
+        csv_path = output_dir / "scan_points.csv"
+        with csv_path.open("w", encoding="utf-8", newline="") as csv_file:
+            writer = csv.writer(csv_file)
+            writer.writerow(self._single_csv_header(dataset.frequency_axis))
+            for point_index, (position, amplitude_trace) in enumerate(
+                zip(dataset.positions, dataset.spectrum_data),
+                start=1,
+            ):
+                writer.writerow(
+                    [
+                        point_index,
+                        position[0],
+                        position[1],
+                        position[2],
+                        *amplitude_trace.tolist(),
+                    ]
+                )
+
+    def _append_single_csv_row(
+        self,
+        output_dir: Path,
+        point_index: int,
+        position: tuple[float, float, float],
+        frequency_axis: NDArray[np.float64],
+        amplitude_trace: NDArray[np.float64],
+    ) -> None:
+        """Append one scan point to the combined CSV file."""
+
+        csv_path = output_dir / "scan_points.csv"
+        if not csv_path.exists():
+            with csv_path.open("w", encoding="utf-8", newline="") as csv_file:
+                csv.writer(csv_file).writerow(self._single_csv_header(frequency_axis))
+
+        with csv_path.open("a", encoding="utf-8", newline="") as csv_file:
+            csv.writer(csv_file).writerow(
+                [
+                    point_index,
+                    position[0],
+                    position[1],
+                    position[2],
+                    *amplitude_trace.tolist(),
+                ]
+            )
+
+    def _single_csv_header(self, frequency_axis: NDArray[np.float64]) -> list[str]:
+        """Build one CSV header containing coordinates and all frequency columns."""
+
+        frequency_labels = [f"freq_{value:g}Hz" for value in frequency_axis.tolist()]
+        return ["point_index", "x", "y", "z", *frequency_labels]
 
     def _require_dataset(self) -> ScanDataset:
         """Return the active dataset or raise when it is missing."""
