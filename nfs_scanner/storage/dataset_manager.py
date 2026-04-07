@@ -31,6 +31,7 @@ class DatasetManager:
     def __init__(self, logger: logging.Logger | None = None) -> None:
         self._logger = logger or logging.getLogger(__name__)
         self._dataset: ScanDataset | None = None
+        self._realtime_output_dir: Path | None = None
 
     @property
     def dataset(self) -> ScanDataset | None:
@@ -42,8 +43,34 @@ class DatasetManager:
         """Create a new empty dataset for one scan configuration."""
 
         self._dataset = ScanDataset(config=config)
+        self._realtime_output_dir = None
         self._logger.info("[DATASET] create dataset")
         return self._dataset
+
+    def prepare_realtime_storage(self, path: str | Path) -> None:
+        """Prepare one output directory for point-by-point realtime persistence."""
+
+        dataset = self._require_dataset()
+        output_dir = Path(path)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        config_path = output_dir / "scan_config.json"
+        with config_path.open("w", encoding="utf-8") as file:
+            json.dump(asdict(dataset.config), file, ensure_ascii=False, indent=2)
+
+        for stale_file in (
+            output_dir / "frequencies.npy",
+            output_dir / "positions.npy",
+            output_dir / "spectrum.npy",
+            output_dir / "images.npy",
+            output_dir / "spectrum_rows.csv",
+            output_dir / "spectrum_rows_meta.jsonl",
+        ):
+            if stale_file.exists():
+                stale_file.unlink()
+
+        self._realtime_output_dir = output_dir
+        self._logger.info("[DATASET] realtime storage prepared")
 
     def append_point(self, result: ScanPointResult) -> None:
         """Append one scan point into the current dataset."""
@@ -65,6 +92,7 @@ class DatasetManager:
         dataset.positions.append((result.x, result.y, result.z))
         dataset.spectrum_data.append(amplitude_trace)
         dataset.images.append(image)
+        self._append_realtime_files_if_enabled(dataset, amplitude_trace)
         self._logger.info("[DATASET] append point")
 
     def save_dataset(self, path: str | Path) -> None:
@@ -120,6 +148,45 @@ class DatasetManager:
                     "z": position[2],
                 }
                 metadata_file.write(json.dumps(metadata, ensure_ascii=False) + "\n")
+
+    def _append_realtime_files_if_enabled(
+        self,
+        dataset: ScanDataset,
+        amplitude_trace: NDArray[np.float64],
+    ) -> None:
+        """Append one point to realtime files and refresh .npy snapshots."""
+
+        if self._realtime_output_dir is None:
+            return
+        if dataset.frequency_axis is None:
+            raise ValueError("Frequency axis is required for realtime persistence.")
+
+        output_dir = self._realtime_output_dir
+        point_index = len(dataset.positions)
+        row_key = f"pt_{point_index:06d}"
+
+        csv_path = output_dir / "spectrum_rows.csv"
+        metadata_path = output_dir / "spectrum_rows_meta.jsonl"
+
+        if point_index == 1:
+            with csv_path.open("w", encoding="utf-8", newline="") as csv_file:
+                csv.writer(csv_file).writerow(["fre", *dataset.frequency_axis.tolist()])
+
+        with csv_path.open("a", encoding="utf-8", newline="") as csv_file:
+            csv.writer(csv_file).writerow([row_key, *amplitude_trace.tolist()])
+
+        x_value, y_value, z_value = dataset.positions[-1]
+        with metadata_path.open("a", encoding="utf-8") as metadata_file:
+            metadata = {"row_key": row_key, "x": x_value, "y": y_value, "z": z_value}
+            metadata_file.write(json.dumps(metadata, ensure_ascii=False) + "\n")
+
+        positions_array = np.asarray(dataset.positions, dtype=np.float64).reshape(-1, 3)
+        spectrum_array = np.asarray(dataset.spectrum_data, dtype=np.float64)
+        images_array = np.asarray(dataset.images, dtype=np.uint8)
+        np.save(output_dir / "frequencies.npy", dataset.frequency_axis)
+        np.save(output_dir / "positions.npy", positions_array)
+        np.save(output_dir / "spectrum.npy", spectrum_array)
+        np.save(output_dir / "images.npy", images_array)
 
     def _require_dataset(self) -> ScanDataset:
         """Return the active dataset or raise when it is missing."""
