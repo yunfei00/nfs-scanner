@@ -11,7 +11,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtWidgets import QApplication
 
 from nfs_scanner.core import ScanManager
-from nfs_scanner.ui.widgets.scan_control_page import ScanControlPage
+from nfs_scanner.ui.widgets.scan_control_page import ScanControlPage, ScanWorker
 
 
 class FakeClock:
@@ -91,6 +91,32 @@ class ScanControlPageTimingTestCase(unittest.TestCase):
         self.assertFalse(hasattr(self.page, "_remaining_seconds_estimate"))
         self.assertFalse(hasattr(self.page, "_estimated_completion_time"))
         self.assertFalse(hasattr(self.page, "_scan_paused"))
+
+
+class ScanWorkerSerialParsingTestCase(unittest.TestCase):
+    """Verify serial status extraction is stable across fragmented input chunks."""
+
+    def setUp(self) -> None:
+        self.worker = ScanWorker.__new__(ScanWorker)
+        self.worker._serial_rx_buffer = ""
+
+    def test_extract_latest_motion_status_handles_fragmented_lines(self) -> None:
+        """The parser should preserve incomplete fragments and emit complete status lines later."""
+
+        first = self.worker._extract_latest_motion_status("<Idle|MPos:1.00,2")
+        self.assertIsNone(first)
+
+        second = self.worker._extract_latest_motion_status(".00,3.00|FS:0,0>\nok\n")
+        self.assertEqual(second, "<Idle|MPos:1.00,2.00,3.00|FS:0,0>")
+        self.assertEqual(self.worker._serial_rx_buffer, "")
+
+    def test_extract_latest_motion_status_returns_last_status_from_mixed_messages(self) -> None:
+        """When multiple lines arrive, the parser should return the most recent valid status line."""
+
+        latest = self.worker._extract_latest_motion_status(
+            "ok\n<Run|MPos:1.00,2.00,3.00|FS:100,0>\nerror:2\n<Idle|MPos:1.00,2.00,3.00|FS:0,0>\n"
+        )
+        self.assertEqual(latest, "<Idle|MPos:1.00,2.00,3.00|FS:0,0>")
 
 
 if __name__ == "__main__":
