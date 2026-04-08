@@ -8,7 +8,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QIODevice, QObject, QThread, QTimer, Qt, Signal
+from PySide6.QtCore import QCoreApplication, QIODevice, QObject, QThread, QTimer, Qt, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtSerialPort import QSerialPort, QSerialPortInfo
 from PySide6.QtWidgets import (
@@ -91,6 +91,7 @@ class ScanWorker(QObject):
         self,
         *,
         serial_port: QSerialPort,
+        ui_thread: QThread,
         scan_points: list[tuple[float, float, float]],
         feed_rate: float,
         dwell_seconds: float,
@@ -101,6 +102,7 @@ class ScanWorker(QObject):
     ) -> None:
         super().__init__()
         self._serial_port = serial_port
+        self._ui_thread = ui_thread
         self._scan_points = list(scan_points)
         self._feed_rate = float(feed_rate)
         self._dwell_seconds = max(float(dwell_seconds), 0.0)
@@ -179,6 +181,17 @@ class ScanWorker(QObject):
             self.finished.emit("completed", "扫描完成")
         except Exception as error:  # noqa: BLE001
             self.finished.emit("error", f"扫描线程异常: {error}")
+        finally:
+            self._restore_serial_thread_affinity()
+
+    def _restore_serial_thread_affinity(self) -> None:
+        """扫描结束后将串口对象归还给 UI 线程。"""
+
+        target_thread = self._ui_thread
+        app = QCoreApplication.instance()
+        if app is not None:
+            target_thread = app.thread()
+        self._serial_port.moveToThread(target_thread)
 
     def _wait_until_motion_done(
         self,
@@ -1248,6 +1261,7 @@ class ScanControlPage(QWidget):
         self._serial_port.moveToThread(self._scan_thread)
         self._scan_worker = ScanWorker(
             serial_port=self._serial_port,
+            ui_thread=self.thread(),
             scan_points=self._scan_points,
             feed_rate=self.current_feed_rate,
             dwell_seconds=self.SCAN_DWELL_SECONDS,
