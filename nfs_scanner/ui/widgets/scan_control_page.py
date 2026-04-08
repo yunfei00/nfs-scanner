@@ -465,6 +465,7 @@ class ScanControlPage(QWidget):
         "scale": "Scale",
     }
     UNIT_SCALE = {"Hz": 1.0, "kHz": 1_000.0, "MHz": 1_000_000.0, "GHz": 1_000_000_000.0}
+    ZNA67_MINIMAL_QUERY_KEYS = ("start_freq", "stop_freq", "rbw", "points")
 
     def __init__(
         self,
@@ -494,6 +495,7 @@ class ScanControlPage(QWidget):
         self._scan_thread: QThread | None = None
         self._scan_worker: ScanWorker | None = None
         self._scan_stop_requested = False
+        self._restore_serial_after_scan = False
         self._instrument_search_thread: QThread | None = None
         self._instrument_search_worker: InstrumentSearchWorker | None = None
 
@@ -1056,12 +1058,17 @@ class ScanControlPage(QWidget):
         self._set_scan_button_states(status_text)
 
     def on_open_serial(self) -> None:
+        self._open_serial_port_for_manual_control(emit_success_log=True)
+
+    def _open_serial_port_for_manual_control(self, *, emit_success_log: bool) -> bool:
+        """打开当前选择串口并用于手动控制。"""
+
         selected_port = self.port_combo.currentData()
         if not selected_port:
             selected_port = self.port_combo.currentText().strip()
         if not selected_port:
             self.append_log("未选择可用串口")
-            return
+            return False
         self._serial_port.setPortName(selected_port)
         self._serial_port.setBaudRate(int(self.baudrate_combo.currentText()))
         self._serial_port.setDataBits(QSerialPort.DataBits.Data8)
@@ -1073,11 +1080,13 @@ class ScanControlPage(QWidget):
             self.serial_is_open = False
             self._sync_serial_buttons()
             self.append_log(f"串口打开失败: {self._serial_port.errorString()}")
-            return
+            return False
 
         self.serial_is_open = True
         self._sync_serial_buttons()
-        self.append_log(f"串口已打开: {self.port_combo.currentText()} @ {self.baudrate_combo.currentText()}")
+        if emit_success_log:
+            self.append_log(f"串口已打开: {self.port_combo.currentText()} @ {self.baudrate_combo.currentText()}")
+        return True
 
     def on_refresh_serial_ports(self) -> None:
         """刷新可用串口并保留用户当前选择。"""
@@ -1178,9 +1187,6 @@ class ScanControlPage(QWidget):
         self.append_log("已将当前坐标设为扫描终点")
 
     def on_start_scan(self) -> None:
-        if not self.serial_is_open:
-            self.append_log("开始扫描失败：串口未打开")
-            return
         if self._scan_thread is not None:
             self.append_log("开始扫描失败：已有扫描任务在执行")
             return
@@ -1221,6 +1227,10 @@ class ScanControlPage(QWidget):
             "扫描开始："
             f"共 {len(self._scan_points)} 点，顺序为 Z 外层（增大）、Y 中层（减小）、X 内层（增大）"
         )
+        self._restore_serial_after_scan = self.serial_is_open
+        if self.serial_is_open:
+            self.append_log("扫描前自动释放手动串口连接，避免重复打开导致扫描失败。")
+            self.on_close_serial()
         self._start_scan_worker(panel)
 
     def on_pause_scan(self) -> None:
@@ -1319,6 +1329,13 @@ class ScanControlPage(QWidget):
         self._scan_worker = None
         self._scan_thread = None
         self._scan_stop_requested = False
+        if self._restore_serial_after_scan:
+            restored = self._open_serial_port_for_manual_control(emit_success_log=False)
+            if restored:
+                self.append_log("扫描结束后已自动恢复手动串口连接。")
+            else:
+                self.append_log("扫描结束后尝试恢复手动串口连接失败，请手动重连。")
+        self._restore_serial_after_scan = False
 
     def on_clear_log(self) -> None:
         self.log_edit.clear()
@@ -1411,6 +1428,10 @@ class ScanControlPage(QWidget):
         if panel is None:
             return
 
+        if instrument_name == "ZNA67" and query_key not in self.ZNA67_MINIMAL_QUERY_KEYS:
+            self.append_log(f"ZNA67 当前阶段跳过参数查询: {query_key}（仅保留最小采集相关命令）")
+            return
+
         value, unit = self._query_instrument_value(instrument_name, query_key)
         panel.set_query_result(query_key, value, unit)
         label = self.QUERY_LABELS.get(query_key, query_key)
@@ -1424,7 +1445,10 @@ class ScanControlPage(QWidget):
         if panel is None:
             return
 
-        query_keys = panel.get_supported_query_keys()
+        query_keys = self._get_effective_query_keys(
+            instrument_name=instrument_name,
+            query_keys=panel.get_supported_query_keys(),
+        )
         if not query_keys:
             return
 
@@ -1435,6 +1459,18 @@ class ScanControlPage(QWidget):
             label = self.QUERY_LABELS.get(query_key, query_key)
             suffix = f" {unit}" if unit else ""
             self.append_log(f"仪表同步: {instrument_name} - {label} = {value}{suffix}")
+
+    def _get_effective_query_keys(
+        self,
+        *,
+        instrument_name: str,
+        query_keys: tuple[str, ...],
+    ) -> tuple[str, ...]:
+        """返回当前仪表在本阶段允许批量查询的参数键集合。"""
+
+        if instrument_name == "ZNA67":
+            return tuple(key for key in query_keys if key in self.ZNA67_MINIMAL_QUERY_KEYS)
+        return query_keys
 
     def _query_instrument_value(self, instrument_name: str, query_key: str) -> tuple[str, str | None]:
         """查询仪表参数：优先真实设备，失败后回退占位值。"""
@@ -1635,7 +1671,11 @@ class ScanControlPage(QWidget):
             return False, "未找到对应仪表面板"
 
         snapshot_values: dict[str, dict[str, str | None]] = {}
-        for query_key in panel.get_supported_query_keys():
+        query_keys = self._get_effective_query_keys(
+            instrument_name=instrument_name,
+            query_keys=panel.get_supported_query_keys(),
+        )
+        for query_key in query_keys:
             value, unit = self._query_instrument_value(instrument_name, query_key)
             panel.set_query_result(query_key, value, unit)
             snapshot_values[query_key] = {"value": value, "unit": unit}
@@ -1765,6 +1805,14 @@ class ScanControlPage(QWidget):
             if isinstance(raw_unit, str) and raw_unit.strip():
                 return f"{raw_value}{raw_unit.strip()}"
             return raw_value
+
+        if panel.instrument_name == "ZNA67":
+            return SpectrumConfig(
+                start_freq=read_field("start_freq"),
+                stop_freq=read_field("stop_freq"),
+                rbw=read_field("rbw"),
+                acquisition_mode="trace",
+            )
 
         return SpectrumConfig(
             start_freq=read_field("start_freq"),
