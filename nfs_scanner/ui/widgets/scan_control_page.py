@@ -111,6 +111,7 @@ class ScanWorker(QObject):
         self._output_dir = output_dir
         self._scan_manager = scan_manager
         self._stop_requested = False
+        self._serial_rx_buffer = ""
 
     def request_stop(self) -> None:
         """请求停止扫描，worker 会在阶段检查点尽快退出。"""
@@ -123,6 +124,7 @@ class ScanWorker(QObject):
             if not self._serial_port.isOpen():
                 self.finished.emit("error", "扫描串口未打开，请先完成串口连接与复位")
                 return
+            self._reset_serial_rx_state(self._serial_port)
 
             for point_index, (x, y, z) in enumerate(self._scan_points, start=1):
                 if self._stop_requested:
@@ -236,6 +238,12 @@ class ScanWorker(QObject):
             return None
         return self._read_serial_response_line(serial_port, timeout_ms=300)
 
+    def _reset_serial_rx_state(self, serial_port: QSerialPort) -> None:
+        """清空串口残留输入，避免上一轮扫描响应干扰状态轮询。"""
+
+        self._serial_rx_buffer = ""
+        serial_port.clear(QSerialPort.Direction.Input)
+
     def _send_command(self, serial_port: QSerialPort, command: str) -> tuple[bool, str]:
         payload = f"{command}\r\n".encode("utf-8")
         written = serial_port.write(payload)
@@ -252,15 +260,29 @@ class ScanWorker(QObject):
     def _read_serial_response_line(self, serial_port: QSerialPort, timeout_ms: int = 300) -> str | None:
         if not serial_port.waitForReadyRead(timeout_ms):
             return None
+
         chunks = [bytes(serial_port.readAll()).decode("utf-8", errors="replace")]
         while serial_port.waitForReadyRead(20):
             chunks.append(bytes(serial_port.readAll()).decode("utf-8", errors="replace"))
-        merged = "".join(chunks).replace("\r", "\n")
-        for line in merged.split("\n"):
+
+        return self._extract_latest_motion_status("".join(chunks))
+
+    def _extract_latest_motion_status(self, text: str) -> str | None:
+        """从串口文本流中提取最新一条完整状态行。"""
+
+        if not text:
+            return None
+
+        self._serial_rx_buffer += text.replace("\r", "\n")
+        lines = self._serial_rx_buffer.split("\n")
+        self._serial_rx_buffer = lines.pop() if lines else ""
+
+        latest_status_line: str | None = None
+        for line in lines:
             cleaned = line.strip()
             if cleaned.startswith("<") and "|" in cleaned:
-                return cleaned
-        return None
+                latest_status_line = cleaned
+        return latest_status_line
 
     def _parse_motion_status(self, status_line: str) -> tuple[str, tuple[float, float, float] | None]:
         if not status_line.startswith("<"):
