@@ -90,30 +90,24 @@ class ScanWorker(QObject):
     def __init__(
         self,
         *,
-        port_name: str,
-        baud_rate: int,
+        serial_port: QSerialPort,
         scan_points: list[tuple[float, float, float]],
         feed_rate: float,
         dwell_seconds: float,
         motion_timeout_seconds: float,
         instrument_name: str,
         output_dir: Path,
-        spectrum_config: SpectrumConfig,
         scan_manager: ScanManager,
-        device_manager: DeviceManager,
     ) -> None:
         super().__init__()
-        self._port_name = port_name
-        self._baud_rate = baud_rate
+        self._serial_port = serial_port
         self._scan_points = list(scan_points)
         self._feed_rate = float(feed_rate)
         self._dwell_seconds = max(float(dwell_seconds), 0.0)
         self._motion_timeout_seconds = max(float(motion_timeout_seconds), 0.1)
         self._instrument_name = instrument_name
         self._output_dir = output_dir
-        self._spectrum_config = spectrum_config
         self._scan_manager = scan_manager
-        self._device_manager = device_manager
         self._stop_requested = False
 
     def request_stop(self) -> None:
@@ -123,87 +117,63 @@ class ScanWorker(QObject):
 
     def run(self) -> None:
         """逐点执行：移动 -> 等待到位 -> 驻留 -> 采集 -> 存储。"""
-
-        serial_port = QSerialPort()
-        serial_port.setPortName(self._port_name)
-        serial_port.setBaudRate(self._baud_rate)
-        serial_port.setDataBits(QSerialPort.DataBits.Data8)
-        serial_port.setParity(QSerialPort.Parity.NoParity)
-        serial_port.setStopBits(QSerialPort.StopBits.OneStop)
-        serial_port.setFlowControl(QSerialPort.FlowControl.NoFlowControl)
-
-        if not serial_port.open(QIODevice.OpenModeFlag.ReadWrite):
-            self.finished.emit("error", f"扫描串口打开失败: {serial_port.errorString()}")
+        if not self._serial_port.isOpen():
+            self.finished.emit("error", "扫描串口未打开，请先完成串口连接与复位")
             return
 
-        try:
-            analyzer = self._device_manager.ensure_spectrum_device(
-                instrument_type=self._instrument_name,
-                resource_names=self._load_cached_instrument_resources(),
+        for point_index, (x, y, z) in enumerate(self._scan_points, start=1):
+            if self._stop_requested:
+                self._send_stop(self._serial_port)
+                self.finished.emit("stopped", "扫描已停止")
+                return
+
+            self.point_started.emit(point_index, len(self._scan_points), x, y, z)
+            command = f"G1 X{x:.2f} Y{y:.2f} Z{z:.2f} F{self._feed_rate:.0f}"
+            ok, reason = self._send_command(self._serial_port, command)
+            if not ok:
+                self.finished.emit("error", f"发送运动命令失败: {reason}")
+                return
+            self.log_message.emit(f"发送命令: {command}")
+
+            done, reason = self._wait_until_motion_done(
+                serial_port=self._serial_port,
+                target=(x, y, z),
+                timeout_seconds=self._motion_timeout_seconds,
             )
-            self._scan_manager.set_spectrum_analyzer(analyzer)
-            self._scan_manager.set_spectrum_config(self._spectrum_config)
-        except SpectrumAnalyzerError as error:
-            serial_port.close()
-            self.finished.emit("error", f"仪表连接失败: {error}")
-            return
+            if not done:
+                self.finished.emit("error", reason)
+                return
 
-        try:
-            for point_index, (x, y, z) in enumerate(self._scan_points, start=1):
-                if self._stop_requested:
-                    self._send_stop(serial_port)
-                    self.finished.emit("stopped", "扫描已停止")
-                    return
+            if not self._wait_with_stop_check(self._dwell_seconds):
+                self._send_stop(self._serial_port)
+                self.finished.emit("stopped", "扫描已停止")
+                return
 
-                self.point_started.emit(point_index, len(self._scan_points), x, y, z)
-                command = f"G1 X{x:.2f} Y{y:.2f} Z{z:.2f} F{self._feed_rate:.0f}"
-                ok, reason = self._send_command(serial_port, command)
-                if not ok:
-                    self.finished.emit("error", f"发送运动命令失败: {reason}")
-                    return
-                self.log_message.emit(f"发送命令: {command}")
+            if self._stop_requested:
+                self._send_stop(self._serial_port)
+                self.finished.emit("stopped", "扫描已停止")
+                return
 
-                done, reason = self._wait_until_motion_done(
-                    serial_port=serial_port,
-                    target=(x, y, z),
-                    timeout_seconds=self._motion_timeout_seconds,
-                )
-                if not done:
-                    self.finished.emit("error", reason)
-                    return
+            try:
+                measurement = self._scan_manager.acquire_spectrum_measurement()
+            except SpectrumAnalyzerError as error:
+                self.finished.emit("error", f"采集失败: {error}")
+                return
 
-                if not self._wait_with_stop_check(self._dwell_seconds):
-                    self._send_stop(serial_port)
-                    self.finished.emit("stopped", "扫描已停止")
-                    return
+            saved, message = self._save_scan_point_data(
+                instrument_name=self._instrument_name,
+                measurement=measurement,
+                x=x,
+                y=y,
+                z=z,
+                point_index=point_index,
+                output_dir=self._output_dir,
+            )
+            if not saved:
+                self.finished.emit("error", f"存储失败: {message}")
+                return
 
-                if self._stop_requested:
-                    self._send_stop(serial_port)
-                    self.finished.emit("stopped", "扫描已停止")
-                    return
-
-                try:
-                    measurement = self._scan_manager.acquire_spectrum_measurement()
-                except SpectrumAnalyzerError as error:
-                    self.finished.emit("error", f"采集失败: {error}")
-                    return
-
-                saved, message = self._save_scan_point_data(
-                    instrument_name=self._instrument_name,
-                    measurement=measurement,
-                    x=x,
-                    y=y,
-                    z=z,
-                    point_index=point_index,
-                    output_dir=self._output_dir,
-                )
-                if not saved:
-                    self.finished.emit("error", f"存储失败: {message}")
-                    return
-
-                self.point_completed.emit(point_index, len(self._scan_points), x, y, z, measurement)
-        finally:
-            serial_port.close()
+            self.point_completed.emit(point_index, len(self._scan_points), x, y, z, measurement)
 
         self.finished.emit("completed", "扫描完成")
 
@@ -299,22 +269,6 @@ class ScanWorker(QObject):
         tolerance: float = 0.02,
     ) -> bool:
         return all(abs(cur - tar) <= tolerance for cur, tar in zip(current, target))
-
-    def _load_cached_instrument_resources(self) -> tuple[str, ...]:
-        cache_path = ScanControlPage.INSTRUMENT_CACHE_PATH
-        if not cache_path.exists():
-            return ()
-        try:
-            payload = json.loads(cache_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return ()
-        resources_by_instrument = payload.get("resources_by_instrument")
-        if not isinstance(resources_by_instrument, dict):
-            return ()
-        raw_values = resources_by_instrument.get(self._instrument_name, [])
-        if not isinstance(raw_values, list):
-            return ()
-        return tuple(item.strip() for item in raw_values if isinstance(item, str) and item.strip())
 
     def _save_scan_point_data(
         self,
@@ -483,9 +437,9 @@ class ScanControlPage(QWidget):
         self.scan_manager = scan_manager or ScanManager()
         self.device_manager = device_manager or DeviceManager()
         self.serial_is_open = False
-        self._serial_port = QSerialPort(self)
-        self._serial_port.readyRead.connect(self._on_serial_ready_read)
-        self._serial_port.errorOccurred.connect(self._on_serial_error)
+        self._serial_port = QSerialPort()
+        self._serial_monitoring_enabled = False
+        self._enable_serial_monitoring()
         self._serial_read_buffer = ""
         self._scan_points: list[tuple[float, float, float]] = []
         self._scan_point_index = 0
@@ -495,7 +449,6 @@ class ScanControlPage(QWidget):
         self._scan_thread: QThread | None = None
         self._scan_worker: ScanWorker | None = None
         self._scan_stop_requested = False
-        self._restore_serial_after_scan = False
         self._instrument_search_thread: QThread | None = None
         self._instrument_search_worker: InstrumentSearchWorker | None = None
 
@@ -992,8 +945,33 @@ class ScanControlPage(QWidget):
         self.append_log(f"轴移动: {axis} {'+' if delta >= 0 else ''}{delta:.2f} mm")
 
     def _sync_serial_buttons(self) -> None:
-        self.open_serial_button.setEnabled(not self.serial_is_open)
-        self.close_serial_button.setEnabled(self.serial_is_open)
+        can_edit_serial = self._scan_thread is None
+        self.open_serial_button.setEnabled(can_edit_serial and (not self.serial_is_open))
+        self.close_serial_button.setEnabled(can_edit_serial and self.serial_is_open)
+
+    def _enable_serial_monitoring(self) -> None:
+        """绑定手动串口监控信号。"""
+
+        if self._serial_monitoring_enabled:
+            return
+        self._serial_port.readyRead.connect(self._on_serial_ready_read)
+        self._serial_port.errorOccurred.connect(self._on_serial_error)
+        self._serial_monitoring_enabled = True
+
+    def _disable_serial_monitoring(self) -> None:
+        """解绑手动串口监控信号，避免扫描线程并发读取。"""
+
+        if not self._serial_monitoring_enabled:
+            return
+        try:
+            self._serial_port.readyRead.disconnect(self._on_serial_ready_read)
+        except (RuntimeError, TypeError):
+            pass
+        try:
+            self._serial_port.errorOccurred.disconnect(self._on_serial_error)
+        except (RuntimeError, TypeError):
+            pass
+        self._serial_monitoring_enabled = False
 
     def _update_step_values_to_table(self, *, save_config: bool = True) -> None:
         self._update_table_cell("step_x", self.step_x_edit.text() or "0.00")
@@ -1190,6 +1168,9 @@ class ScanControlPage(QWidget):
         if self._scan_thread is not None:
             self.append_log("开始扫描失败：已有扫描任务在执行")
             return
+        if not self.serial_is_open or not self._serial_port.isOpen():
+            self.append_log("开始扫描失败：请先打开串口并完成复位")
+            return
 
         try:
             self._scan_points = self._build_scan_points()
@@ -1220,6 +1201,16 @@ class ScanControlPage(QWidget):
             self._refresh_clock()
             return
 
+        try:
+            analyzer = self._get_instrument_adapter(panel.instrument_name)
+            self.scan_manager.set_spectrum_analyzer(analyzer)
+            self.scan_manager.set_spectrum_config(self._build_instrument_measurement_config(panel))
+        except SpectrumAnalyzerError as error:
+            self.append_log(f"开始扫描失败：仪表连接失败：{error}")
+            self.scan_manager.fail_scan(f"仪表连接失败：{error}")
+            self._refresh_clock()
+            return
+
         self._prepare_scan_storage_workspace()
         self._refresh_clock()
         self._save_scan_plan_snapshot()
@@ -1227,10 +1218,7 @@ class ScanControlPage(QWidget):
             "扫描开始："
             f"共 {len(self._scan_points)} 点，顺序为 Z 外层（增大）、Y 中层（减小）、X 内层（增大）"
         )
-        self._restore_serial_after_scan = self.serial_is_open
-        if self.serial_is_open:
-            self.append_log("扫描前自动释放手动串口连接，避免重复打开导致扫描失败。")
-            self.on_close_serial()
+        self.append_log("扫描将复用当前已打开串口句柄与已连接仪表句柄，不再重复获取。")
         self._start_scan_worker(panel)
 
     def on_pause_scan(self) -> None:
@@ -1245,26 +1233,25 @@ class ScanControlPage(QWidget):
         self.append_log("已请求停止扫描，正在等待当前阶段安全退出。")
 
     def _start_scan_worker(self, panel: InstrumentPanel) -> None:
-        selected_port = self.port_combo.currentData() or self.port_combo.currentText().strip()
-        if not selected_port:
-            self.append_log("开始扫描失败：未选择串口")
-            self.scan_manager.fail_scan("未选择串口")
+        del panel
+        if not self._serial_port.isOpen():
+            self.append_log("开始扫描失败：串口未打开")
+            self.scan_manager.fail_scan("串口未打开")
             self._refresh_clock()
             return
 
+        self._disable_serial_monitoring()
         self._scan_thread = QThread(self)
+        self._serial_port.moveToThread(self._scan_thread)
         self._scan_worker = ScanWorker(
-            port_name=str(selected_port),
-            baud_rate=int(self.baudrate_combo.currentText()),
+            serial_port=self._serial_port,
             scan_points=self._scan_points,
             feed_rate=self.current_feed_rate,
             dwell_seconds=self.SCAN_DWELL_SECONDS,
             motion_timeout_seconds=self.MOTION_WAIT_TIMEOUT_SECONDS,
             instrument_name=panel.instrument_name,
             output_dir=self._get_current_output_dir(),
-            spectrum_config=self._build_instrument_measurement_config(panel),
             scan_manager=self.scan_manager,
-            device_manager=self.device_manager,
         )
         self._scan_worker.moveToThread(self._scan_thread)
         self._scan_thread.started.connect(self._scan_worker.run)
@@ -1275,6 +1262,7 @@ class ScanControlPage(QWidget):
         self._scan_worker.finished.connect(self._scan_thread.quit)
         self._scan_thread.finished.connect(self._on_scan_thread_finished)
         self._scan_thread.start()
+        self._sync_serial_buttons()
 
     def _on_scan_worker_point_started(
         self,
@@ -1322,6 +1310,8 @@ class ScanControlPage(QWidget):
         self._refresh_clock()
 
     def _on_scan_thread_finished(self) -> None:
+        self._serial_port.moveToThread(self.thread())
+        self._enable_serial_monitoring()
         if self._scan_worker is not None:
             self._scan_worker.deleteLater()
         if self._scan_thread is not None:
@@ -1329,13 +1319,7 @@ class ScanControlPage(QWidget):
         self._scan_worker = None
         self._scan_thread = None
         self._scan_stop_requested = False
-        if self._restore_serial_after_scan:
-            restored = self._open_serial_port_for_manual_control(emit_success_log=False)
-            if restored:
-                self.append_log("扫描结束后已自动恢复手动串口连接。")
-            else:
-                self.append_log("扫描结束后尝试恢复手动串口连接失败，请手动重连。")
-        self._restore_serial_after_scan = False
+        self._sync_serial_buttons()
 
     def on_clear_log(self) -> None:
         self.log_edit.clear()
