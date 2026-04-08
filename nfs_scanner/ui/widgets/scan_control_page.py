@@ -86,6 +86,7 @@ class ScanWorker(QObject):
 
     STATUS_QUERY_COMMAND = "?"
     STATUS_POLL_INTERVAL_SECONDS = 0.1
+    MOTION_BLOCKING_STATES = frozenset({"Alarm", "Door", "Check", "Sleep"})
 
     def __init__(
         self,
@@ -125,6 +126,10 @@ class ScanWorker(QObject):
                 self.finished.emit("error", "扫描串口未打开，请先完成串口连接与复位")
                 return
             self._reset_serial_rx_state(self._serial_port)
+            ready, reason = self._ensure_controller_ready(self._serial_port)
+            if not ready:
+                self.finished.emit("error", reason)
+                return
 
             for point_index, (x, y, z) in enumerate(self._scan_points, start=1):
                 if self._stop_requested:
@@ -205,6 +210,8 @@ class ScanWorker(QObject):
         """轮询设备状态，直到 Idle 且位置到位。"""
 
         deadline = time.monotonic() + timeout_seconds
+        latest_state = ""
+        latest_status_line = ""
         while time.monotonic() < deadline:
             if self._stop_requested:
                 return False, "扫描已停止"
@@ -212,15 +219,41 @@ class ScanWorker(QObject):
             if status_line is None:
                 time.sleep(self.STATUS_POLL_INTERVAL_SECONDS)
                 continue
+            latest_status_line = status_line
             state, current_pos = self._parse_motion_status(status_line)
+            latest_state = state
             if state in {"Run", "Busy", "Hold"}:
                 time.sleep(self.STATUS_POLL_INTERVAL_SECONDS)
                 continue
+            if state in self.MOTION_BLOCKING_STATES:
+                return False, f"运动控制器状态异常: {state}，请先复位/解锁后重试"
             if state == "Idle":
                 if current_pos is None or self._is_position_within_tolerance(current_pos, target):
                     return True, ""
             time.sleep(self.STATUS_POLL_INTERVAL_SECONDS)
-        return False, "等待运动完成超时"
+        if latest_state:
+            return False, (
+                "等待运动完成超时，"
+                f"最后状态={latest_state}，目标=({target[0]:.2f}, {target[1]:.2f}, {target[2]:.2f})"
+            )
+        if latest_status_line:
+            return False, f"等待运动完成超时，最后响应={latest_status_line}"
+        return False, "等待运动完成超时：未收到状态响应"
+
+    def _ensure_controller_ready(self, serial_port: QSerialPort) -> tuple[bool, str]:
+        """扫描前检查控制器状态，避免上一轮异常状态影响新任务。"""
+
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:
+            status_line = self._query_motion_status(serial_port)
+            if status_line is None:
+                time.sleep(self.STATUS_POLL_INTERVAL_SECONDS)
+                continue
+            state, _ = self._parse_motion_status(status_line)
+            if state in self.MOTION_BLOCKING_STATES:
+                return False, f"控制器状态为 {state}，请先复位/解锁后再开始扫描"
+            return True, ""
+        return False, "扫描前未能读取控制器状态，请检查串口连接或控制器是否在线"
 
     def _wait_with_stop_check(self, seconds: float) -> bool:
         """驻留等待，期间持续检查 stop 请求。"""

@@ -118,6 +118,32 @@ class ScanWorkerSerialParsingTestCase(unittest.TestCase):
         )
         self.assertEqual(latest, "<Idle|MPos:1.00,2.00,3.00|FS:0,0>")
 
+    def test_ensure_controller_ready_rejects_alarm_state(self) -> None:
+        """Preflight should fail fast when controller reports a blocking state."""
+
+        self.worker.STATUS_POLL_INTERVAL_SECONDS = 0.0
+        self.worker._query_motion_status = lambda _serial_port: "<Alarm|MPos:0.00,0.00,0.00|FS:0,0>"
+        ready, reason = self.worker._ensure_controller_ready(serial_port=None)
+        self.assertFalse(ready)
+        self.assertIn("Alarm", reason)
+
+    def test_wait_until_motion_done_reports_blocking_state_instead_of_timeout(self) -> None:
+        """Runtime polling should return actionable reason when controller enters Alarm state."""
+
+        self.worker.STATUS_POLL_INTERVAL_SECONDS = 0.0
+        self.worker._stop_requested = False
+        self.worker.MOTION_BLOCKING_STATES = frozenset({"Alarm", "Door", "Check", "Sleep"})
+        self.worker._query_motion_status = lambda _serial_port: "<Alarm|MPos:0.00,0.00,0.00|FS:0,0>"
+
+        done, reason = self.worker._wait_until_motion_done(
+            serial_port=None,
+            target=(1.0, 2.0, 3.0),
+            timeout_seconds=0.2,
+        )
+        self.assertFalse(done)
+        self.assertIn("状态异常", reason)
+        self.assertIn("Alarm", reason)
+
 
 if __name__ == "__main__":
     unittest.main()
