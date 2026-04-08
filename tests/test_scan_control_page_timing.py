@@ -47,15 +47,13 @@ class ScanControlPageTimingTestCase(unittest.TestCase):
         )
         self.page = ScanControlPage(scan_manager=self.scan_manager)
         self.page.clock_timer.stop()
-        self.page._scan_timer.stop()
         self.page.serial_is_open = True
-        self.page.SCAN_DISPATCH_INTERVAL_MS = 5000
+        self.page.SCAN_DWELL_SECONDS = 5.0
         self.page._build_scan_points = lambda: [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (2.0, 0.0, 0.0)]
         self.page._prepare_scan_storage_workspace = lambda: None
         self.page._save_scan_plan_snapshot = lambda: None
         self.page._save_scan_execution_snapshot = lambda completed: None
-        self.page._capture_and_store_scan_point = lambda **kwargs: (True, "ok")
-        self.page._send_serial_command = lambda command: (True, "ok")
+        self.page._start_scan_worker = lambda panel: None
 
     def tearDown(self) -> None:
         self.page.close()
@@ -76,37 +74,14 @@ class ScanControlPageTimingTestCase(unittest.TestCase):
             label_text,
         )
 
-    def test_pause_freezes_eta_and_resume_reanchors_display(self) -> None:
-        """Pause should freeze manager timing, and resume should re-anchor the ETA."""
+    def test_scan_start_no_longer_depends_on_dispatch_timer(self) -> None:
+        """Scan start should trigger worker path, without timer-dispatch entry points."""
 
         self.page.on_start_scan()
-        self.clock.advance(2.0)
-        self.page._refresh_clock()
 
-        before_pause = self.scan_manager.get_scan_runtime_snapshot()
-        self.page.on_pause_scan()
-        paused_snapshot = self.scan_manager.get_scan_runtime_snapshot()
-
-        self.assertEqual(paused_snapshot.status, "paused")
-        self.assertEqual(paused_snapshot.remaining_seconds, before_pause.remaining_seconds)
-        frozen_eta = paused_snapshot.estimated_completion_time
-        frozen_remaining = paused_snapshot.remaining_seconds
-
-        self.clock.advance(10.0)
-        self.page._refresh_clock()
-        label_text = self.page.time_status_label.text()
-        self.assertEqual(self.scan_manager.get_scan_runtime_snapshot().remaining_seconds, frozen_remaining)
-        self.assertIn(f"剩余: {frozen_remaining} 秒", label_text)
-
-        self.page._dispatch_next_scan_point = lambda: None
-        self.page.on_start_scan()
-        resumed_snapshot = self.scan_manager.get_scan_runtime_snapshot()
-
-        self.assertEqual(resumed_snapshot.status, "running")
-        self.assertEqual(resumed_snapshot.remaining_seconds, frozen_remaining)
-        self.assertIsNotNone(frozen_eta)
-        self.assertIsNotNone(resumed_snapshot.estimated_completion_time)
-        self.assertGreater(resumed_snapshot.estimated_completion_time, frozen_eta)
+        self.assertFalse(hasattr(self.page, "_scan_timer"))
+        self.assertFalse(hasattr(self.page, "_dispatch_next_scan_point"))
+        self.assertEqual(self.scan_manager.get_scan_runtime_snapshot().status, "running")
 
     def test_page_no_longer_tracks_scan_timing_locally(self) -> None:
         """Core timing fields should live in the manager rather than on the page."""
