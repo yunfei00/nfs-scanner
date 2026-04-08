@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -75,6 +76,317 @@ class InstrumentSearchWorker(QObject):
         self.finished.emit(result)
 
 
+class ScanWorker(QObject):
+    """在后台线程中串行执行整次扫描任务。"""
+
+    point_started = Signal(int, int, float, float, float)
+    point_completed = Signal(int, int, float, float, float, object)
+    log_message = Signal(str)
+    finished = Signal(str, str)
+
+    STATUS_QUERY_COMMAND = "?"
+    STATUS_POLL_INTERVAL_SECONDS = 0.1
+
+    def __init__(
+        self,
+        *,
+        port_name: str,
+        baud_rate: int,
+        scan_points: list[tuple[float, float, float]],
+        feed_rate: float,
+        dwell_seconds: float,
+        motion_timeout_seconds: float,
+        instrument_name: str,
+        output_dir: Path,
+        spectrum_config: SpectrumConfig,
+        scan_manager: ScanManager,
+        device_manager: DeviceManager,
+    ) -> None:
+        super().__init__()
+        self._port_name = port_name
+        self._baud_rate = baud_rate
+        self._scan_points = list(scan_points)
+        self._feed_rate = float(feed_rate)
+        self._dwell_seconds = max(float(dwell_seconds), 0.0)
+        self._motion_timeout_seconds = max(float(motion_timeout_seconds), 0.1)
+        self._instrument_name = instrument_name
+        self._output_dir = output_dir
+        self._spectrum_config = spectrum_config
+        self._scan_manager = scan_manager
+        self._device_manager = device_manager
+        self._stop_requested = False
+
+    def request_stop(self) -> None:
+        """请求停止扫描，worker 会在阶段检查点尽快退出。"""
+
+        self._stop_requested = True
+
+    def run(self) -> None:
+        """逐点执行：移动 -> 等待到位 -> 驻留 -> 采集 -> 存储。"""
+
+        serial_port = QSerialPort()
+        serial_port.setPortName(self._port_name)
+        serial_port.setBaudRate(self._baud_rate)
+        serial_port.setDataBits(QSerialPort.DataBits.Data8)
+        serial_port.setParity(QSerialPort.Parity.NoParity)
+        serial_port.setStopBits(QSerialPort.StopBits.OneStop)
+        serial_port.setFlowControl(QSerialPort.FlowControl.NoFlowControl)
+
+        if not serial_port.open(QIODevice.OpenModeFlag.ReadWrite):
+            self.finished.emit("error", f"扫描串口打开失败: {serial_port.errorString()}")
+            return
+
+        try:
+            analyzer = self._device_manager.ensure_spectrum_device(
+                instrument_type=self._instrument_name,
+                resource_names=self._load_cached_instrument_resources(),
+            )
+            self._scan_manager.set_spectrum_analyzer(analyzer)
+            self._scan_manager.set_spectrum_config(self._spectrum_config)
+        except SpectrumAnalyzerError as error:
+            serial_port.close()
+            self.finished.emit("error", f"仪表连接失败: {error}")
+            return
+
+        try:
+            for point_index, (x, y, z) in enumerate(self._scan_points, start=1):
+                if self._stop_requested:
+                    self._send_stop(serial_port)
+                    self.finished.emit("stopped", "扫描已停止")
+                    return
+
+                self.point_started.emit(point_index, len(self._scan_points), x, y, z)
+                command = f"G1 X{x:.2f} Y{y:.2f} Z{z:.2f} F{self._feed_rate:.0f}"
+                ok, reason = self._send_command(serial_port, command)
+                if not ok:
+                    self.finished.emit("error", f"发送运动命令失败: {reason}")
+                    return
+                self.log_message.emit(f"发送命令: {command}")
+
+                done, reason = self._wait_until_motion_done(
+                    serial_port=serial_port,
+                    target=(x, y, z),
+                    timeout_seconds=self._motion_timeout_seconds,
+                )
+                if not done:
+                    self.finished.emit("error", reason)
+                    return
+
+                if not self._wait_with_stop_check(self._dwell_seconds):
+                    self._send_stop(serial_port)
+                    self.finished.emit("stopped", "扫描已停止")
+                    return
+
+                if self._stop_requested:
+                    self._send_stop(serial_port)
+                    self.finished.emit("stopped", "扫描已停止")
+                    return
+
+                try:
+                    measurement = self._scan_manager.acquire_spectrum_measurement()
+                except SpectrumAnalyzerError as error:
+                    self.finished.emit("error", f"采集失败: {error}")
+                    return
+
+                saved, message = self._save_scan_point_data(
+                    instrument_name=self._instrument_name,
+                    measurement=measurement,
+                    x=x,
+                    y=y,
+                    z=z,
+                    point_index=point_index,
+                    output_dir=self._output_dir,
+                )
+                if not saved:
+                    self.finished.emit("error", f"存储失败: {message}")
+                    return
+
+                self.point_completed.emit(point_index, len(self._scan_points), x, y, z, measurement)
+        finally:
+            serial_port.close()
+
+        self.finished.emit("completed", "扫描完成")
+
+    def _wait_until_motion_done(
+        self,
+        *,
+        serial_port: QSerialPort,
+        target: tuple[float, float, float],
+        timeout_seconds: float,
+    ) -> tuple[bool, str]:
+        """轮询设备状态，直到 Idle 且位置到位。"""
+
+        deadline = time.monotonic() + timeout_seconds
+        while time.monotonic() < deadline:
+            if self._stop_requested:
+                return False, "扫描已停止"
+            status_line = self._query_motion_status(serial_port)
+            if status_line is None:
+                time.sleep(self.STATUS_POLL_INTERVAL_SECONDS)
+                continue
+            state, current_pos = self._parse_motion_status(status_line)
+            if state in {"Run", "Busy", "Hold"}:
+                time.sleep(self.STATUS_POLL_INTERVAL_SECONDS)
+                continue
+            if state == "Idle":
+                if current_pos is None or self._is_position_within_tolerance(current_pos, target):
+                    return True, ""
+            time.sleep(self.STATUS_POLL_INTERVAL_SECONDS)
+        return False, "等待运动完成超时"
+
+    def _wait_with_stop_check(self, seconds: float) -> bool:
+        """驻留等待，期间持续检查 stop 请求。"""
+
+        end_time = time.monotonic() + seconds
+        while time.monotonic() < end_time:
+            if self._stop_requested:
+                return False
+            time.sleep(min(0.05, max(end_time - time.monotonic(), 0.0)))
+        return True
+
+    def _query_motion_status(self, serial_port: QSerialPort) -> str | None:
+        ok, _ = self._send_command(serial_port, self.STATUS_QUERY_COMMAND)
+        if not ok:
+            return None
+        return self._read_serial_response_line(serial_port, timeout_ms=300)
+
+    def _send_command(self, serial_port: QSerialPort, command: str) -> tuple[bool, str]:
+        payload = f"{command}\r\n".encode("utf-8")
+        written = serial_port.write(payload)
+        if written <= 0:
+            return False, serial_port.errorString() or "写入失败"
+        if not serial_port.waitForBytesWritten(500):
+            return False, serial_port.errorString() or "写入超时"
+        return True, ""
+
+    def _send_stop(self, serial_port: QSerialPort) -> None:
+        serial_port.write(b"\x18")
+        serial_port.waitForBytesWritten(200)
+
+    def _read_serial_response_line(self, serial_port: QSerialPort, timeout_ms: int = 300) -> str | None:
+        if not serial_port.waitForReadyRead(timeout_ms):
+            return None
+        chunks = [bytes(serial_port.readAll()).decode("utf-8", errors="replace")]
+        while serial_port.waitForReadyRead(20):
+            chunks.append(bytes(serial_port.readAll()).decode("utf-8", errors="replace"))
+        merged = "".join(chunks).replace("\r", "\n")
+        for line in merged.split("\n"):
+            cleaned = line.strip()
+            if cleaned.startswith("<") and "|" in cleaned:
+                return cleaned
+        return None
+
+    def _parse_motion_status(self, status_line: str) -> tuple[str, tuple[float, float, float] | None]:
+        if not status_line.startswith("<"):
+            return "", None
+        payload = status_line.strip("<>")
+        head = payload.split("|", 1)[0]
+        if "MPos:" not in payload:
+            return head, None
+        mpos_segment = payload.split("MPos:", 1)[1].split("|", 1)[0]
+        values = mpos_segment.split(",")
+        if len(values) < 3:
+            return head, None
+        try:
+            return head, (float(values[0]), float(values[1]), float(values[2]))
+        except ValueError:
+            return head, None
+
+    def _is_position_within_tolerance(
+        self,
+        current: tuple[float, float, float],
+        target: tuple[float, float, float],
+        tolerance: float = 0.02,
+    ) -> bool:
+        return all(abs(cur - tar) <= tolerance for cur, tar in zip(current, target))
+
+    def _load_cached_instrument_resources(self) -> tuple[str, ...]:
+        cache_path = ScanControlPage.INSTRUMENT_CACHE_PATH
+        if not cache_path.exists():
+            return ()
+        try:
+            payload = json.loads(cache_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return ()
+        resources_by_instrument = payload.get("resources_by_instrument")
+        if not isinstance(resources_by_instrument, dict):
+            return ()
+        raw_values = resources_by_instrument.get(self._instrument_name, [])
+        if not isinstance(raw_values, list):
+            return ()
+        return tuple(item.strip() for item in raw_values if isinstance(item, str) and item.strip())
+
+    def _save_scan_point_data(
+        self,
+        *,
+        instrument_name: str,
+        measurement: object,
+        x: float,
+        y: float,
+        z: float,
+        point_index: int,
+        output_dir: Path,
+    ) -> tuple[bool, str]:
+        from nfs_scanner.core.models import SpectrumAcquisitionResult
+
+        if not isinstance(measurement, SpectrumAcquisitionResult):
+            return False, "采集结果类型无效"
+
+        data_dir = output_dir / "instrument_scan_data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        if instrument_name == "ZNA67":
+            data_file = data_dir / f"point_{point_index:06d}_zna67.csv"
+            combined_csv_file = data_dir / "all_points.csv"
+            try:
+                mmem_text = measurement.metadata.get("mmem_csv_text")
+                if not isinstance(mmem_text, str) or not mmem_text.strip():
+                    return False, "ZNA67 未返回 MMEM CSV 文本"
+                raw_text = convert_zna_mmem_csv_to_row_text(raw_text=mmem_text, x=x, y=y, z=z)
+                save_zna_trace_csv(raw_text=raw_text, file_path=data_file)
+                append_zna_trace_csv(raw_text=raw_text, file_path=combined_csv_file)
+            except (OSError, ValueError) as error:
+                return False, str(error)
+        else:
+            data_file = data_dir / f"point_{point_index:06d}_{instrument_name.lower()}_snapshot.json"
+            snapshot = measurement.to_serializable_dict()
+            snapshot.update(
+                {
+                    "instrument_name": instrument_name,
+                    "point_index": point_index,
+                    "x": x,
+                    "y": y,
+                    "z": z,
+                    "saved_at": datetime.now().isoformat(timespec="seconds"),
+                }
+            )
+            try:
+                data_file.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
+            except OSError as error:
+                return False, str(error)
+
+        index_file = data_dir / "point_index.jsonl"
+        try:
+            with index_file.open("a", encoding="utf-8") as handle:
+                handle.write(
+                    json.dumps(
+                        {
+                            "point_index": point_index,
+                            "instrument_name": instrument_name,
+                            "x": x,
+                            "y": y,
+                            "z": z,
+                            "saved_at": datetime.now().isoformat(timespec="seconds"),
+                            "file_name": data_file.name,
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
+        except OSError as error:
+            return False, str(error)
+        return True, "ok"
+
+
 class ScanControlPage(QWidget):
     """扫描控制页面。
 
@@ -104,7 +416,8 @@ class ScanControlPage(QWidget):
     INSTRUMENT_ORDER = tuple(SUPPORTED_INSTRUMENTS)
     SERIAL_FALLBACK_INSTRUMENTS = frozenset({"ZNA67"})
     SCAN_AREA_CONFIG_PATH = Path("config") / "scan_area_config.json"
-    SCAN_DISPATCH_INTERVAL_MS = 120
+    SCAN_DWELL_SECONDS = 0.12
+    MOTION_WAIT_TIMEOUT_SECONDS = 30.0
     RUNTIME_STATUS_LABELS = {
         "idle": "就绪",
         "running": "扫描中",
@@ -173,13 +486,14 @@ class ScanControlPage(QWidget):
         self._serial_port.readyRead.connect(self._on_serial_ready_read)
         self._serial_port.errorOccurred.connect(self._on_serial_error)
         self._serial_read_buffer = ""
-        self._scan_timer = QTimer(self)
-        self._scan_timer.timeout.connect(self._dispatch_next_scan_point)
         self._scan_points: list[tuple[float, float, float]] = []
         self._scan_point_index = 0
         self._executed_scan_points: list[tuple[float, float, float]] = []
         self._is_updating_scan_table = False
         self._active_scan_output_dir: Path | None = None
+        self._scan_thread: QThread | None = None
+        self._scan_worker: ScanWorker | None = None
+        self._scan_stop_requested = False
         self._instrument_search_thread: QThread | None = None
         self._instrument_search_worker: InstrumentSearchWorker | None = None
 
@@ -690,11 +1004,6 @@ class ScanControlPage(QWidget):
         if state == "扫描中":
             self.start_button.setText("开始")
             self.start_button.setEnabled(False)
-            self.pause_button.setEnabled(True)
-            self.stop_button.setEnabled(True)
-        elif state == "暂停":
-            self.start_button.setText("恢复")
-            self.start_button.setEnabled(True)
             self.pause_button.setEnabled(False)
             self.stop_button.setEnabled(True)
         else:
@@ -869,12 +1178,11 @@ class ScanControlPage(QWidget):
         self.append_log("已将当前坐标设为扫描终点")
 
     def on_start_scan(self) -> None:
-        if self._get_scan_runtime_snapshot().status == "paused":
-            self._resume_scan()
-            return
-
         if not self.serial_is_open:
             self.append_log("开始扫描失败：串口未打开")
+            return
+        if self._scan_thread is not None:
+            self.append_log("开始扫描失败：已有扫描任务在执行")
             return
 
         try:
@@ -889,14 +1197,23 @@ class ScanControlPage(QWidget):
 
         self._scan_point_index = 0
         self._executed_scan_points = []
+        self._scan_stop_requested = False
         try:
             self.scan_manager.begin_scan(
                 total_points=len(self._scan_points),
-                minimum_point_seconds=self.SCAN_DISPATCH_INTERVAL_MS / 1000,
+                minimum_point_seconds=self.SCAN_DWELL_SECONDS,
             )
         except RuntimeError as error:
             self.append_log(f"开始扫描失败：{error}")
             return
+
+        panel = self.instrument_tabs.currentWidget()
+        if not isinstance(panel, InstrumentPanel):
+            self.append_log("开始扫描失败：当前未选中有效仪表页签")
+            self.scan_manager.fail_scan("当前未选中有效仪表页签")
+            self._refresh_clock()
+            return
+
         self._prepare_scan_storage_workspace()
         self._refresh_clock()
         self._save_scan_plan_snapshot()
@@ -904,67 +1221,104 @@ class ScanControlPage(QWidget):
             "扫描开始："
             f"共 {len(self._scan_points)} 点，顺序为 Z 外层（增大）、Y 中层（减小）、X 内层（增大）"
         )
-        self._scan_timer.start(self.SCAN_DISPATCH_INTERVAL_MS)
-        self._dispatch_next_scan_point()
+        self._start_scan_worker(panel)
 
     def on_pause_scan(self) -> None:
-        snapshot = self._get_scan_runtime_snapshot()
-        if snapshot.status != "running" or not self._scan_points or self._scan_point_index >= len(self._scan_points):
-            self.append_log("暂停扫描失败：当前没有进行中的任务")
-            return
-
-        self._scan_timer.stop()
-        try:
-            self.scan_manager.pause_scan()
-        except RuntimeError as error:
-            self.append_log(f"暂停扫描失败：{error}")
-            return
-        self._refresh_clock()
-        sent, reason = self._send_serial_command("!")
-        if sent:
-            self.append_log("发送命令: !（暂停）")
-        else:
-            self.append_log(f"发送命令失败: !，原因: {reason}")
+        self.append_log("暂停功能暂未开放；当前版本优先保证 stop 可靠性。")
 
     def on_stop_scan(self) -> None:
-        self._scan_timer.stop()
-        self._save_scan_execution_snapshot(completed=False)
-        self._scan_points = []
-        self._scan_point_index = 0
-        self.scan_manager.stop_scan()
-        self._refresh_clock()
-        sent, reason = self._send_serial_command("\x18")
-        if sent:
-            self.append_log("发送命令: Ctrl+X（停止/复位）")
-        else:
-            self.append_log(f"发送命令失败: Ctrl+X，原因: {reason}")
-
-    def _resume_scan(self) -> None:
-        """恢复已暂停的扫描任务。"""
-
-        if not self.serial_is_open:
-            self.append_log("恢复扫描失败：串口未打开")
+        if self._scan_worker is None:
+            self.append_log("停止扫描：当前没有运行中的任务")
             return
-        if not self._scan_points or self._scan_point_index >= len(self._scan_points):
-            self.append_log("恢复扫描失败：当前没有可恢复的任务")
+        self._scan_stop_requested = True
+        self._scan_worker.request_stop()
+        self.append_log("已请求停止扫描，正在等待当前阶段安全退出。")
+
+    def _start_scan_worker(self, panel: InstrumentPanel) -> None:
+        selected_port = self.port_combo.currentData() or self.port_combo.currentText().strip()
+        if not selected_port:
+            self.append_log("开始扫描失败：未选择串口")
+            self.scan_manager.fail_scan("未选择串口")
             self._refresh_clock()
             return
 
-        sent, reason = self._send_serial_command("~")
-        if not sent:
-            self.append_log(f"发送命令失败: ~，原因: {reason}")
-            return
+        self._scan_thread = QThread(self)
+        self._scan_worker = ScanWorker(
+            port_name=str(selected_port),
+            baud_rate=int(self.baudrate_combo.currentText()),
+            scan_points=self._scan_points,
+            feed_rate=self.current_feed_rate,
+            dwell_seconds=self.SCAN_DWELL_SECONDS,
+            motion_timeout_seconds=self.MOTION_WAIT_TIMEOUT_SECONDS,
+            instrument_name=panel.instrument_name,
+            output_dir=self._get_current_output_dir(),
+            spectrum_config=self._build_instrument_measurement_config(panel),
+            scan_manager=self.scan_manager,
+            device_manager=self.device_manager,
+        )
+        self._scan_worker.moveToThread(self._scan_thread)
+        self._scan_thread.started.connect(self._scan_worker.run)
+        self._scan_worker.log_message.connect(self.append_log)
+        self._scan_worker.point_started.connect(self._on_scan_worker_point_started)
+        self._scan_worker.point_completed.connect(self._on_scan_worker_point_completed)
+        self._scan_worker.finished.connect(self._on_scan_worker_finished)
+        self._scan_worker.finished.connect(self._scan_thread.quit)
+        self._scan_thread.finished.connect(self._on_scan_thread_finished)
+        self._scan_thread.start()
 
-        try:
-            self.scan_manager.resume_scan()
-        except RuntimeError as error:
-            self.append_log(f"恢复扫描失败：{error}")
-            return
+    def _on_scan_worker_point_started(
+        self,
+        point_index: int,
+        total_points: int,
+        x: float,
+        y: float,
+        z: float,
+    ) -> None:
+        self.current_x = x
+        self.current_y = y
+        self.current_z = z
+        self.update_position_status(x, y, z)
+        self.append_log(f"扫描点 {point_index}/{total_points} 开始: X{x:.2f} Y{y:.2f} Z{z:.2f}")
+
+    def _on_scan_worker_point_completed(
+        self,
+        point_index: int,
+        total_points: int,
+        x: float,
+        y: float,
+        z: float,
+        _measurement: object,
+    ) -> None:
+        del _measurement
+        self._executed_scan_points.append((x, y, z))
+        self._scan_point_index = point_index
+        self.scan_manager.record_completed_point()
         self._refresh_clock()
-        self.append_log("发送命令: ~（恢复）")
-        self.append_log(f"恢复扫描：剩余 {len(self._scan_points) - self._scan_point_index} 点")
-        self._scan_timer.start(self.SCAN_DISPATCH_INTERVAL_MS)
-        self._dispatch_next_scan_point()
+        self.append_log(f"扫描点 {point_index}/{total_points} 完成")
+
+    def _on_scan_worker_finished(self, outcome: str, message: str) -> None:
+        if outcome == "completed":
+            self.scan_manager.complete_scan()
+            self._save_scan_execution_snapshot(completed=True)
+            self.append_log("扫描结束：全部路径点执行完成")
+        elif outcome == "stopped":
+            self.scan_manager.stop_scan()
+            self._save_scan_execution_snapshot(completed=False)
+            self.append_log("扫描已停止")
+        else:
+            self.scan_manager.fail_scan(message)
+            self._save_scan_execution_snapshot(completed=False)
+            self.append_log(f"扫描失败：{message}")
+        self._refresh_clock()
+
+    def _on_scan_thread_finished(self) -> None:
+        if self._scan_worker is not None:
+            self._scan_worker.deleteLater()
+        if self._scan_thread is not None:
+            self._scan_thread.deleteLater()
+        self._scan_worker = None
+        self._scan_thread = None
+        self._scan_stop_requested = False
 
     def on_clear_log(self) -> None:
         self.log_edit.clear()
@@ -1738,53 +2092,6 @@ class ScanControlPage(QWidget):
             return
         self.append_log(f"串口错误: {self._serial_port.errorString()}")
 
-    def _dispatch_next_scan_point(self) -> None:
-        """按规划路径逐点发送绝对运动命令。"""
-
-        if self._scan_point_index >= len(self._scan_points):
-            self._scan_timer.stop()
-            self._save_scan_execution_snapshot(completed=True)
-            self.scan_manager.complete_scan()
-            self._refresh_clock()
-            self.append_log("扫描结束：全部路径点已发送")
-            return
-
-        x, y, z = self._scan_points[self._scan_point_index]
-        command = f"G1 X{x:.2f} Y{y:.2f} Z{z:.2f} F{self.current_feed_rate:.0f}"
-        sent, reason = self._send_serial_command(command)
-        if not sent:
-            self._scan_timer.stop()
-            self._save_scan_execution_snapshot(completed=False)
-            self.scan_manager.fail_scan(reason)
-            self._refresh_clock()
-            self.append_log(f"扫描中断：发送失败，原因: {reason}")
-            return
-
-        self.current_x = x
-        self.current_y = y
-        self.current_z = z
-        self.update_position_status(self.current_x, self.current_y, self.current_z)
-
-        saved, message = self._capture_and_store_scan_point(
-            x=x,
-            y=y,
-            z=z,
-            point_index=self._scan_point_index + 1,
-        )
-        if not saved:
-            self._scan_timer.stop()
-            self._save_scan_execution_snapshot(completed=False)
-            self.scan_manager.fail_scan(message)
-            self._refresh_clock()
-            self.append_log(f"扫描中断：测量存储失败，原因: {message}")
-            return
-
-        self._executed_scan_points.append((x, y, z))
-        self._scan_point_index += 1
-        self.scan_manager.record_completed_point()
-        self._refresh_clock()
-        self.append_log(f"扫描点 {self._scan_point_index}/{len(self._scan_points)}: {command}")
-
     def _prepare_scan_storage_workspace(self) -> None:
         """准备扫描过程中的数据存储目录和索引文件。"""
 
@@ -1801,123 +2108,6 @@ class ScanControlPage(QWidget):
         if combined_csv_file.exists():
             combined_csv_file.unlink()
         self.append_log(f"已初始化扫描数据目录: {data_dir}")
-
-    def _capture_and_store_scan_point(
-        self,
-        *,
-        x: float,
-        y: float,
-        z: float,
-        point_index: int,
-    ) -> tuple[bool, str]:
-        """采集并保存单个扫描点仪表数据。"""
-
-        panel = self.instrument_tabs.currentWidget()
-        if not isinstance(panel, InstrumentPanel):
-            return False, "当前未选中有效仪表页签"
-
-        instrument_name = panel.instrument_name
-        continue_disabled, disable_reason = self._set_instrument_continue(instrument_name, enabled=False)
-        if not continue_disabled:
-            return False, f"关闭 continue 失败: {disable_reason}"
-
-        try:
-            return self._save_scan_point_data(
-                instrument_name=instrument_name,
-                panel=panel,
-                x=x,
-                y=y,
-                z=z,
-                point_index=point_index,
-            )
-        finally:
-            continue_enabled, enable_reason = self._set_instrument_continue(instrument_name, enabled=True)
-            if not continue_enabled:
-                self.append_log(f"警告：存储完成后开启 continue 失败: {enable_reason}")
-
-    def _save_scan_point_data(
-        self,
-        *,
-        instrument_name: str,
-        panel: InstrumentPanel,
-        x: float,
-        y: float,
-        z: float,
-        point_index: int,
-    ) -> tuple[bool, str]:
-        """按扫描点保存仪表数据文件，并追加索引元数据。"""
-
-        del panel
-        output_dir = self._get_current_output_dir()
-        data_dir = output_dir / "instrument_scan_data"
-        data_dir.mkdir(parents=True, exist_ok=True)
-        try:
-            measurement = self._acquire_instrument_measurement(instrument_name)
-        except SpectrumAnalyzerError as error:
-            return False, str(error)
-
-        if instrument_name == "ZNA67":
-            data_file = data_dir / f"point_{point_index:06d}_zna67.csv"
-            combined_csv_file = data_dir / "all_points.csv"
-            try:
-                mmem_text = measurement.metadata.get("mmem_csv_text")
-                if not isinstance(mmem_text, str) or not mmem_text.strip():
-                    return False, "ZNA67 未返回 MMEM CSV 文本"
-                raw_text = convert_zna_mmem_csv_to_row_text(raw_text=mmem_text, x=x, y=y, z=z)
-                row_count, trace_names = save_zna_trace_csv(raw_text=raw_text, file_path=data_file)
-                append_zna_trace_csv(raw_text=raw_text, file_path=combined_csv_file)
-            except (OSError, ValueError) as error:
-                return False, str(error)
-            summary = (
-                f"{data_file.name}（{row_count} 行，trace: {'、'.join(sorted(trace_names))}，"
-                f"汇总: {combined_csv_file.name}）"
-            )
-        else:
-            data_file = data_dir / f"point_{point_index:06d}_{instrument_name.lower()}_snapshot.json"
-            snapshot = measurement.to_serializable_dict()
-            snapshot.update(
-                {
-                    "instrument_name": instrument_name,
-                    "point_index": point_index,
-                    "x": x,
-                    "y": y,
-                    "z": z,
-                    "saved_at": datetime.now().isoformat(timespec="seconds"),
-                }
-            )
-            try:
-                data_file.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
-            except OSError as error:
-                return False, str(error)
-            summary = data_file.name
-
-        index_file = data_dir / "point_index.jsonl"
-        metadata = {
-            "point_index": point_index,
-            "x": x,
-            "y": y,
-            "z": z,
-            "instrument_name": instrument_name,
-            "data_file": data_file.name,
-            "saved_at": datetime.now().isoformat(timespec="seconds"),
-        }
-        with index_file.open("a", encoding="utf-8") as file:
-            file.write(json.dumps(metadata, ensure_ascii=False) + "\n")
-
-        self.append_log(f"扫描点数据已保存: {summary}")
-        return True, str(data_file)
-
-    def _set_instrument_continue(self, instrument_name: str, *, enabled: bool) -> tuple[bool, str]:
-        """切换仪表连续扫描状态（INIT:CONT ON/OFF）。"""
-
-        try:
-            analyzer = self._get_instrument_adapter(instrument_name)
-            analyzer.set_continuous(enabled)
-            status_text = "开启" if enabled else "关闭"
-            self.append_log(f"{instrument_name} continue 已{status_text}")
-            return True, ""
-        except SpectrumAnalyzerError as error:
-            return False, str(error)
 
     def _save_scan_plan_snapshot(self) -> None:
         """保存当前扫描规划点，便于回溯与调试。"""
