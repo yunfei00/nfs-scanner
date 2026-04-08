@@ -1233,7 +1233,7 @@ class ScanControlPage(QWidget):
         self.append_log("已请求停止扫描，正在等待当前阶段安全退出。")
 
     def _start_scan_worker(self, panel: InstrumentPanel) -> None:
-        del panel
+        instrument_name = panel.instrument_name
         if not self._serial_port.isOpen():
             self.append_log("开始扫描失败：串口未打开")
             self.scan_manager.fail_scan("串口未打开")
@@ -1249,7 +1249,7 @@ class ScanControlPage(QWidget):
             feed_rate=self.current_feed_rate,
             dwell_seconds=self.SCAN_DWELL_SECONDS,
             motion_timeout_seconds=self.MOTION_WAIT_TIMEOUT_SECONDS,
-            instrument_name=panel.instrument_name,
+            instrument_name=instrument_name,
             output_dir=self._get_current_output_dir(),
             scan_manager=self.scan_manager,
         )
