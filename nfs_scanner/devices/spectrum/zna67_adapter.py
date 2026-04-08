@@ -9,7 +9,7 @@ import numpy as np
 from nfs_scanner.core.models import SpectrumAcquisitionResult
 
 from .exceptions import SpectrumQueryError
-from .scpi_adapter import BaseScpiSpectrumAnalyzer
+from .scpi_adapter import BaseScpiSpectrumAnalyzer, SpectrumCommandSet
 from .utils import normalize_frequency_window
 from .zna_storage import convert_zna_mmem_csv_to_row_text, parse_zna_trace_text
 
@@ -19,6 +19,20 @@ class Zna67SpectrumAnalyzer(BaseScpiSpectrumAnalyzer):
 
     instrument_type = "ZNA67"
     mmem_temp_trace_path = r"C:\temp\data.csv"
+    command_set = SpectrumCommandSet(
+        query_commands={
+            "start_freq": "SENS:FREQ:STAR?",
+            "stop_freq": "SENS:FREQ:STOP?",
+            "rbw": "SENS:BAND:RES?",
+            "points": "SENS:SWE:POIN?",
+        },
+        set_commands={
+            "start_freq": "SENS:FREQ:STAR",
+            "stop_freq": "SENS:FREQ:STOP",
+            "rbw": "SENS:BAND:RES",
+            "points": "SENS:SWE:POIN",
+        },
+    )
 
     def fetch_trace(self) -> SpectrumAcquisitionResult:
         """Fetch one ZNA67 trace bundle and normalize the primary trace."""
@@ -41,10 +55,10 @@ class Zna67SpectrumAnalyzer(BaseScpiSpectrumAnalyzer):
             acquisition_mode="trace",
             frequency_settings=frequency_settings,
             rbw_hz=self._query_optional_float("rbw"),
-            vbw_hz=self._query_optional_float("vbw"),
-            ref_level_dbm=self._query_optional_float("ref_level"),
-            detector=self._query_optional_text("detector"),
-            trace_mode=self._query_optional_text("trace_mode"),
+            vbw_hz=None,
+            ref_level_dbm=None,
+            detector=None,
+            trace_mode=None,
             trace_frequencies_hz=trace_axis,
             trace_values=amplitude_trace,
             point_value=float(np.max(amplitude_trace)) if amplitude_trace.size else None,
