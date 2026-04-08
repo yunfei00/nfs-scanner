@@ -117,65 +117,68 @@ class ScanWorker(QObject):
 
     def run(self) -> None:
         """逐点执行：移动 -> 等待到位 -> 驻留 -> 采集 -> 存储。"""
-        if not self._serial_port.isOpen():
-            self.finished.emit("error", "扫描串口未打开，请先完成串口连接与复位")
-            return
-
-        for point_index, (x, y, z) in enumerate(self._scan_points, start=1):
-            if self._stop_requested:
-                self._send_stop(self._serial_port)
-                self.finished.emit("stopped", "扫描已停止")
+        try:
+            if not self._serial_port.isOpen():
+                self.finished.emit("error", "扫描串口未打开，请先完成串口连接与复位")
                 return
 
-            self.point_started.emit(point_index, len(self._scan_points), x, y, z)
-            command = f"G1 X{x:.2f} Y{y:.2f} Z{z:.2f} F{self._feed_rate:.0f}"
-            ok, reason = self._send_command(self._serial_port, command)
-            if not ok:
-                self.finished.emit("error", f"发送运动命令失败: {reason}")
-                return
-            self.log_message.emit(f"发送命令: {command}")
+            for point_index, (x, y, z) in enumerate(self._scan_points, start=1):
+                if self._stop_requested:
+                    self._send_stop(self._serial_port)
+                    self.finished.emit("stopped", "扫描已停止")
+                    return
 
-            done, reason = self._wait_until_motion_done(
-                serial_port=self._serial_port,
-                target=(x, y, z),
-                timeout_seconds=self._motion_timeout_seconds,
-            )
-            if not done:
-                self.finished.emit("error", reason)
-                return
+                self.point_started.emit(point_index, len(self._scan_points), x, y, z)
+                command = f"G1 X{x:.2f} Y{y:.2f} Z{z:.2f} F{self._feed_rate:.0f}"
+                ok, reason = self._send_command(self._serial_port, command)
+                if not ok:
+                    self.finished.emit("error", f"发送运动命令失败: {reason}")
+                    return
+                self.log_message.emit(f"发送命令: {command}")
 
-            if not self._wait_with_stop_check(self._dwell_seconds):
-                self._send_stop(self._serial_port)
-                self.finished.emit("stopped", "扫描已停止")
-                return
+                done, reason = self._wait_until_motion_done(
+                    serial_port=self._serial_port,
+                    target=(x, y, z),
+                    timeout_seconds=self._motion_timeout_seconds,
+                )
+                if not done:
+                    self.finished.emit("error", reason)
+                    return
 
-            if self._stop_requested:
-                self._send_stop(self._serial_port)
-                self.finished.emit("stopped", "扫描已停止")
-                return
+                if not self._wait_with_stop_check(self._dwell_seconds):
+                    self._send_stop(self._serial_port)
+                    self.finished.emit("stopped", "扫描已停止")
+                    return
 
-            try:
-                measurement = self._scan_manager.acquire_spectrum_measurement()
-            except SpectrumAnalyzerError as error:
-                self.finished.emit("error", f"采集失败: {error}")
-                return
+                if self._stop_requested:
+                    self._send_stop(self._serial_port)
+                    self.finished.emit("stopped", "扫描已停止")
+                    return
 
-            saved, message = self._save_scan_point_data(
-                instrument_name=self._instrument_name,
-                measurement=measurement,
-                x=x,
-                y=y,
-                z=z,
-                point_index=point_index,
-                output_dir=self._output_dir,
-            )
-            if not saved:
-                self.finished.emit("error", f"存储失败: {message}")
-                return
+                try:
+                    measurement = self._scan_manager.acquire_spectrum_measurement()
+                except SpectrumAnalyzerError as error:
+                    self.finished.emit("error", f"采集失败: {error}")
+                    return
 
-            self.point_completed.emit(point_index, len(self._scan_points), x, y, z, measurement)
+                saved, message = self._save_scan_point_data(
+                    instrument_name=self._instrument_name,
+                    measurement=measurement,
+                    x=x,
+                    y=y,
+                    z=z,
+                    point_index=point_index,
+                    output_dir=self._output_dir,
+                )
+                if not saved:
+                    self.finished.emit("error", f"存储失败: {message}")
+                    return
 
-        self.finished.emit("completed", "扫描完成")
+                self.point_completed.emit(point_index, len(self._scan_points), x, y, z, measurement)
+
+            self.finished.emit("completed", "扫描完成")
+        except Exception as error:  # noqa: BLE001
+            self.finished.emit("error", f"扫描线程异常: {error}")
 
     def _wait_until_motion_done(
         self,
