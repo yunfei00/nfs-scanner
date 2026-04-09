@@ -1,6 +1,7 @@
 name: Release Windows Package
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - "v*"
@@ -11,10 +12,22 @@ permissions:
 jobs:
   build-and-release:
     runs-on: windows-latest
+    env:
+      DIST_DIR: dist/NFSScanner
+      VERSION_NAME: ${{ github.ref_name || 'manual' }}
+      TRIGGER_TYPE: ${{ github.event_name == 'workflow_dispatch' && 'manual' || 'tag' }}
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+
+      - name: Show workflow context
+        shell: pwsh
+        run: |
+          Write-Host "触发类型: $env:TRIGGER_TYPE"
+          Write-Host "事件名称: ${{ github.event_name }}"
+          Write-Host "Ref: ${{ github.ref }}"
+          Write-Host "版本名(ref_name): $env:VERSION_NAME"
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
@@ -35,14 +48,19 @@ jobs:
         run: |
           pyinstaller --clean --noconfirm NFSScanner.spec
 
-      - name: Ensure runtime folders exist in package
+      - name: Prepare runtime folders for release package
         shell: pwsh
         run: |
-          $packageDir = "dist/NFSScanner"
+          $packageDir = "$env:DIST_DIR"
 
           if (-not (Test-Path "$packageDir/resources")) {
             New-Item -ItemType Directory -Path "$packageDir/resources" | Out-Null
             "运行时资源目录（按需放置）" | Set-Content -Encoding UTF8 "$packageDir/resources/README.txt"
+          }
+
+          if (-not (Test-Path "$packageDir/devices")) {
+            New-Item -ItemType Directory -Path "$packageDir/devices" | Out-Null
+            "设备适配目录（按需扩展）" | Set-Content -Encoding UTF8 "$packageDir/devices/README.txt"
           }
 
           if (-not (Test-Path "$packageDir/plugins")) {
@@ -54,28 +72,48 @@ jobs:
         id: package
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}"
-          $zipName = "NFSScanner-$version-windows-x64.zip"
+          $zipName = "NFSScanner-$env:VERSION_NAME-windows-x64.zip"
           $zipPath = "dist/$zipName"
 
           if (Test-Path $zipPath) {
             Remove-Item $zipPath -Force
           }
 
-          Compress-Archive -Path "dist/NFSScanner/*" -DestinationPath $zipPath -Force
+          Compress-Archive -Path "$env:DIST_DIR/*" -DestinationPath $zipPath -Force
+
           "asset_path=$zipPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           "asset_name=$zipName" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
-      - name: Upload workflow artifact (optional)
+      - name: Build summary
+        shell: pwsh
+        run: |
+          Write-Host "触发类型: $env:TRIGGER_TYPE"
+          Write-Host "版本名 / ref_name: $env:VERSION_NAME"
+          Write-Host "dist 目录位置: $env:DIST_DIR"
+          Write-Host "zip 文件名: ${{ steps.package.outputs.asset_name }}"
+          Write-Host "zip 文件路径: ${{ steps.package.outputs.asset_path }}"
+
+      - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.package.outputs.asset_name }}
           path: ${{ steps.package.outputs.asset_path }}
 
       - name: Publish GitHub Release and upload asset
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           generate_release_notes: true
           files: ${{ steps.package.outputs.asset_path }}
+
+      - name: Release upload summary
+        shell: pwsh
+        run: |
+          if ("${{ startsWith(github.ref, 'refs/tags/') }}" -eq "true") {
+            Write-Host "是否执行 release 上传: 是（tag 触发）"
+          }
+          else {
+            Write-Host "是否执行 release 上传: 否（manual 触发，仅产出 artifact）"
+          }
