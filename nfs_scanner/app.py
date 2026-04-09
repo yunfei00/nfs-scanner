@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
+from .infra.logging_config import get_logger, setup_logging
 from .ui.main_window import MainWindow
 
 
@@ -25,6 +26,10 @@ def create_application(argv: Sequence[str] | None = None) -> QApplication:
 def main(argv: Sequence[str] | None = None) -> int:
     """Start the desktop application."""
 
+    log_file = setup_logging(force=True)
+    logger = get_logger(__name__)
+    logger.info("应用启动，日志文件：%s", log_file)
+
     app = create_application(argv)
     window = MainWindow()
     window.show()
@@ -33,4 +38,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     if auto_close_ms:
         QTimer.singleShot(int(auto_close_ms), app.quit)
 
-    return app.exec()
+    exit_code = app.exec()
+    logger.info("应用退出，退出码：%s", exit_code)
+    return exit_code
