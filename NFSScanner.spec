@@ -1,32 +1,21 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller build spec for directory-based desktop release output."""
-
-from __future__ import annotations
+"""PyInstaller spec for Windows release packaging."""
 
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_submodules
 
 project_root = Path(__file__).resolve().parent
 
-# Keep package data collection explicit and maintainable.
-datas = collect_data_files("nfs_scanner", include_py_files=False)
-
-# Ensure plugin-like modules and optional adapter paths are importable in frozen mode.
-hiddenimports = [
-    *collect_submodules("nfs_scanner.devices"),
-    *collect_submodules("nfs_scanner.ui"),
-    *collect_submodules("nfs_scanner.analysis"),
-    *collect_submodules("nfs_scanner.storage"),
-    *collect_submodules("nfs_scanner.scan"),
+datas = [
+    (str(project_root / "README.md"), "."),
+    (str(project_root / "docs"), "docs"),
 ]
 
-
-block_cipher = None
-
+hiddenimports = [*collect_submodules("nfs_scanner")]
 
 a = Analysis(
-    ["run.py"],
+    [str(project_root / "run.py")],
     pathex=[str(project_root)],
     binaries=[],
     datas=datas,
@@ -35,27 +24,21 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
     noarchive=False,
+    optimize=0,
 )
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure)
 
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,
     name="NFSScanner",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
+    upx=False,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -67,10 +50,9 @@ exe = EXE(
 coll = COLLECT(
     exe,
     a.binaries,
-    a.zipfiles,
     a.datas,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     name="NFSScanner",
 )
