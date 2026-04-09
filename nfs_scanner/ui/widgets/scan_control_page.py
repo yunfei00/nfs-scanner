@@ -86,6 +86,7 @@ class ScanWorker(QObject):
 
     STATUS_QUERY_COMMAND = "?"
     STATUS_POLL_INTERVAL_SECONDS = 0.1
+    POSITION_TOLERANCE_MM = 0.2
     READY_CHECK_TIMEOUT_SECONDS = 2.0
     MOTION_BLOCKING_STATES = frozenset({"Alarm", "Door", "Check", "Sleep"})
     MOTION_ACTIVE_STATES = frozenset({"Run", "Busy", "Hold", "Jog", "Home"})
@@ -225,6 +226,18 @@ class ScanWorker(QObject):
             latest_status_line = status_line
             state, current_pos = self._parse_motion_status(status_line)
             latest_state = state
+            if current_pos is None:
+                self.log_message.emit(
+                    "[运动状态] 实际位置=未知 "
+                    f"| 目标位置=({target[0]:.3f}, {target[1]:.3f}, {target[2]:.3f}) "
+                    f"| 控制器状态={state or '未知'}"
+                )
+            else:
+                self.log_message.emit(
+                    f"[运动状态] 实际位置=({current_pos[0]:.3f}, {current_pos[1]:.3f}, {current_pos[2]:.3f}) "
+                    f"| 目标位置=({target[0]:.3f}, {target[1]:.3f}, {target[2]:.3f}) "
+                    f"| 控制器状态={state or '未知'}"
+                )
             if state in {"Run", "Busy", "Hold"}:
                 time.sleep(self.STATUS_POLL_INTERVAL_SECONDS)
                 continue
@@ -366,7 +379,7 @@ class ScanWorker(QObject):
         self,
         current: tuple[float, float, float],
         target: tuple[float, float, float],
-        tolerance: float = 0.02,
+        tolerance: float = POSITION_TOLERANCE_MM,
     ) -> bool:
         return all(abs(cur - tar) <= tolerance for cur, tar in zip(current, target))
 
