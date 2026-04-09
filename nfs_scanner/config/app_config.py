@@ -9,10 +9,14 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Mapping
 
+from nfs_scanner.core.versioning import is_major_compatible, safe_version_str
+from nfs_scanner.version import CONFIG_VERSION
+
 LOGGER = logging.getLogger(__name__)
 CONFIG_PATH_ENV_VAR = "NFS_SCANNER_CONFIG_PATH"
 SCAN_MODE_VALUES = {"raster", "snake"}
 DEFAULT_CONFIG: dict[str, Any] = {
+    "config_version": CONFIG_VERSION,
     "scan": {
         "start_x": "0",
         "stop_x": "4",
@@ -55,8 +59,12 @@ def load_config() -> dict[str, Any]:
     except (OSError, json.JSONDecodeError):
         payload = {}
 
-    config = _normalize_config(payload)
-    LOGGER.info("[CONFIG] config loaded")
+    if not isinstance(payload, dict):
+        payload = {}
+
+    migrated_payload = migrate_config_if_needed(payload)
+    config = _normalize_config(migrated_payload)
+    LOGGER.info("[CONFIG] config loaded: version=%s", config.get("config_version"))
     return config
 
 
@@ -65,12 +73,50 @@ def save_config(config: Mapping[str, Any]) -> None:
 
     config_path = get_config_path()
     normalized_config = _normalize_config(dict(config))
+    normalized_config["config_version"] = safe_version_str(
+        normalized_config.get("config_version"),
+        default=CONFIG_VERSION,
+    )
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
     with config_path.open("w", encoding="utf-8") as file:
         json.dump(normalized_config, file, ensure_ascii=False, indent=2)
 
-    LOGGER.info("[CONFIG] config saved")
+    LOGGER.info("[CONFIG] config saved: version=%s", normalized_config.get("config_version"))
+
+
+def migrate_config_if_needed(config_dict: dict[str, Any]) -> dict[str, Any]:
+    """Migrate old config payloads to the current schema baseline.
+
+    Current stage only performs tolerant bootstrapping and logging.
+    Future versions can add keyed migration handlers here.
+    """
+
+    migrated = deepcopy(config_dict)
+    stored_version = safe_version_str(migrated.get("config_version"), default=CONFIG_VERSION)
+    if "config_version" not in migrated:
+        LOGGER.warning(
+            "[CONFIG] missing config_version, fallback=%s; treating as legacy payload.",
+            CONFIG_VERSION,
+        )
+        migrated["config_version"] = CONFIG_VERSION
+        return migrated
+
+    migrated["config_version"] = stored_version
+    if stored_version != CONFIG_VERSION:
+        LOGGER.warning(
+            "[CONFIG] version mismatch: current=%s, loaded=%s. Migration entry reserved.",
+            CONFIG_VERSION,
+            stored_version,
+        )
+        if not is_major_compatible(CONFIG_VERSION, stored_version):
+            LOGGER.warning(
+                "[CONFIG] major version differs (current=%s loaded=%s); running compatibility mode.",
+                CONFIG_VERSION,
+                stored_version,
+            )
+
+    return migrated
 
 
 def _normalize_config(payload: Any) -> dict[str, Any]:
@@ -79,6 +125,8 @@ def _normalize_config(payload: Any) -> dict[str, Any]:
     config = deepcopy(DEFAULT_CONFIG)
     if not isinstance(payload, dict):
         return config
+
+    config["config_version"] = safe_version_str(payload.get("config_version"), default=CONFIG_VERSION)
 
     scan_settings = payload.get("scan")
     if isinstance(scan_settings, dict):

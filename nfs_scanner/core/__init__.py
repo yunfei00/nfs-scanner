@@ -10,6 +10,7 @@ from .models import (
     SpectrumFrequencySettings,
 )
 from .scan_manager import ScanManager, ScanRuntimeSnapshot, ScanRuntimeStatus
+from .versioning import get_major, is_major_compatible, parse_version, safe_version_str
 
 __all__ = [
     "DeviceManager",
@@ -22,4 +23,8 @@ __all__ = [
     "SpectrumAcquisitionResult",
     "SpectrumConfig",
     "SpectrumFrequencySettings",
+    "get_major",
+    "is_major_compatible",
+    "parse_version",
+    "safe_version_str",
 ]

@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QApplication
 
 from .infra.logging_config import get_logger, setup_logging
 from .ui.main_window import MainWindow
+from .version import APP_NAME, APP_VERSION
 
 
 def create_application(argv: Sequence[str] | None = None) -> QApplication:
@@ -18,7 +19,7 @@ def create_application(argv: Sequence[str] | None = None) -> QApplication:
 
     arguments = list(argv) if argv is not None else sys.argv
     app = QApplication(arguments)
-    app.setApplicationName("Near Field Scan System")
+    app.setApplicationName(f"{APP_NAME} v{APP_VERSION}")
     app.setOrganizationName("nfs-scanner")
     return app
 

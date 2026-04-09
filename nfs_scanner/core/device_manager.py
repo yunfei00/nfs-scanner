@@ -6,8 +6,15 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 import logging
 
+from nfs_scanner.core.versioning import is_major_compatible, safe_version_str
 from nfs_scanner.devices import SpectrumAnalyzer, create_spectrum_analyzer
-from nfs_scanner.devices.spectrum import SpectrumAnalyzerError, SpectrumConnectionError
+from nfs_scanner.devices.spectrum import (
+    SpectrumAnalyzerError,
+    SpectrumConnectionError,
+    SpectrumPluginMetadata,
+    get_spectrum_plugin_metadata,
+)
+from nfs_scanner.version import PLUGIN_API_VERSION
 
 
 @dataclass(slots=True)
@@ -79,6 +86,8 @@ class DeviceManager:
         normalized_resources = tuple(resource.strip() for resource in resource_names if resource.strip())
         if not normalized_resources:
             raise SpectrumConnectionError(f"{normalized_type} has no available resource names.")
+
+        self._validate_plugin_compatibility(normalized_type)
 
         cached = self._connected_spectrum_devices.get(normalized_type)
         if cached is not None and cached.resource_name in normalized_resources:
@@ -162,6 +171,60 @@ class DeviceManager:
         """Return the connected spectrum-device cache for inspection or debugging."""
 
         return dict(self._connected_spectrum_devices)
+
+    def _validate_plugin_compatibility(self, instrument_type: str) -> None:
+        """Verify plugin metadata and enforce API major-version compatibility."""
+
+        metadata = get_spectrum_plugin_metadata(instrument_type)
+        if metadata is None:
+            self._logger.warning(
+                "[PLUGIN] instrument=%s has no metadata; compatibility fallback enabled.",
+                instrument_type,
+            )
+            return
+
+        normalized_metadata = self._normalize_plugin_metadata(metadata)
+        is_compatible = is_major_compatible(PLUGIN_API_VERSION, normalized_metadata.plugin_api_version)
+        self._logger.info(
+            "[PLUGIN] name=%s version=%s api=%s host_api=%s compatible=%s",
+            normalized_metadata.plugin_name,
+            normalized_metadata.plugin_version,
+            normalized_metadata.plugin_api_version,
+            PLUGIN_API_VERSION,
+            is_compatible,
+        )
+        if not is_compatible:
+            self._logger.error(
+                "[PLUGIN] load failed: name=%s version=%s api=%s incompatible with host API %s",
+                normalized_metadata.plugin_name,
+                normalized_metadata.plugin_version,
+                normalized_metadata.plugin_api_version,
+                PLUGIN_API_VERSION,
+            )
+            raise SpectrumConnectionError(
+                "Plugin API major version mismatch: "
+                f"plugin={normalized_metadata.plugin_api_version}, host={PLUGIN_API_VERSION}"
+            )
+
+    def _normalize_plugin_metadata(self, metadata: SpectrumPluginMetadata) -> SpectrumPluginMetadata:
+        """Fill missing plugin version fields with safe defaults and warnings."""
+
+        plugin_name = safe_version_str(metadata.plugin_name, default="unknown-plugin")
+        plugin_version = safe_version_str(metadata.plugin_version, default="0.0.0")
+        plugin_api_version = safe_version_str(metadata.plugin_api_version, default=PLUGIN_API_VERSION)
+
+        if plugin_name != metadata.plugin_name:
+            self._logger.warning("[PLUGIN] missing plugin_name, fallback=%s", plugin_name)
+        if plugin_version != metadata.plugin_version:
+            self._logger.warning("[PLUGIN] missing plugin_version, fallback=%s", plugin_version)
+        if plugin_api_version != metadata.plugin_api_version:
+            self._logger.warning("[PLUGIN] missing plugin_api_version, fallback=%s", plugin_api_version)
+
+        return SpectrumPluginMetadata(
+            plugin_name=plugin_name,
+            plugin_version=plugin_version,
+            plugin_api_version=plugin_api_version,
+        )
 
     def _safe_disconnect(self, instrument_type: str, analyzer: SpectrumAnalyzer) -> None:
         """Best-effort disconnect helper used during cleanup paths."""
