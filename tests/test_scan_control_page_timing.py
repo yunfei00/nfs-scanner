@@ -10,7 +10,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication
 
-from nfs_scanner.core import ScanManager
+from nfs_scanner.core import ScanManager, SpectrumConfig
 from nfs_scanner.ui.widgets.scan_control_page import ScanControlPage, ScanWorker
 
 
@@ -48,11 +48,14 @@ class ScanControlPageTimingTestCase(unittest.TestCase):
         self.page = ScanControlPage(scan_manager=self.scan_manager)
         self.page.clock_timer.stop()
         self.page.serial_is_open = True
+        self.page._serial_port = type("SerialPortStub", (), {"isOpen": lambda self: True})()
         self.page.SCAN_DWELL_SECONDS = 5.0
         self.page._build_scan_points = lambda: [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (2.0, 0.0, 0.0)]
         self.page._prepare_scan_storage_workspace = lambda: None
         self.page._save_scan_plan_snapshot = lambda: None
         self.page._save_scan_execution_snapshot = lambda completed: None
+        self.page._get_instrument_adapter = lambda _instrument_name: object()
+        self.page._build_instrument_measurement_config = lambda _panel: SpectrumConfig()
         self.page._start_scan_worker = lambda panel: None
 
     def tearDown(self) -> None:
@@ -92,6 +95,18 @@ class ScanControlPageTimingTestCase(unittest.TestCase):
         self.assertFalse(hasattr(self.page, "_estimated_completion_time"))
         self.assertFalse(hasattr(self.page, "_scan_paused"))
 
+    def test_completed_scan_keeps_start_disabled_until_worker_cleanup_finishes(self) -> None:
+        """The start button should remain disabled while the previous worker is still cleaning up."""
+
+        completed_label = self.page.RUNTIME_STATUS_LABELS["completed"]
+        self.page._scan_thread = object()
+        self.page._set_scan_button_states(completed_label)
+        self.assertFalse(self.page.start_button.isEnabled())
+
+        self.page._scan_thread = None
+        self.page._set_scan_button_states(completed_label)
+        self.assertTrue(self.page.start_button.isEnabled())
+
 
 class ScanWorkerSerialParsingTestCase(unittest.TestCase):
     """Verify serial status extraction is stable across fragmented input chunks."""
@@ -126,6 +141,27 @@ class ScanWorkerSerialParsingTestCase(unittest.TestCase):
         ready, reason = self.worker._ensure_controller_ready(serial_port=None)
         self.assertFalse(ready)
         self.assertIn("Alarm", reason)
+
+    def test_ensure_controller_ready_waits_until_idle(self) -> None:
+        """Preflight should keep polling while the controller is still in an active motion state."""
+
+        self.worker.STATUS_POLL_INTERVAL_SECONDS = 0.0
+        self.worker.READY_CHECK_TIMEOUT_SECONDS = 0.2
+        responses = iter(
+            [
+                "<Run|MPos:0.00,0.00,0.00|FS:100,0>",
+                "<Idle|MPos:0.00,0.00,0.00|FS:0,0>",
+            ]
+        )
+        self.worker._query_motion_status = lambda _serial_port: next(
+            responses,
+            "<Idle|MPos:0.00,0.00,0.00|FS:0,0>",
+        )
+
+        ready, reason = self.worker._ensure_controller_ready(serial_port=None)
+
+        self.assertTrue(ready)
+        self.assertEqual(reason, "")
 
     def test_wait_until_motion_done_reports_blocking_state_instead_of_timeout(self) -> None:
         """Runtime polling should return actionable reason when controller enters Alarm state."""

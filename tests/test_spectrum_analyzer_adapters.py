@@ -170,6 +170,7 @@ class SpectrumAnalyzerAdapterTestCase(unittest.TestCase):
         self.assertEqual(result.metadata["trace_names"], ["Trc1_S21"])
         self.assertIn('MMEM:STOR:TRAC:CHAN 1, "C:\\temp\\data.csv"', transport.writes)
         self.assertIn('MMEM:DEL "C:\\temp\\data.csv"', transport.writes)
+        self.assertEqual(transport.queries.count("*OPC?"), 3)
         self.assertAlmostEqual(result.point_value or 0.0, 20.0 * np.log10(5.0), places=6)
 
     def test_device_manager_reuses_existing_adapter_for_same_resource(self) -> None:

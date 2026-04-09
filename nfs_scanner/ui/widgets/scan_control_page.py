@@ -86,7 +86,9 @@ class ScanWorker(QObject):
 
     STATUS_QUERY_COMMAND = "?"
     STATUS_POLL_INTERVAL_SECONDS = 0.1
+    READY_CHECK_TIMEOUT_SECONDS = 2.0
     MOTION_BLOCKING_STATES = frozenset({"Alarm", "Door", "Check", "Sleep"})
+    MOTION_ACTIVE_STATES = frozenset({"Run", "Busy", "Hold", "Jog", "Home"})
 
     def __init__(
         self,
@@ -189,6 +191,7 @@ class ScanWorker(QObject):
         except Exception as error:  # noqa: BLE001
             self.finished.emit("error", f"扫描线程异常: {error}")
         finally:
+            self._finalize_serial_session()
             self._restore_serial_thread_affinity()
 
     def _restore_serial_thread_affinity(self) -> None:
@@ -241,18 +244,33 @@ class ScanWorker(QObject):
         return False, "等待运动完成超时：未收到状态响应"
 
     def _ensure_controller_ready(self, serial_port: QSerialPort) -> tuple[bool, str]:
-        """扫描前检查控制器状态，避免上一轮异常状态影响新任务。"""
+        """Check controller state before a scan starts."""
 
-        deadline = time.monotonic() + 1.0
+        deadline = time.monotonic() + self.READY_CHECK_TIMEOUT_SECONDS
+        latest_state = ""
+        latest_status_line = ""
         while time.monotonic() < deadline:
             status_line = self._query_motion_status(serial_port)
             if status_line is None:
                 time.sleep(self.STATUS_POLL_INTERVAL_SECONDS)
                 continue
+
+            latest_status_line = status_line
             state, _ = self._parse_motion_status(status_line)
+            latest_state = state
+            if state == "Idle":
+                return True, ""
+            if state in self.MOTION_ACTIVE_STATES:
+                time.sleep(self.STATUS_POLL_INTERVAL_SECONDS)
+                continue
             if state in self.MOTION_BLOCKING_STATES:
                 return False, f"控制器状态为 {state}，请先复位/解锁后再开始扫描"
-            return True, ""
+            time.sleep(self.STATUS_POLL_INTERVAL_SECONDS)
+
+        if latest_state:
+            return False, f"扫描前控制器未进入 Idle，当前状态: {latest_state}"
+        if latest_status_line:
+            return False, f"扫描前控制器状态未就绪，最后响应: {latest_status_line}"
         return False, "扫描前未能读取控制器状态，请检查串口连接或控制器是否在线"
 
     def _wait_with_stop_check(self, seconds: float) -> bool:
@@ -276,6 +294,17 @@ class ScanWorker(QObject):
 
         self._serial_rx_buffer = ""
         serial_port.clear(QSerialPort.Direction.Input)
+
+    def _finalize_serial_session(self) -> None:
+        """Best-effort serial cleanup so the next scan starts from a clean state."""
+
+        if not self._serial_port.isOpen():
+            return
+        self._reset_serial_rx_state(self._serial_port)
+        ready, reason = self._ensure_controller_ready(self._serial_port)
+        if not ready:
+            self.log_message.emit(f"扫描收尾提示: {reason}")
+        self._reset_serial_rx_state(self._serial_port)
 
     def _send_command(self, serial_port: QSerialPort, command: str) -> tuple[bool, str]:
         payload = f"{command}\r\n".encode("utf-8")
@@ -1052,6 +1081,7 @@ class ScanControlPage(QWidget):
             self._save_scan_area_config()
 
     def _set_scan_button_states(self, state: str) -> None:
+        is_worker_active = self._scan_thread is not None
         if state == "扫描中":
             self.start_button.setText("开始")
             self.start_button.setEnabled(False)
@@ -1059,7 +1089,7 @@ class ScanControlPage(QWidget):
             self.stop_button.setEnabled(True)
         else:
             self.start_button.setText("开始")
-            self.start_button.setEnabled(True)
+            self.start_button.setEnabled(not is_worker_active)
             self.pause_button.setEnabled(False)
             self.stop_button.setEnabled(False)
 
@@ -1237,6 +1267,10 @@ class ScanControlPage(QWidget):
 
     def on_start_scan(self) -> None:
         if self._scan_thread is not None:
+            snapshot = self.scan_manager.get_scan_runtime_snapshot()
+            if snapshot.status in {"completed", "failed", "stopped"}:
+                self.append_log("上一轮扫描仍在收尾，请稍候后再开始。")
+                return
             self.append_log("开始扫描失败：已有扫描任务在执行")
             return
         if not self.serial_is_open or not self._serial_port.isOpen():
@@ -1392,6 +1426,7 @@ class ScanControlPage(QWidget):
         self._scan_thread = None
         self._scan_stop_requested = False
         self._sync_serial_buttons()
+        self._refresh_clock()
 
     def on_clear_log(self) -> None:
         self.log_edit.clear()

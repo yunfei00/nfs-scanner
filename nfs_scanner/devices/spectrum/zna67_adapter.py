@@ -71,7 +71,11 @@ class Zna67SpectrumAnalyzer(BaseScpiSpectrumAnalyzer):
         )
 
     def _capture_mmem_csv_text(self) -> str:
-        """Run the existing MMEM store/read/delete cycle through VISA."""
+        """Run the existing MMEM store/read/delete cycle through VISA.
+
+        Waiting for ``MMEM:DEL`` to finish avoids leaving the temp trace file
+        in a transient state when the next scan starts immediately.
+        """
 
         path_text = self.mmem_temp_trace_path
         store_command = f'MMEM:STOR:TRAC:CHAN 1, "{path_text}"'
@@ -84,6 +88,7 @@ class Zna67SpectrumAnalyzer(BaseScpiSpectrumAnalyzer):
             mmem_csv_text = self._transport.query(read_command, timeout_ms=6000)
         finally:
             self._transport.write(delete_command, timeout_ms=3000)
+            self.wait_opc(timeout_ms=3000)
         return mmem_csv_text
 
     def _parse_primary_trace(
