@@ -225,17 +225,20 @@ class SpectrumAnalyzerAdapterTestCase(unittest.TestCase):
 
         transport = FakeTransport(
             {
+                "*IDN?": "Keysight Technologies,N9020A,MY12345678,A.25.05",
                 "*OPC?": "1",
-                "FREQuency:STARt?": "10000000",
-                "FREQuency:STOP?": "12000000",
-                "FREQuency:CENTer?": "11000000",
-                "FREQuency:SPAN?": "2000000",
-                "BANDwidth:RESolution?": "100000",
-                "BANDwidth:VIDeo?": "100000",
-                "DISPlay:WINDow:TRACe:Y:RLEVel?": "0",
-                "DETector?": "POS",
-                "TRACe:MODE? TRACE1": "WRIT",
-                "TRACe:DATA? TRACE1": "-90,-55,-60",
+                "FREQ:STAR?": "10000000",
+                "FREQ:STOP?": "12000000",
+                "FREQ:CENT?": "11000000",
+                "FREQ:SPAN?": "2000000",
+                "BAND:RES?": "100000",
+                "BAND:VID?": "100000",
+                "SWE:TIME?": "0.12",
+                "SWE:POIN?": "3",
+                "DISP:WIND:TRAC:Y:RLEV?": "0",
+                "DET?": "POS",
+                "TRAC:TYPE? TRACE1": "CLRW",
+                "TRAC:DATA? TRACE1": "-90,-55,-60",
             }
         )
         analyzer = N9020ASpectrumAnalyzer(transport)
@@ -246,6 +249,7 @@ class SpectrumAnalyzerAdapterTestCase(unittest.TestCase):
                 center_freq="11MHz",
                 span="2MHz",
                 rbw="100kHz",
+                points=3,
                 acquisition_mode="point",
             )
         )
@@ -254,6 +258,104 @@ class SpectrumAnalyzerAdapterTestCase(unittest.TestCase):
         self.assertEqual(result.instrument_type, "N9020A")
         self.assertEqual(result.acquisition_mode, "point")
         self.assertEqual(result.point_value, -55.0)
+        self.assertEqual(result.trace_points, 3)
+        self.assertEqual(result.metadata["reported_sweep_points"], 3)
+        self.assertEqual(result.metadata["reported_sweep_time_s"], 0.12)
+        self.assertIn("*CLS", transport.writes)
+        self.assertIn("FORM ASC", transport.writes)
+        self.assertIn("SWE:POIN 3", transport.writes)
+        self.assertIn("ABOR", transport.writes)
+        self.assertIn("INIT:CONT OFF", transport.writes)
+        self.assertIn("INIT:IMM", transport.writes)
+
+    def test_n9020a_connect_rejects_wrong_identity(self) -> None:
+        """N9020A adapter should fail fast when the resource identifies as another model."""
+
+        analyzer = N9020ASpectrumAnalyzer(FakeTransport({"*IDN?": "Rohde&Schwarz,FSW,1324.5000K02,4.70"}))
+
+        with self.assertRaises(SpectrumConnectionError):
+            analyzer.connect()
+
+    def test_n9020a_configures_start_stop_points_and_ascii_trace_mode(self) -> None:
+        """N9020A configure should apply clear, ASCII format, start/stop, points, and trace type."""
+
+        transport = FakeTransport({"*IDN?": "Agilent Technologies,N9020A,MY76543210,A.14.00"})
+        analyzer = N9020ASpectrumAnalyzer(transport)
+
+        analyzer.connect()
+        analyzer.configure(
+            SpectrumConfig(
+                start_freq="2.4GHz",
+                stop_freq="2.5GHz",
+                rbw="100kHz",
+                vbw="100kHz",
+                points=401,
+                detector="POS",
+                trace_mode="AVER",
+                trace_name="TRACE 1",
+            )
+        )
+
+        self.assertIn("*CLS", transport.writes)
+        self.assertIn("FORM ASC", transport.writes)
+        self.assertIn("FREQ:STAR 2400000000.000000", transport.writes)
+        self.assertIn("FREQ:STOP 2500000000.000000", transport.writes)
+        self.assertIn("BAND:RES 100000.000000", transport.writes)
+        self.assertIn("BAND:VID 100000.000000", transport.writes)
+        self.assertIn("SWE:POIN 401", transport.writes)
+        self.assertIn("DET POS", transport.writes)
+        self.assertIn("TRAC:TYPE TRACE1, AVG", transport.writes)
+
+    def test_n9020a_prefers_center_span_configuration(self) -> None:
+        """When both window styles are given, N9020A should configure center/span."""
+
+        transport = FakeTransport({"*IDN?": "Keysight Technologies,N9020A,MY99999999,A.25.05"})
+        analyzer = N9020ASpectrumAnalyzer(transport)
+
+        analyzer.connect()
+        analyzer.configure(
+            SpectrumConfig(
+                start_freq="2.4GHz",
+                stop_freq="2.5GHz",
+                center_freq="2.45GHz",
+                span="100MHz",
+            )
+        )
+
+        self.assertIn("FREQ:CENT 2450000000.000000", transport.writes)
+        self.assertIn("FREQ:SPAN 100000000.000000", transport.writes)
+        self.assertNotIn("FREQ:STAR 2400000000.000000", transport.writes)
+        self.assertNotIn("FREQ:STOP 2500000000.000000", transport.writes)
+
+    def test_n9020a_trace_metadata_marks_point_count_mismatch(self) -> None:
+        """N9020A trace fetch should flag mismatch between reported sweep points and trace data count."""
+
+        transport = FakeTransport(
+            {
+                "*IDN?": "Keysight Technologies,N9020A,MY12345678,A.25.05",
+                "*OPC?": "1",
+                "FREQ:STAR?": "2400000000",
+                "FREQ:STOP?": "2500000000",
+                "FREQ:CENT?": "2450000000",
+                "FREQ:SPAN?": "100000000",
+                "BAND:RES?": "100000",
+                "BAND:VID?": "100000",
+                "SWE:TIME?": "0.1",
+                "SWE:POIN?": "401",
+                "DISP:WIND:TRAC:Y:RLEV?": "0",
+                "DET?": "POS",
+                "TRAC:TYPE? TRACE1": "CLRW",
+                "TRAC:DATA? TRACE1": "-80,-60,-70",
+            }
+        )
+        analyzer = N9020ASpectrumAnalyzer(transport)
+
+        analyzer.connect()
+        analyzer.configure(SpectrumConfig(start_freq="2.4GHz", stop_freq="2.5GHz", points=401))
+        result = analyzer.acquire_spectrum()
+
+        self.assertTrue(result.metadata["trace_point_mismatch"])
+        self.assertEqual(result.metadata["reported_sweep_points"], 401)
         self.assertEqual(result.trace_points, 3)
 
     def test_zna67_adapter_parses_mmem_payload(self) -> None:
@@ -303,6 +405,34 @@ class SpectrumAnalyzerAdapterTestCase(unittest.TestCase):
 
         self.assertIs(first, second)
         self.assertEqual(created_resources, ["TCPIP0::192.168.0.10::inst0::INSTR"])
+
+    def test_device_manager_reuses_existing_n9020a_adapter_for_same_resource(self) -> None:
+        """DeviceManager should also reuse N9020A adapters for repeat requests."""
+
+        created_resources: list[str] = []
+
+        def fake_factory(instrument_type: str, **kwargs) -> N9020ASpectrumAnalyzer:
+            created_resources.append(kwargs["resource_name"])
+            return N9020ASpectrumAnalyzer(
+                FakeTransport(
+                    {"*IDN?": "Keysight Technologies,N9020A,MY12345678,A.25.05"},
+                    resource_name=kwargs["resource_name"],
+                )
+            )
+
+        manager = DeviceManager(spectrum_analyzer_factory=fake_factory)
+
+        first = manager.ensure_spectrum_device(
+            instrument_type="N9020A",
+            resource_names=("TCPIP0::192.168.0.60::inst0::INSTR",),
+        )
+        second = manager.ensure_spectrum_device(
+            instrument_type="N9020A",
+            resource_names=("TCPIP0::192.168.0.60::inst0::INSTR",),
+        )
+
+        self.assertIs(first, second)
+        self.assertEqual(created_resources, ["TCPIP0::192.168.0.60::inst0::INSTR"])
 
     def test_device_manager_requires_at_least_one_resource(self) -> None:
         """Connecting a real analyzer without a resource should fail cleanly."""

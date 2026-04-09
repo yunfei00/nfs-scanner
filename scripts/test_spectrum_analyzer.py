@@ -49,10 +49,11 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--span", default=None, help="Span, such as 100MHz.")
     parser.add_argument("--rbw", default="100kHz", help="Resolution bandwidth.")
     parser.add_argument("--vbw", default=None, help="Video bandwidth.")
+    parser.add_argument("--points", type=int, default=None, help="Sweep points.")
     parser.add_argument("--ref-level", default=None, help="Reference level in dBm.")
     parser.add_argument("--detector", default=None, help="Detector mode, such as RMS / POS.")
-    parser.add_argument("--trace-mode", default=None, help="Trace mode, such as WRIT / MAXH.")
-    parser.add_argument("--trace-name", default="TRACE1", help="Trace name. FSW bring-up recommends TRACE1.")
+    parser.add_argument("--trace-mode", default=None, help="Trace mode, such as WRIT / MAXH / CLRW / AVG.")
+    parser.add_argument("--trace-name", default="TRACE1", help="Trace name. Bring-up commonly uses TRACE1.")
     parser.add_argument("--point-mode", action="store_true", help="Use point acquisition mode.")
     parser.add_argument("--preset", action="store_true", help="Apply preset before configuration.")
     parser.add_argument(
@@ -73,6 +74,9 @@ def build_spectrum_config(args: argparse.Namespace) -> SpectrumConfig:
     if args.instrument == "FSW":
         detector = detector or "RMS"
         trace_mode = trace_mode or "WRIT"
+    if args.instrument == "N9020A":
+        detector = detector or "POS"
+        trace_mode = trace_mode or "CLRW"
 
     return SpectrumConfig(
         start_freq=args.start_freq,
@@ -81,6 +85,7 @@ def build_spectrum_config(args: argparse.Namespace) -> SpectrumConfig:
         span=args.span,
         rbw=args.rbw,
         vbw=args.vbw,
+        points=args.points,
         ref_level=args.ref_level,
         detector=detector,
         trace_mode=trace_mode,
@@ -111,10 +116,17 @@ def classify_error(error: Exception) -> str:
         return "Configuration error"
     if isinstance(error, SpectrumQueryError):
         lowered = str(error).lower()
+        if any(keyword in lowered for keyword in ("parse trace payload", "trace payload contains", "trace payload is empty")):
+            return "Trace parse error"
         if any(keyword in lowered for keyword in ("undefined header", "undefined command", "unsupported", "-113")):
             return "SCPI command not supported"
+        if any(keyword in lowered for keyword in ("query failed on", "command failed on")):
+            return "SCPI error"
         return "Unexpected instrument response"
     if isinstance(error, SpectrumAnalyzerError):
+        lowered = str(error).lower()
+        if "visa" in lowered or "resource" in lowered:
+            return "VISA error"
         return "Spectrum analyzer operation failed"
     return "Unknown error"
 
@@ -132,10 +144,28 @@ def print_configuration_summary(args: argparse.Namespace, config: SpectrumConfig
     print(f"Start/Stop:  {config.start_freq} -> {config.stop_freq}")
     print(f"Center/Span: {config.center_freq} / {config.span}")
     print(f"RBW/VBW:     {config.rbw} / {config.vbw}")
+    print(f"Points:      {config.points}")
     print(f"RefLevel:    {config.ref_level}")
     print(f"Detector:    {config.detector}")
     print(f"TraceMode:   {config.trace_mode}")
     print()
+
+
+def format_trace_preview(result, *, preview_points: int = 5) -> str:
+    """Render one short preview of the first trace points."""
+
+    if result.trace_values is None or result.trace_frequencies_hz is None or result.trace_values.size == 0:
+        return "[]"
+
+    preview_count = min(int(result.trace_values.size), preview_points)
+    preview_pairs = [
+        {
+            "freq_hz": float(result.trace_frequencies_hz[index]),
+            "value_dbm": float(result.trace_values[index]),
+        }
+        for index in range(preview_count)
+    ]
+    return json.dumps(preview_pairs, ensure_ascii=False)
 
 
 def main() -> int:
@@ -186,6 +216,7 @@ def main() -> int:
                 "span": config.span,
                 "rbw": config.rbw,
                 "vbw": config.vbw,
+                "points": config.points,
                 "ref_level": config.ref_level,
                 "detector": config.detector,
                 "trace_mode": config.trace_mode,
@@ -199,10 +230,15 @@ def main() -> int:
     print("=== Acquisition Result ===")
     print(f"Instrument:  {args.instrument}")
     print(f"Resource:    {args.resource}")
-    print(f"IDN:         {idn_text}")
+    print(f"RawIDN:      {idn_text}")
     print(f"Mode:        {result.acquisition_mode}")
     print(f"PointValue:  {result.point_value}")
+    print(f"FirstPoints: {format_trace_preview(result)}")
     print(f"TracePoints: {result.trace_points}")
+    print(
+        "SweepPoints: "
+        f"{result.metadata.get('reported_sweep_points') or result.metadata.get('configured_sweep_points')}"
+    )
     print(
         "FreqRange:   "
         f"{result.frequency_settings.start_freq_hz} -> {result.frequency_settings.stop_freq_hz}"
@@ -215,6 +251,7 @@ def main() -> int:
     print(f"RefLevel:    {result.ref_level_dbm}")
     print(f"Detector:    {result.detector}")
     print(f"TraceMode:   {result.trace_mode}")
+    print(f"TraceMatch:  {not bool(result.metadata.get('trace_point_mismatch'))}")
     print(f"Metadata:    {format_metadata(result.metadata)}")
 
     if args.save_json is not None:

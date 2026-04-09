@@ -36,6 +36,7 @@ class SpectrumCommandSet:
             "span": "FREQuency:SPAN?",
             "rbw": "BANDwidth:RESolution?",
             "vbw": "BANDwidth:VIDeo?",
+            "sweep_time": "SWEep:TIME?",
             "ref_level": "DISPlay:WINDow:TRACe:Y:RLEVel?",
             "points": "SWEep:POINts?",
             "scale": "DISPlay:WINDow:TRACe:Y:SCALe:PDIVision?",
@@ -51,6 +52,7 @@ class SpectrumCommandSet:
             "span": "FREQuency:SPAN",
             "rbw": "BANDwidth:RESolution",
             "vbw": "BANDwidth:VIDeo",
+            "sweep_time": "SWEep:TIME",
             "ref_level": "DISPlay:WINDow:TRACe:Y:RLEVel",
             "points": "SWEep:POINts",
             "scale": "DISPlay:WINDow:TRACe:Y:SCALe:PDIVision",
@@ -271,6 +273,8 @@ class BaseScpiSpectrumAnalyzer(SpectrumAnalyzer):
             self.set_rbw(rbw_hz)
         if vbw_hz is not None:
             self.set_vbw(vbw_hz)
+        if self._config.points is not None:
+            self.set_setting("points", self._config.points)
         if ref_level_dbm is not None:
             self.set_ref_level(ref_level_dbm)
         if self._config.detector:
@@ -345,11 +349,24 @@ class BaseScpiSpectrumAnalyzer(SpectrumAnalyzer):
             ) from error
 
         frequency_settings = self._query_frequency_settings()
+        configured_sweep_points = self._configured_sweep_points()
+        reported_sweep_points = self._query_optional_int("points")
+        reported_sweep_time_s = self._query_optional_float("sweep_time")
         trace_axis = build_frequency_axis(
             frequency_settings.start_freq_hz,
             frequency_settings.stop_freq_hz,
             int(trace_values.size),
         )
+
+        trace_point_mismatch = reported_sweep_points is not None and reported_sweep_points != int(trace_values.size)
+        if trace_point_mismatch:
+            self._logger.warning(
+                "[SPECTRUM] point count mismatch instrument=%s resource=%s reported=%s actual=%s",
+                self.instrument_type,
+                self.resource_name,
+                reported_sweep_points,
+                int(trace_values.size),
+            )
 
         self._logger.info(
             "[SPECTRUM] trace acquired instrument=%s resource=%s trace=%s points=%s",
@@ -376,6 +393,10 @@ class BaseScpiSpectrumAnalyzer(SpectrumAnalyzer):
                 "resource_name": self.resource_name,
                 "raw_trace_text": raw_trace_text,
                 "trace_name": trace_name,
+                "configured_sweep_points": configured_sweep_points,
+                "reported_sweep_points": reported_sweep_points,
+                "reported_sweep_time_s": reported_sweep_time_s,
+                "trace_point_mismatch": trace_point_mismatch,
             },
         )
 
@@ -426,7 +447,10 @@ class BaseScpiSpectrumAnalyzer(SpectrumAnalyzer):
             numeric_value = parse_numeric_value(value)
             if numeric_value is None:
                 raise SpectrumConfigurationError(f"Setting {setting_key} requires an integer value.")
-            return str(int(round(numeric_value)))
+            integer_value = int(round(numeric_value))
+            if integer_value <= 0:
+                raise SpectrumConfigurationError(f"Setting {setting_key} must be greater than zero.")
+            return str(integer_value)
 
         numeric_value = parse_numeric_value(value)
         if numeric_value is None:
@@ -477,6 +501,25 @@ class BaseScpiSpectrumAnalyzer(SpectrumAnalyzer):
             return None
         normalized = raw_value.strip()
         return normalized or None
+
+    def _query_optional_int(self, setting_key: str) -> int | None:
+        """Query one optional integer-valued setting and swallow unsupported replies."""
+
+        raw_value = self._query_optional_float(setting_key)
+        if raw_value is None:
+            return None
+        return int(round(raw_value))
+
+    def _configured_sweep_points(self) -> int | None:
+        """Return the configured sweep points from the current config when available."""
+
+        try:
+            raw_value = parse_numeric_value(self._config.points)
+        except ValueError:
+            return None
+        if raw_value is None:
+            return None
+        return int(round(raw_value))
 
     def _raise_transport_error(
         self,

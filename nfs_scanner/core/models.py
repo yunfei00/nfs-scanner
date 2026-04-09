@@ -42,6 +42,7 @@ class SpectrumConfig:
     span: str | None = None
     rbw: str | None = "100kHz"
     vbw: str | None = None
+    points: str | int | None = None
     ref_level: str | None = None
     detector: str | None = None
     trace_mode: str | None = None

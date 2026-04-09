@@ -8,7 +8,7 @@ from importlib.util import find_spec
 SUPPORTED_INSTRUMENTS = ("ZNA67", "N9020A", "FSW")
 INSTRUMENT_IDN_KEYWORDS: dict[str, tuple[str, ...]] = {
     "ZNA67": ("ZNA67",),
-    "N9020A": ("N9020A", "CXA"),
+    "N9020A": ("N9020A", "MXA", "X-SERIES"),
     "FSW": ("FSW",),
 }
 
