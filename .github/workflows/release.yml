@@ -1,0 +1,81 @@
+name: Release Windows Package
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller spec
+        shell: pwsh
+        run: |
+          pyinstaller --clean --noconfirm NFSScanner.spec
+
+      - name: Ensure runtime folders exist in package
+        shell: pwsh
+        run: |
+          $packageDir = "dist/NFSScanner"
+
+          if (-not (Test-Path "$packageDir/resources")) {
+            New-Item -ItemType Directory -Path "$packageDir/resources" | Out-Null
+            "运行时资源目录（按需放置）" | Set-Content -Encoding UTF8 "$packageDir/resources/README.txt"
+          }
+
+          if (-not (Test-Path "$packageDir/plugins")) {
+            New-Item -ItemType Directory -Path "$packageDir/plugins" | Out-Null
+            "插件目录（按需放置）" | Set-Content -Encoding UTF8 "$packageDir/plugins/README.txt"
+          }
+
+      - name: Package release zip
+        id: package
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}"
+          $zipName = "NFSScanner-$version-windows-x64.zip"
+          $zipPath = "dist/$zipName"
+
+          if (Test-Path $zipPath) {
+            Remove-Item $zipPath -Force
+          }
+
+          Compress-Archive -Path "dist/NFSScanner/*" -DestinationPath $zipPath -Force
+          "asset_path=$zipPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "asset_name=$zipName" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Upload workflow artifact (optional)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.asset_name }}
+          path: ${{ steps.package.outputs.asset_path }}
+
+      - name: Publish GitHub Release and upload asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          generate_release_notes: true
+          files: ${{ steps.package.outputs.asset_path }}
