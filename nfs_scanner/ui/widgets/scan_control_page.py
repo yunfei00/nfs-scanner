@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import time
 from datetime import datetime
 from pathlib import Path
@@ -483,6 +484,8 @@ class ScanControlPage(QWidget):
     INSTRUMENT_ORDER = tuple(SUPPORTED_INSTRUMENTS)
     SERIAL_FALLBACK_INSTRUMENTS = frozenset({"ZNA67"})
     SCAN_AREA_CONFIG_PATH = Path("config") / "scan_area_config.json"
+    SERIAL_CONFIG_PATH = Path("config") / "serial_port_config.json"
+    SERIAL_RECONNECT_INTERVAL_MS = 5000
     SCAN_DWELL_SECONDS = 0.12
     MOTION_WAIT_TIMEOUT_SECONDS = 30.0
     RUNTIME_STATUS_LABELS = {
@@ -564,6 +567,12 @@ class ScanControlPage(QWidget):
         self._scan_stop_requested = False
         self._instrument_search_thread: QThread | None = None
         self._instrument_search_worker: InstrumentSearchWorker | None = None
+        self._pending_serial_port_name: str = ""
+        self._auto_reconnect_notified = False
+
+        self._serial_reconnect_timer = QTimer(self)
+        self._serial_reconnect_timer.setInterval(self.SERIAL_RECONNECT_INTERVAL_MS)
+        self._serial_reconnect_timer.timeout.connect(self._attempt_auto_reconnect)
 
         self.port_combo: QComboBox
         self.baudrate_combo: QComboBox
@@ -604,7 +613,9 @@ class ScanControlPage(QWidget):
         self._setup_ui()
         self._connect_signals()
         self._load_scan_area_config()
+        self._load_serial_config()
         self._start_clock()
+        self._schedule_startup_device_tasks()
 
     def _setup_ui(self) -> None:
         self.setObjectName("scanControlRoot")
@@ -680,6 +691,8 @@ class ScanControlPage(QWidget):
         self.open_serial_button.clicked.connect(self.on_open_serial)
         self.close_serial_button.clicked.connect(self.on_close_serial)
         self.refresh_ports_button.clicked.connect(self.on_refresh_serial_ports)
+        self.port_combo.currentIndexChanged.connect(self._save_serial_config)
+        self.baudrate_combo.currentTextChanged.connect(self._save_serial_config)
 
         grid.addWidget(QLabel("端口号", group), 0, 0)
         grid.addWidget(self.port_combo, 0, 1)
@@ -1150,9 +1163,14 @@ class ScanControlPage(QWidget):
         self._set_scan_button_states(status_text)
 
     def on_open_serial(self) -> None:
-        self._open_serial_port_for_manual_control(emit_success_log=True)
+        self._open_serial_port_for_manual_control(emit_success_log=True, prompt_reset=True)
 
-    def _open_serial_port_for_manual_control(self, *, emit_success_log: bool) -> bool:
+    def _open_serial_port_for_manual_control(
+        self,
+        *,
+        emit_success_log: bool,
+        prompt_reset: bool,
+    ) -> bool:
         """打开当前选择串口并用于手动控制。"""
 
         selected_port = self.port_combo.currentData()
@@ -1172,12 +1190,18 @@ class ScanControlPage(QWidget):
             self.serial_is_open = False
             self._sync_serial_buttons()
             self.append_log(f"串口打开失败: {self._serial_port.errorString()}")
+            self._start_serial_reconnect_monitoring()
             return False
 
         self.serial_is_open = True
+        self._auto_reconnect_notified = False
+        self._serial_reconnect_timer.stop()
         self._sync_serial_buttons()
+        self._save_serial_config()
         if emit_success_log:
             self.append_log(f"串口已打开: {self.port_combo.currentText()} @ {self.baudrate_combo.currentText()}")
+        if prompt_reset:
+            self._ask_for_device_reset_after_open()
         return True
 
     def on_refresh_serial_ports(self) -> None:
@@ -1194,6 +1218,8 @@ class ScanControlPage(QWidget):
         if self._serial_port.isOpen():
             self._serial_port.close()
         self.serial_is_open = False
+        self._serial_reconnect_timer.stop()
+        self._auto_reconnect_notified = False
         self._sync_serial_buttons()
         self.append_log("串口已关闭")
 
@@ -2243,6 +2269,144 @@ class ScanControlPage(QWidget):
         ):
             return
         self.append_log(f"串口错误: {self._serial_port.errorString()}")
+        if error in (
+            QSerialPort.SerialPortError.ResourceError,
+            QSerialPort.SerialPortError.DeviceNotFoundError,
+            QSerialPort.SerialPortError.PermissionError,
+        ):
+            self._handle_serial_lost()
+
+    def _schedule_startup_device_tasks(self) -> None:
+        """启动后自动执行仪表搜索与串口连接尝试。"""
+
+        if os.getenv("NFS_SCANNER_DISABLE_AUTO_STARTUP_TASKS") == "1":
+            return
+        QTimer.singleShot(0, self.on_search_instruments)
+        QTimer.singleShot(0, self._try_auto_open_serial_from_config)
+
+    def _load_serial_config(self) -> None:
+        """加载串口配置（无文件时使用默认值）。"""
+
+        payload: dict[str, object] = {}
+        try:
+            if self.SERIAL_CONFIG_PATH.exists():
+                raw_data = json.loads(self.SERIAL_CONFIG_PATH.read_text(encoding="utf-8"))
+                if isinstance(raw_data, dict):
+                    payload = raw_data
+        except (OSError, json.JSONDecodeError):
+            payload = {}
+
+        configured_port = str(payload.get("port_name", "")).strip()
+        configured_baud = str(payload.get("baud_rate", "115200")).strip() or "115200"
+        if self.baudrate_combo.findText(configured_baud) < 0:
+            configured_baud = "115200"
+        self.baudrate_combo.setCurrentText(configured_baud)
+
+        if configured_port:
+            index = self.port_combo.findData(configured_port)
+            if index >= 0:
+                self.port_combo.setCurrentIndex(index)
+            self._pending_serial_port_name = configured_port
+
+    def _save_serial_config(self, *_args: object) -> None:
+        """保存当前串口配置，供下次启动自动加载。"""
+
+        selected_port = str(self.port_combo.currentData() or "").strip()
+        if selected_port:
+            self._pending_serial_port_name = selected_port
+        else:
+            selected_port = self._pending_serial_port_name
+        payload = {
+            "port_name": selected_port,
+            "baud_rate": int(self.baudrate_combo.currentText() or "115200"),
+            "updated_at": datetime.now().isoformat(timespec="seconds"),
+        }
+        try:
+            self.SERIAL_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+            self.SERIAL_CONFIG_PATH.write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except OSError:
+            return
+
+    def _try_auto_open_serial_from_config(self) -> None:
+        """尝试根据配置自动查找并打开串口。"""
+
+        if self.serial_is_open:
+            return
+        configured_port = self._pending_serial_port_name.strip()
+        found_count = self._refresh_available_ports(selected_port=configured_port or None)
+        if found_count <= 0:
+            self._start_serial_reconnect_monitoring()
+            return
+
+        if configured_port:
+            index = self.port_combo.findData(configured_port)
+            if index >= 0:
+                self.port_combo.setCurrentIndex(index)
+        if self._open_serial_port_for_manual_control(emit_success_log=True, prompt_reset=True):
+            self.append_log("已根据配置自动打开串口")
+        else:
+            self._start_serial_reconnect_monitoring()
+
+    def _start_serial_reconnect_monitoring(self) -> None:
+        """串口丢失后进入自动重连监控，每 5 秒提示一次。"""
+
+        if not self._auto_reconnect_notified:
+            self.append_log("串口丢失或未连接，已启动自动重连（每 5 秒尝试一次）")
+            self._auto_reconnect_notified = True
+        if not self._serial_reconnect_timer.isActive():
+            self._serial_reconnect_timer.start()
+
+    def _attempt_auto_reconnect(self) -> None:
+        """自动尝试重新查找并打开串口。"""
+
+        if self.serial_is_open:
+            self._serial_reconnect_timer.stop()
+            self._auto_reconnect_notified = False
+            return
+
+        self.append_log("串口仍未恢复，正在自动重连...")
+        configured_port = self._pending_serial_port_name.strip()
+        found_count = self._refresh_available_ports(selected_port=configured_port or None)
+        if found_count <= 0:
+            self.append_log("未发现匹配串口，5 秒后重试")
+            return
+
+        if configured_port:
+            index = self.port_combo.findData(configured_port)
+            if index >= 0:
+                self.port_combo.setCurrentIndex(index)
+
+        if self._open_serial_port_for_manual_control(emit_success_log=True, prompt_reset=False):
+            self.append_log("串口已恢复，自动重连成功")
+
+    def _handle_serial_lost(self) -> None:
+        """处理串口断连并启动自动重连流程。"""
+
+        if self._serial_port.isOpen():
+            self._serial_port.close()
+        self.serial_is_open = False
+        self._sync_serial_buttons()
+        self._start_serial_reconnect_monitoring()
+
+    def _ask_for_device_reset_after_open(self) -> None:
+        """串口打开后询问用户是否立即执行设备复位。"""
+
+        if os.getenv("QT_QPA_PLATFORM") == "offscreen":
+            self.append_log("当前为离屏模式，跳过复位确认弹窗")
+            return
+
+        choice = QMessageBox.question(
+            self,
+            "设备复位",
+            "串口已打开，是否立即执行设备复位（$H）？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if choice == QMessageBox.StandardButton.Yes:
+            self.on_home_command()
 
     def _prepare_scan_storage_workspace(self) -> None:
         """准备扫描过程中的数据存储目录和索引文件。"""

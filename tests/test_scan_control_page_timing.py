@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import os
+import tempfile
 import unittest
 from datetime import datetime, timedelta
+from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ.setdefault("NFS_SCANNER_DISABLE_AUTO_STARTUP_TASKS", "1")
 
 from PySide6.QtWidgets import QApplication
 
@@ -179,6 +182,63 @@ class ScanWorkerSerialParsingTestCase(unittest.TestCase):
         self.assertFalse(done)
         self.assertIn("状态异常", reason)
         self.assertIn("Alarm", reason)
+
+
+class ScanControlPageSerialConfigTestCase(unittest.TestCase):
+    """Verify serial config persistence and reconnect behavior."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def setUp(self) -> None:
+        self.page = ScanControlPage()
+        self.page.clock_timer.stop()
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.page.SERIAL_CONFIG_PATH = Path(self.temp_dir.name) / "serial_config.json"
+
+    def tearDown(self) -> None:
+        self.page.close()
+        self.temp_dir.cleanup()
+
+    def test_save_serial_config_persists_selected_port_and_baud(self) -> None:
+        """Saving serial config should persist current UI values."""
+
+        self.page.port_combo.clear()
+        self.page.port_combo.addItem("COM3 - Mock", "COM3")
+        self.page.port_combo.setCurrentIndex(0)
+        self.page.baudrate_combo.setCurrentText("230400")
+
+        self.page._save_serial_config()
+
+        payload = self.page.SERIAL_CONFIG_PATH.read_text(encoding="utf-8")
+        self.assertIn('"port_name": "COM3"', payload)
+        self.assertIn('"baud_rate": 230400', payload)
+
+    def test_load_serial_config_applies_persisted_values(self) -> None:
+        """Loading serial config should restore baud and preferred port."""
+
+        self.page.port_combo.clear()
+        self.page.port_combo.addItem("COM6 - Mock", "COM6")
+        self.page.SERIAL_CONFIG_PATH.write_text(
+            '{"port_name": "COM6", "baud_rate": 57600}',
+            encoding="utf-8",
+        )
+
+        self.page._load_serial_config()
+
+        self.assertEqual(self.page.baudrate_combo.currentText(), "57600")
+        self.assertEqual(self.page.port_combo.currentData(), "COM6")
+        self.assertEqual(self.page._pending_serial_port_name, "COM6")
+
+    def test_handle_serial_lost_starts_reconnect_timer(self) -> None:
+        """Serial loss should trigger periodic reconnect monitoring."""
+
+        self.page.serial_is_open = True
+        self.page._handle_serial_lost()
+
+        self.assertFalse(self.page.serial_is_open)
+        self.assertTrue(self.page._serial_reconnect_timer.isActive())
 
 
 if __name__ == "__main__":
