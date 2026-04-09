@@ -1,22 +1,20 @@
 # -*- mode: python ; coding: utf-8 -*-
 """PyInstaller spec for Windows release packaging."""
 
-from pathlib import Path
-
 from PyInstaller.utils.hooks import collect_submodules
 
-project_root = Path(__file__).resolve().parent
 
 datas = [
-    (str(project_root / "README.md"), "."),
-    (str(project_root / "docs"), "docs"),
+    ("README.md", "."),
+    ("docs", "docs"),
+    ("nfs_scanner/devices", "nfs_scanner/devices"),
 ]
 
 hiddenimports = [*collect_submodules("nfs_scanner")]
 
 a = Analysis(
-    [str(project_root / "run.py")],
-    pathex=[str(project_root)],
+    ["run.py"],
+    pathex=["."],
     binaries=[],
     datas=datas,
     hiddenimports=hiddenimports,
