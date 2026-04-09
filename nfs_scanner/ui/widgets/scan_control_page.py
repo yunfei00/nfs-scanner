@@ -61,20 +61,23 @@ class InstrumentSearchWorker(QObject):
 
     def run(self) -> None:
         """执行搜索并发出结果。"""
-
-        if self.preferred_resources:
-            cached_probes = probe_resources(resource_names=self.preferred_resources)
-            cached_result = InstrumentDiscoveryResult(probes=cached_probes, pyvisa_available=True)
-            cached_matches = {
-                name
-                for name in SUPPORTED_INSTRUMENTS
-                if cached_result.matched_resources_for(name)
-            }
-            if cached_matches == set(SUPPORTED_INSTRUMENTS):
-                self.finished.emit(cached_result)
-                return
-        result = discover_supported_instruments_via_visa()
-        self.finished.emit(result)
+        try:
+            if self.preferred_resources:
+                cached_probes = probe_resources(resource_names=self.preferred_resources)
+                cached_result = InstrumentDiscoveryResult(probes=cached_probes, pyvisa_available=True)
+                cached_matches = {
+                    name
+                    for name in SUPPORTED_INSTRUMENTS
+                    if cached_result.matched_resources_for(name)
+                }
+                if cached_matches == set(SUPPORTED_INSTRUMENTS):
+                    self.finished.emit(cached_result)
+                    return
+            result = discover_supported_instruments_via_visa()
+            self.finished.emit(result)
+        except Exception as error:  # pragma: no cover - depends on local VISA runtime status
+            get_logger(__name__).exception("仪表搜索线程发生异常，已回退为空结果: %s", error)
+            self.finished.emit(InstrumentDiscoveryResult(probes=[], pyvisa_available=True))
 
 
 class ScanWorker(QObject):
