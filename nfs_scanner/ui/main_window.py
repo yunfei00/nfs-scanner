@@ -23,6 +23,7 @@ from nfs_scanner.config import load_config, save_config
 from nfs_scanner.core import DeviceManager, ScanManager, ScanPointResult, SpectrumConfig
 from nfs_scanner.scan import ScanJob
 from nfs_scanner.storage import DatasetManager
+from nfs_scanner.version import APP_NAME, APP_VERSION
 
 from .controls_panel import ControlsPanel
 from .heatmap_view import HeatmapView
@@ -51,7 +52,7 @@ class MainWindow(QMainWindow):
         self.log_panel: LogPanel
         self._resolved_output_dir: Path
         self._last_job_display_snapshot: tuple[str, str, str] | None = None
-        self.setWindowTitle("近场扫描系统")
+        self.setWindowTitle(f"{APP_NAME} v{APP_VERSION} - 近场扫描系统")
         self.resize(1600, 900)
         self._resolved_output_dir = self._resolve_default_output_dir()
         self._setup_ui()
@@ -75,7 +76,7 @@ class MainWindow(QMainWindow):
         root_layout.addWidget(self.scan_control_page)
         self.setCentralWidget(central_widget)
 
-        self.statusBar().showMessage("系统就绪")
+        self.statusBar().showMessage(f"系统就绪 | {APP_NAME} v{APP_VERSION}")
 
     def _create_scan_workspace_page(self, parent: QWidget) -> QWidget:
         """Create the original scan workspace as one tab page."""

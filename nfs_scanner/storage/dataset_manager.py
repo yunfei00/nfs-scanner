@@ -3,15 +3,19 @@
 from __future__ import annotations
 
 import csv
+from datetime import datetime, timezone
 import json
 import logging
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
 
 from nfs_scanner.core.models import ScanConfig, ScanPointResult
+from nfs_scanner.core.versioning import is_major_compatible, safe_version_str
+from nfs_scanner.version import APP_VERSION, BUILD_VERSION, DATA_FORMAT_VERSION
 
 
 @dataclass(slots=True)
@@ -66,6 +70,7 @@ class DatasetManager:
             output_dir / "spectrum_rows.csv",
             output_dir / "spectrum_rows_meta.jsonl",
             output_dir / "scan_points.csv",
+            output_dir / "scan_points.meta.json",
         ):
             if stale_file.exists():
                 stale_file.unlink()
@@ -119,8 +124,163 @@ class DatasetManager:
             np.save(output_dir / "frequencies.npy", dataset.frequency_axis)
             self._save_zna_row_format(output_dir, dataset)
             self._save_single_csv_dataset(output_dir, dataset)
+            self._write_data_meta(
+                csv_path=output_dir / "scan_points.csv",
+                point_count=len(dataset.positions),
+                frequency_count=int(dataset.frequency_axis.size),
+            )
 
         self._logger.info("[DATASET] dataset saved")
+
+    def load_scan_points_csv(self, csv_path: str | Path) -> tuple[list[dict[str, float]], dict[str, Any]]:
+        """Load one scan CSV with optional sidecar meta and compatibility fallback."""
+
+        resolved_csv_path = Path(csv_path)
+        if not resolved_csv_path.exists():
+            raise FileNotFoundError(f"CSV file not found: {resolved_csv_path}")
+
+        meta_path = resolved_csv_path.with_suffix(".meta.json")
+        meta = self._load_data_meta(meta_path)
+        meta = self.migrate_data_if_needed(meta_dict=meta, csv_path=resolved_csv_path)
+
+        with resolved_csv_path.open("r", encoding="utf-8", newline="") as csv_file:
+            reader = csv.DictReader(csv_file)
+            rows: list[dict[str, float]] = []
+            for record in reader:
+                normalized_row: dict[str, float] = {}
+                for key, value in record.items():
+                    if key is None or value is None:
+                        continue
+                    key_text = key.strip()
+                    value_text = value.strip()
+                    if not key_text:
+                        continue
+                    try:
+                        normalized_row[key_text] = float(value_text)
+                    except ValueError:
+                        continue
+                if normalized_row:
+                    rows.append(normalized_row)
+
+        if "point_count" not in meta:
+            meta["point_count"] = len(rows)
+        self._logger.info(
+            "[DATASET] loaded csv=%s rows=%s format=%s",
+            resolved_csv_path,
+            len(rows),
+            meta.get("data_format_version"),
+        )
+        return rows, meta
+
+    def migrate_data_if_needed(self, meta_dict: dict[str, Any], csv_path: Path) -> dict[str, Any]:
+        """Compatibility gateway for dataset metadata migration."""
+
+        migrated = dict(meta_dict)
+        loaded_version = safe_version_str(migrated.get("data_format_version"), default=DATA_FORMAT_VERSION)
+        migrated["data_format_version"] = loaded_version
+
+        if loaded_version != DATA_FORMAT_VERSION:
+            self._logger.warning(
+                "[DATASET] data format mismatch: current=%s loaded=%s file=%s",
+                DATA_FORMAT_VERSION,
+                loaded_version,
+                csv_path,
+            )
+            if not is_major_compatible(DATA_FORMAT_VERSION, loaded_version):
+                self._logger.warning(
+                    "[DATASET] major version differs, enabling compatibility mode for %s",
+                    csv_path,
+                )
+
+        if "generator_version" not in migrated:
+            migrated["generator_version"] = APP_VERSION
+            self._logger.warning(
+                "[DATASET] missing generator_version in meta for %s, fallback=%s",
+                csv_path,
+                APP_VERSION,
+            )
+
+        if "build_version" not in migrated:
+            migrated["build_version"] = BUILD_VERSION
+            self._logger.warning(
+                "[DATASET] missing build_version in meta for %s, fallback=%s",
+                csv_path,
+                BUILD_VERSION,
+            )
+
+        return migrated
+
+    def _load_data_meta(self, meta_path: Path) -> dict[str, Any]:
+        """Load sidecar metadata, falling back for legacy CSV-only payloads."""
+
+        default_meta = {
+            "data_format_version": DATA_FORMAT_VERSION,
+            "generator_version": APP_VERSION,
+            "app_version": APP_VERSION,
+            "build_version": BUILD_VERSION,
+            "created_at": None,
+            "trace_ids": [],
+            "meta_file_present": False,
+        }
+
+        if not meta_path.exists():
+            self._logger.warning(
+                "[DATASET] meta sidecar missing: %s, using compatibility defaults.",
+                meta_path,
+            )
+            return default_meta
+
+        try:
+            payload = json.loads(meta_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            self._logger.warning(
+                "[DATASET] failed to read meta sidecar=%s, fallback defaults: %s",
+                meta_path,
+                error,
+            )
+            return default_meta
+
+        if not isinstance(payload, dict):
+            self._logger.warning(
+                "[DATASET] invalid meta payload type for %s, fallback defaults.",
+                meta_path,
+            )
+            return default_meta
+
+        normalized = dict(default_meta)
+        normalized["meta_file_present"] = True
+        normalized["data_format_version"] = safe_version_str(payload.get("data_format_version"), DATA_FORMAT_VERSION)
+        normalized["generator_version"] = safe_version_str(payload.get("generator_version"), APP_VERSION)
+        normalized["app_version"] = safe_version_str(payload.get("app_version"), APP_VERSION)
+        normalized["build_version"] = safe_version_str(payload.get("build_version"), BUILD_VERSION)
+        normalized["created_at"] = payload.get("created_at")
+        normalized["trace_ids"] = payload.get("trace_ids") if isinstance(payload.get("trace_ids"), list) else []
+        normalized["frequency_unit"] = payload.get("frequency_unit", "Hz")
+        normalized["amplitude_unit"] = payload.get("amplitude_unit", "dBm")
+        normalized["point_count"] = payload.get("point_count")
+        normalized["frequency_count"] = payload.get("frequency_count")
+        return normalized
+
+    def _write_data_meta(self, *, csv_path: Path, point_count: int, frequency_count: int) -> None:
+        """Write sidecar metadata for one generated scan CSV file."""
+
+        meta_path = csv_path.with_suffix(".meta.json")
+        trace_ids = [f"pt_{index:06d}" for index in range(1, point_count + 1)]
+        payload = {
+            "data_format_version": DATA_FORMAT_VERSION,
+            "generator_version": APP_VERSION,
+            "app_version": APP_VERSION,
+            "build_version": BUILD_VERSION,
+            "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "trace_ids": trace_ids,
+            "frequency_unit": "Hz",
+            "amplitude_unit": "dBm",
+            "point_count": point_count,
+            "frequency_count": frequency_count,
+            "csv_file": csv_path.name,
+        }
+        meta_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        self._logger.info("[DATASET] wrote meta sidecar: %s", meta_path)
 
     def _save_zna_row_format(self, output_dir: Path, dataset: ScanDataset) -> None:
         """Save one frequency header row + many data rows for ZNA-like exports."""
@@ -197,6 +357,12 @@ class DatasetManager:
         np.save(output_dir / "spectrum.npy", spectrum_array)
         np.save(output_dir / "images.npy", images_array)
 
+        self._write_data_meta(
+            csv_path=output_dir / "scan_points.csv",
+            point_count=point_index,
+            frequency_count=int(dataset.frequency_axis.size),
+        )
+
     def _save_single_csv_dataset(self, output_dir: Path, dataset: ScanDataset) -> None:
         """Save the complete scan results to one CSV file."""
 
@@ -260,32 +426,30 @@ class DatasetManager:
             raise RuntimeError("Dataset has not been created.")
         return self._dataset
 
-    def _extract_trace(
-        self,
-        result: ScanPointResult,
-    ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
-        """Return frequency and amplitude arrays from one spectrum trace."""
+    def _extract_trace(self, result: ScanPointResult) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+        """Extract and normalize spectrum trace arrays from one scan point result."""
 
-        if result.spectrum_result is not None and result.spectrum_result.has_trace_data:
-            frequency, amplitude = result.spectrum_result.to_trace()
-        else:
-            frequency, amplitude = result.spectrum_trace
-        frequency_array = np.asarray(frequency, dtype=np.float64)
-        amplitude_array = np.asarray(amplitude, dtype=np.float64)
+        frequency_axis_raw, amplitude_trace_raw = result.spectrum_trace
+        frequency_axis = np.asarray(frequency_axis_raw, dtype=np.float64)
+        amplitude_trace = np.asarray(amplitude_trace_raw, dtype=np.float64)
 
-        if frequency_array.ndim != 1 or amplitude_array.ndim != 1:
-            raise ValueError("Spectrum trace must be one-dimensional.")
-        if frequency_array.shape != amplitude_array.shape:
-            raise ValueError("Frequency and amplitude trace shapes must match.")
+        if frequency_axis.ndim != 1 or amplitude_trace.ndim != 1:
+            raise ValueError("Spectrum trace arrays must be one-dimensional.")
+        if frequency_axis.size == 0 or amplitude_trace.size == 0:
+            raise ValueError("Spectrum trace arrays cannot be empty.")
+        if frequency_axis.shape != amplitude_trace.shape:
+            raise ValueError("Spectrum frequency and amplitude arrays must share the same shape.")
 
-        return frequency_array, amplitude_array
+        return frequency_axis, amplitude_trace
 
-    def _normalize_image(self, image: NDArray[np.uint8]) -> NDArray[np.uint8]:
-        """Convert one image to a grayscale array for dataset storage."""
+    def _normalize_image(self, image: NDArray[np.uint8] | NDArray[np.float32]) -> NDArray[np.uint8]:
+        """Normalize one captured image into uint8 RGB format."""
 
-        image_array = np.asarray(image, dtype=np.uint8)
-        if image_array.ndim == 2:
-            return image_array
-        if image_array.ndim == 3:
-            return image_array.mean(axis=2).astype(np.uint8)
-        raise ValueError("Camera image must be a 2D or 3D array.")
+        normalized = np.asarray(image)
+        if normalized.ndim != 3 or normalized.shape[2] != 3:
+            raise ValueError("Camera image must be an RGB array with shape (H, W, 3).")
+
+        if normalized.dtype != np.uint8:
+            normalized = np.clip(normalized, 0, 255).astype(np.uint8)
+
+        return normalized

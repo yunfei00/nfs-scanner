@@ -8,7 +8,13 @@ from .exceptions import (
     SpectrumConnectionError,
     SpectrumQueryError,
 )
-from .factory import create_spectrum_analyzer
+from .factory import (
+    SpectrumAnalyzerPlugin,
+    SpectrumPluginMetadata,
+    create_spectrum_analyzer,
+    get_spectrum_plugin,
+    get_spectrum_plugin_metadata,
+)
 from .fsw_adapter import FswSpectrumAnalyzer
 from .mock_spectrum import MockSpectrumAnalyzer
 from .n9020a_adapter import N9020ASpectrumAnalyzer
@@ -33,6 +39,8 @@ from .zna_discovery import (
 
 __all__ = [
     "BaseScpiSpectrumAnalyzer",
+    "SpectrumAnalyzerPlugin",
+    "SpectrumPluginMetadata",
     "create_spectrum_analyzer",
     "FswSpectrumAnalyzer",
     "InstrumentDiscoveryResult",
@@ -53,6 +61,8 @@ __all__ = [
     "ZnaDiscoveryResult",
     "discover_supported_instruments_via_visa",
     "discover_zna67_via_visa",
+    "get_spectrum_plugin",
+    "get_spectrum_plugin_metadata",
     "probe_resources",
     "convert_zna_mmem_csv_to_row_text",
     "append_zna_trace_csv",
