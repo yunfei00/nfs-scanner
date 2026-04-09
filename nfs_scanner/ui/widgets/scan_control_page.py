@@ -538,7 +538,6 @@ class ScanControlPage(QWidget):
         "scale": "Scale",
     }
     UNIT_SCALE = {"Hz": 1.0, "kHz": 1_000.0, "MHz": 1_000_000.0, "GHz": 1_000_000_000.0}
-    ZNA67_MINIMAL_QUERY_KEYS = ("start_freq", "stop_freq", "rbw", "points")
 
     def __init__(
         self,
@@ -1561,10 +1560,6 @@ class ScanControlPage(QWidget):
         if panel is None:
             return
 
-        if instrument_name == "ZNA67" and query_key not in self.ZNA67_MINIMAL_QUERY_KEYS:
-            self.append_log(f"ZNA67 当前阶段跳过参数查询: {query_key}（仅保留最小采集相关命令）")
-            return
-
         value, unit = self._query_instrument_value(instrument_name, query_key)
         panel.set_query_result(query_key, value, unit)
         label = self.QUERY_LABELS.get(query_key, query_key)
@@ -1578,10 +1573,7 @@ class ScanControlPage(QWidget):
         if panel is None:
             return
 
-        query_keys = self._get_effective_query_keys(
-            instrument_name=instrument_name,
-            query_keys=panel.get_supported_query_keys(),
-        )
+        query_keys = panel.get_supported_query_keys()
         if not query_keys:
             return
 
@@ -1592,18 +1584,6 @@ class ScanControlPage(QWidget):
             label = self.QUERY_LABELS.get(query_key, query_key)
             suffix = f" {unit}" if unit else ""
             self.append_log(f"仪表同步: {instrument_name} - {label} = {value}{suffix}")
-
-    def _get_effective_query_keys(
-        self,
-        *,
-        instrument_name: str,
-        query_keys: tuple[str, ...],
-    ) -> tuple[str, ...]:
-        """返回当前仪表在本阶段允许批量查询的参数键集合。"""
-
-        if instrument_name == "ZNA67":
-            return tuple(key for key in query_keys if key in self.ZNA67_MINIMAL_QUERY_KEYS)
-        return query_keys
 
     def _query_instrument_value(self, instrument_name: str, query_key: str) -> tuple[str, str | None]:
         """查询仪表参数：优先真实设备，失败后回退占位值。"""
@@ -1804,10 +1784,7 @@ class ScanControlPage(QWidget):
             return False, "未找到对应仪表面板"
 
         snapshot_values: dict[str, dict[str, str | None]] = {}
-        query_keys = self._get_effective_query_keys(
-            instrument_name=instrument_name,
-            query_keys=panel.get_supported_query_keys(),
-        )
+        query_keys = panel.get_supported_query_keys()
         for query_key in query_keys:
             value, unit = self._query_instrument_value(instrument_name, query_key)
             panel.set_query_result(query_key, value, unit)
