@@ -25,7 +25,7 @@ class LoggingConfigTestCase(unittest.TestCase):
             try:
                 log_file = setup_logging(force=True)
                 logger = logging.getLogger("tests.logging")
-                message = "日志系统可按天落盘"
+                message = "logging system writes to the daily log file"
                 logger.info(message)
 
                 self.assertTrue(log_file.exists())
@@ -33,6 +33,10 @@ class LoggingConfigTestCase(unittest.TestCase):
                 self.assertRegex(log_file.name, r"^\d{4}-\d{2}-\d{2}\.log$")
                 self.assertIn(message, log_file.read_text(encoding="utf-8"))
             finally:
+                root_logger = logging.getLogger()
+                for handler in list(root_logger.handlers):
+                    handler.close()
+                    root_logger.removeHandler(handler)
                 if previous_value is None:
                     os.environ.pop(LOG_DIRECTORY_ENV_VAR, None)
                 else:

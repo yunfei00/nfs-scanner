@@ -150,7 +150,7 @@ class ScanWorker(QObject):
                 if not ok:
                     self.finished.emit("error", f"发送运动命令失败: {reason}")
                     return
-                self.log_message.emit(f"发送命令: {command}")
+                self._emit_log_message(f"发送命令: {command}")
 
                 done, reason = self._wait_until_motion_done(
                     serial_port=self._serial_port,
@@ -231,13 +231,13 @@ class ScanWorker(QObject):
             state, current_pos = self._parse_motion_status(status_line)
             latest_state = state
             if current_pos is None:
-                self.log_message.emit(
+                self._emit_log_message(
                     "[运动状态] 实际位置=未知 "
                     f"| 目标位置=({target[0]:.3f}, {target[1]:.3f}, {target[2]:.3f}) "
                     f"| 控制器状态={state or '未知'}"
                 )
             else:
-                self.log_message.emit(
+                self._emit_log_message(
                     f"[运动状态] 实际位置=({current_pos[0]:.3f}, {current_pos[1]:.3f}, {current_pos[2]:.3f}) "
                     f"| 目标位置=({target[0]:.3f}, {target[1]:.3f}, {target[2]:.3f}) "
                     f"| 控制器状态={state or '未知'}"
@@ -320,8 +320,16 @@ class ScanWorker(QObject):
         self._reset_serial_rx_state(self._serial_port)
         ready, reason = self._ensure_controller_ready(self._serial_port)
         if not ready:
-            self.log_message.emit(f"扫描收尾提示: {reason}")
+            self._emit_log_message(f"扫描收尾提示: {reason}")
         self._reset_serial_rx_state(self._serial_port)
+
+    def _emit_log_message(self, message: str) -> None:
+        """Emit one worker log message when the Qt signal is available."""
+
+        try:
+            self.log_message.emit(message)
+        except RuntimeError:
+            get_logger(__name__).debug("ScanWorker log signal unavailable: %s", message)
 
     def _send_command(self, serial_port: QSerialPort, command: str) -> tuple[bool, str]:
         payload = f"{command}\r\n".encode("utf-8")

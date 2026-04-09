@@ -17,6 +17,7 @@ from nfs_scanner.devices.spectrum import (
     Zna67SpectrumAnalyzer,
     create_spectrum_analyzer,
 )
+from nfs_scanner.devices.spectrum.utils import parse_ascii_float_values
 
 
 class FakeTransport(SpectrumTransport):
@@ -112,6 +113,113 @@ class SpectrumAnalyzerAdapterTestCase(unittest.TestCase):
         self.assertIn("INITiate:CONTinuous OFF", transport.writes)
         self.assertIn("INITiate:IMMediate", transport.writes)
 
+    def test_fsw_adapter_configures_start_stop_window(self) -> None:
+        """FSW should support explicit start/stop configuration."""
+
+        transport = FakeTransport({"*OPC?": "1"})
+        analyzer = FswSpectrumAnalyzer(transport)
+
+        analyzer.connect()
+        analyzer.configure(
+            SpectrumConfig(
+                start_freq="2.4GHz",
+                stop_freq="2.5GHz",
+                trace_name="TRACE 1",
+            )
+        )
+
+        self.assertIn("FREQuency:STARt 2400000000.000000", transport.writes)
+        self.assertIn("FREQuency:STOP 2500000000.000000", transport.writes)
+        self.assertNotIn("FREQuency:CENTer 2450000000.000000", transport.writes)
+
+    def test_fsw_adapter_prefers_center_span_when_both_frequency_windows_are_given(self) -> None:
+        """When both window styles are provided, center/span should win."""
+
+        transport = FakeTransport({"*OPC?": "1"})
+        analyzer = FswSpectrumAnalyzer(transport)
+
+        analyzer.connect()
+        analyzer.configure(
+            SpectrumConfig(
+                start_freq="2.4GHz",
+                stop_freq="2.5GHz",
+                center_freq="2.45GHz",
+                span="100MHz",
+            )
+        )
+
+        self.assertIn("FREQuency:CENTer 2450000000.000000", transport.writes)
+        self.assertIn("FREQuency:SPAN 100000000.000000", transport.writes)
+        self.assertNotIn("FREQuency:STARt 2400000000.000000", transport.writes)
+        self.assertNotIn("FREQuency:STOP 2500000000.000000", transport.writes)
+
+    def test_fsw_adapter_point_mode_normalizes_trace_name_and_trace_mode(self) -> None:
+        """Point-mode FSW acquisition should use TRACE1 and preserve trace mode commands."""
+
+        transport = FakeTransport(
+            {
+                "*OPC?": "1",
+                "FREQuency:STARt?": "2400000000",
+                "FREQuency:STOP?": "2500000000",
+                "FREQuency:CENTer?": "2450000000",
+                "FREQuency:SPAN?": "100000000",
+                "BANDwidth:RESolution?": "100000",
+                "BANDwidth:VIDeo?": "100000",
+                "DISPlay:WINDow:TRACe:Y:RLEVel?": "0",
+                "DETector?": "RMS",
+                "TRACe:MODE? TRACE1": "MAXH",
+                "TRACe:DATA? TRACE1": '"-82; -61;\n-70"',
+            }
+        )
+        analyzer = FswSpectrumAnalyzer(transport)
+
+        analyzer.connect()
+        analyzer.configure(
+            SpectrumConfig(
+                center_freq="2.45GHz",
+                span="100MHz",
+                rbw="100kHz",
+                vbw="100kHz",
+                trace_mode="MAXH",
+                acquisition_mode="point",
+                trace_name="TrACe 1",
+            )
+        )
+        result = analyzer.acquire_spectrum()
+
+        self.assertEqual(result.instrument_type, "FSW")
+        self.assertEqual(result.acquisition_mode, "point")
+        self.assertEqual(result.point_value, -61.0)
+        self.assertIn("TRACe:MODE TRACE1, MAXH", transport.writes)
+        self.assertIn("TRACe:MODE? TRACE1", transport.queries)
+        self.assertIn("TRACe:DATA? TRACE1", transport.queries)
+
+    def test_fsw_adapter_raises_clear_error_for_invalid_trace_payload(self) -> None:
+        """Invalid FSW trace payloads should surface a query error."""
+
+        transport = FakeTransport(
+            {
+                "*OPC?": "1",
+                "FREQuency:STARt?": "1000000",
+                "FREQuency:STOP?": "3000000",
+                "FREQuency:CENTer?": "2000000",
+                "FREQuency:SPAN?": "2000000",
+                "BANDwidth:RESolution?": "100000",
+                "BANDwidth:VIDeo?": "300000",
+                "DISPlay:WINDow:TRACe:Y:RLEVel?": "10",
+                "DETector?": "RMS",
+                "TRACe:MODE? TRACE1": "WRIT",
+                "TRACe:DATA? TRACE1": "INVALID_TRACE_DATA",
+            }
+        )
+        analyzer = FswSpectrumAnalyzer(transport)
+
+        analyzer.connect()
+        analyzer.configure(SpectrumConfig(start_freq="1MHz", stop_freq="3MHz"))
+
+        with self.assertRaises(SpectrumQueryError):
+            analyzer.acquire_spectrum()
+
     def test_n9020a_point_mode_returns_peak_value(self) -> None:
         """Point mode should still provide a normalized point value for the caller."""
 
@@ -202,6 +310,12 @@ class SpectrumAnalyzerAdapterTestCase(unittest.TestCase):
         manager = DeviceManager()
         with self.assertRaises(SpectrumConnectionError):
             manager.ensure_spectrum_device(instrument_type="FSW", resource_names=())
+
+    def test_parse_ascii_float_values_supports_scpi_block_and_mixed_separators(self) -> None:
+        """ASCII trace parsing should accept mixed separators and SCPI block headers."""
+
+        values = parse_ascii_float_values("#212-80,-60;\n-70")
+        np.testing.assert_allclose(values, np.asarray([-80.0, -60.0, -70.0]))
 
 
 if __name__ == "__main__":

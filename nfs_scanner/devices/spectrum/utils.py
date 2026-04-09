@@ -65,16 +65,66 @@ def parse_numeric_value(value: str | float | int | None) -> float | None:
 
 
 def parse_ascii_float_values(raw_text: str) -> NDArray[np.float64]:
-    """Parse one comma or whitespace separated float payload."""
+    """Parse one ASCII trace payload into a float array.
+
+    The parser accepts common SCPI ASCII variants, including comma, semicolon,
+    and newline separators, optional surrounding quotes, and definite-length
+    block headers returned by some VISA stacks.
+    """
+
+    normalized = _strip_ascii_block_header(raw_text.strip())
+    normalized = normalized.strip().strip('"').strip("'")
+    normalized = normalized.strip()
+    if not normalized:
+        raise ValueError("Trace payload is empty.")
 
     tokens = [
         token
-        for token in re.split(r"[\s,]+", raw_text.strip())
+        for token in re.split(r"[\s,;]+", normalized)
         if token
     ]
     if not tokens:
         raise ValueError("Trace payload is empty.")
-    return np.asarray([float(token) for token in tokens], dtype=np.float64)
+
+    values: list[float] = []
+    for token in tokens:
+        try:
+            values.append(float(token))
+        except ValueError as error:
+            raise ValueError(f"Trace payload contains non-numeric token: {token!r}") from error
+    return np.asarray(values, dtype=np.float64)
+
+
+def _strip_ascii_block_header(raw_text: str) -> str:
+    """Strip one SCPI definite-length block header when present."""
+
+    if not raw_text.startswith("#"):
+        return raw_text
+    if len(raw_text) < 2 or not raw_text[1].isdigit():
+        return raw_text
+
+    header_digits = int(raw_text[1])
+    if header_digits <= 0:
+        raise ValueError("Unsupported SCPI block header.")
+
+    header_end = 2 + header_digits
+    if len(raw_text) < header_end:
+        raise ValueError("Malformed SCPI block header.")
+
+    payload_length_text = raw_text[2:header_end]
+    if not payload_length_text.isdigit():
+        raise ValueError("Malformed SCPI block length.")
+
+    payload_length = int(payload_length_text)
+    payload_end = header_end + payload_length
+    payload = raw_text[header_end:payload_end]
+    if len(payload) < payload_length:
+        raise ValueError("Incomplete SCPI block payload.")
+
+    remainder = raw_text[payload_end:].strip()
+    if remainder:
+        return f"{payload} {remainder}"
+    return payload
 
 
 def build_frequency_axis(

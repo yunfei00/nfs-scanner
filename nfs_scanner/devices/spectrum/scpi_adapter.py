@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 import logging
+import re
 from typing import Callable
 
 import numpy as np
@@ -12,7 +13,7 @@ import numpy as np
 from nfs_scanner.core.models import SpectrumAcquisitionResult, SpectrumConfig
 
 from .base_spectrum import SpectrumAnalyzer
-from .exceptions import SpectrumConfigurationError, SpectrumQueryError
+from .exceptions import SpectrumAnalyzerError, SpectrumConfigurationError, SpectrumQueryError
 from .scpi_transport import SpectrumTransport
 from .utils import (
     build_frequency_axis,
@@ -69,6 +70,7 @@ class BaseScpiSpectrumAnalyzer(SpectrumAnalyzer):
     """SCPI-backed implementation shared by concrete analyzer families."""
 
     instrument_type = "SCPI"
+    default_trace_name = "TRACE1"
     command_set = SpectrumCommandSet()
     text_setting_keys = frozenset({"detector", "trace_mode"})
     integer_setting_keys = frozenset({"points"})
@@ -89,22 +91,37 @@ class BaseScpiSpectrumAnalyzer(SpectrumAnalyzer):
     def connect(self) -> bool:
         """Connect the underlying transport."""
 
-        return self._transport.connect()
+        self._logger.info("[SPECTRUM] connecting instrument=%s resource=%s", self.instrument_type, self.resource_name)
+        connected = self._transport.connect()
+        self._logger.info("[SPECTRUM] connected instrument=%s resource=%s", self.instrument_type, self.resource_name)
+        return connected
 
     def disconnect(self) -> None:
         """Disconnect the underlying transport."""
 
+        self._logger.info("[SPECTRUM] disconnect instrument=%s resource=%s", self.instrument_type, self.resource_name)
         self._transport.disconnect()
 
     def get_idn(self) -> str:
         """Return the device identification string."""
 
-        return self._transport.query("*IDN?")
+        try:
+            return self._transport.query("*IDN?")
+        except SpectrumAnalyzerError as error:
+            self._raise_transport_error(error, context="Failed to query instrument identification", command="*IDN?")
 
     def preset(self) -> None:
         """Apply one instrument preset and wait until it finishes."""
 
-        self._transport.write(self.command_set.preset_command)
+        self._logger.info("[SPECTRUM] preset instrument=%s resource=%s", self.instrument_type, self.resource_name)
+        try:
+            self._transport.write(self.command_set.preset_command)
+        except SpectrumAnalyzerError as error:
+            self._raise_transport_error(
+                error,
+                context="Failed to preset instrument",
+                command=self.command_set.preset_command,
+            )
         self.wait_opc()
 
     def set_center_freq(self, frequency_hz: float) -> None:
@@ -152,7 +169,10 @@ class BaseScpiSpectrumAnalyzer(SpectrumAnalyzer):
         """Toggle continuous acquisition mode."""
 
         command = self.command_set.continuous_on_command if enabled else self.command_set.continuous_off_command
-        self._transport.write(command)
+        try:
+            self._transport.write(command)
+        except SpectrumAnalyzerError as error:
+            self._raise_transport_error(error, context="Failed to update continuous mode", command=command)
 
     def query_setting(self, setting_key: str) -> str:
         """Query one normalized setting key from the concrete instrument."""
@@ -160,7 +180,16 @@ class BaseScpiSpectrumAnalyzer(SpectrumAnalyzer):
         command = self.command_set.query_commands.get(setting_key)
         if command is None:
             raise SpectrumQueryError(f"Unsupported setting query: {setting_key}")
-        return self._transport.query(command.format(trace_name=self._config.trace_name))
+
+        resolved_command = command.format(trace_name=self._active_trace_name())
+        try:
+            return self._transport.query(resolved_command)
+        except SpectrumAnalyzerError as error:
+            self._raise_transport_error(
+                error,
+                context=f"Failed to query setting {setting_key}",
+                command=resolved_command,
+            )
 
     def set_setting(self, setting_key: str, value: str | float | int) -> None:
         """Apply one normalized setting key to the concrete instrument."""
@@ -170,32 +199,69 @@ class BaseScpiSpectrumAnalyzer(SpectrumAnalyzer):
             raise SpectrumConfigurationError(f"Unsupported setting update: {setting_key}")
 
         formatted_value = self._format_setting_value(setting_key, value)
-        command = f"{command_prefix.format(trace_name=self._config.trace_name)} {formatted_value}".strip()
-        self._transport.write(command)
+        command = f"{command_prefix.format(trace_name=self._active_trace_name())} {formatted_value}".strip()
+        try:
+            self._transport.write(command)
+        except SpectrumAnalyzerError as error:
+            self._raise_transport_error(
+                error,
+                context=f"Failed to apply setting {setting_key}",
+                command=command,
+            )
 
     def configure(self, config: SpectrumConfig) -> None:
         """Apply one normalized acquisition config to the instrument."""
 
-        self._config = config
+        normalized_trace_name = self._normalize_trace_name(config.trace_name)
+        if normalized_trace_name != config.trace_name:
+            self._logger.info(
+                "[SPECTRUM] normalized trace name instrument=%s resource=%s raw=%r normalized=%s",
+                self.instrument_type,
+                self.resource_name,
+                config.trace_name,
+                normalized_trace_name,
+            )
+        self._config = replace(config, trace_name=normalized_trace_name)
 
-        if config.apply_preset:
+        self._logger.info(
+            "[SPECTRUM] configure instrument=%s resource=%s acquisition=%s trace=%s",
+            self.instrument_type,
+            self.resource_name,
+            self._config.acquisition_mode,
+            self._config.trace_name,
+        )
+
+        if self._config.apply_preset:
             self.preset()
 
-        start_hz = parse_frequency_value(config.start_freq)
-        stop_hz = parse_frequency_value(config.stop_freq)
-        center_hz = parse_frequency_value(config.center_freq)
-        span_hz = parse_frequency_value(config.span)
-        rbw_hz = parse_frequency_value(config.rbw)
-        vbw_hz = parse_frequency_value(config.vbw)
-        ref_level_dbm = parse_numeric_value(config.ref_level)
+        start_hz = parse_frequency_value(self._config.start_freq)
+        stop_hz = parse_frequency_value(self._config.stop_freq)
+        center_hz = parse_frequency_value(self._config.center_freq)
+        span_hz = parse_frequency_value(self._config.span)
+        rbw_hz = parse_frequency_value(self._config.rbw)
+        vbw_hz = parse_frequency_value(self._config.vbw)
+        ref_level_dbm = parse_numeric_value(self._config.ref_level)
 
-        if center_hz is not None:
+        use_center_span = center_hz is not None and span_hz is not None
+        use_start_stop = start_hz is not None and stop_hz is not None
+
+        if use_center_span and use_start_stop:
+            self._logger.info(
+                "[SPECTRUM] configure instrument=%s resource=%s using center/span and skipping start/stop",
+                self.instrument_type,
+                self.resource_name,
+            )
+
+        if use_center_span:
             self.set_center_freq(center_hz)
-        if span_hz is not None:
             self.set_span(span_hz)
-        elif start_hz is not None and stop_hz is not None:
+        elif use_start_stop:
             self.set_start_stop_freq(start_hz, stop_hz)
         else:
+            if center_hz is not None:
+                self.set_center_freq(center_hz)
+            if span_hz is not None:
+                self.set_span(span_hz)
             if start_hz is not None:
                 self.set_setting("start_freq", start_hz)
             if stop_hz is not None:
@@ -207,36 +273,90 @@ class BaseScpiSpectrumAnalyzer(SpectrumAnalyzer):
             self.set_vbw(vbw_hz)
         if ref_level_dbm is not None:
             self.set_ref_level(ref_level_dbm)
-        if config.detector:
-            self.set_detector(config.detector)
-        if config.trace_mode:
-            self.set_trace_mode(config.trace_mode)
+        if self._config.detector:
+            self.set_detector(self._config.detector)
+        if self._config.trace_mode:
+            self.set_trace_mode(self._config.trace_mode)
 
     def trigger_single(self) -> None:
         """Trigger one single sweep with continuous mode disabled."""
 
+        self._logger.info(
+            "[SPECTRUM] single sweep instrument=%s resource=%s trace=%s",
+            self.instrument_type,
+            self.resource_name,
+            self._active_trace_name(),
+        )
         self.set_continuous(False)
-        self._transport.write(self.command_set.trigger_single_command)
+        try:
+            self._transport.write(self.command_set.trigger_single_command)
+        except SpectrumAnalyzerError as error:
+            self._raise_transport_error(
+                error,
+                context="Failed to start single sweep",
+                command=self.command_set.trigger_single_command,
+            )
 
     def wait_opc(self, timeout_ms: int | None = None) -> None:
         """Wait until the instrument reports operation complete."""
 
-        response = self._transport.query(self.command_set.opc_query, timeout_ms=timeout_ms)
-        if response.strip() != "1":
-            raise SpectrumQueryError(f"Unexpected *OPC? response: {response!r}")
+        try:
+            response = self._transport.query(self.command_set.opc_query, timeout_ms=timeout_ms)
+        except SpectrumAnalyzerError as error:
+            self._raise_transport_error(
+                error,
+                context="Failed while waiting for operation complete",
+                command=self.command_set.opc_query,
+            )
+
+        try:
+            response_value = parse_numeric_value(response)
+        except ValueError as error:
+            raise SpectrumQueryError(
+                f"Unexpected *OPC? response from {self.instrument_type} on {self.resource_name}: {response!r}"
+            ) from error
+
+        if response_value != 1.0:
+            raise SpectrumQueryError(
+                f"Unexpected *OPC? response from {self.instrument_type} on {self.resource_name}: {response!r}"
+            )
 
     def fetch_trace(self) -> SpectrumAcquisitionResult:
         """Fetch one trace acquisition and normalize it for upper layers."""
 
-        raw_trace_text = self._transport.query(
-            self.command_set.trace_query_template.format(trace_name=self._config.trace_name)
-        )
-        trace_values = parse_ascii_float_values(raw_trace_text)
+        trace_name = self._active_trace_name()
+        trace_command = self.command_set.trace_query_template.format(trace_name=trace_name)
+        try:
+            raw_trace_text = self._transport.query(trace_command)
+        except SpectrumAnalyzerError as error:
+            self._raise_transport_error(
+                error,
+                context="Failed to query trace data",
+                command=trace_command,
+            )
+
+        try:
+            trace_values = parse_ascii_float_values(raw_trace_text)
+        except ValueError as error:
+            raise SpectrumQueryError(
+                "Failed to parse trace payload from "
+                f"{self.instrument_type} on {self.resource_name} for {trace_name}: {error}. "
+                f"Raw preview={self._preview_text(raw_trace_text)!r}"
+            ) from error
+
         frequency_settings = self._query_frequency_settings()
         trace_axis = build_frequency_axis(
             frequency_settings.start_freq_hz,
             frequency_settings.stop_freq_hz,
             int(trace_values.size),
+        )
+
+        self._logger.info(
+            "[SPECTRUM] trace acquired instrument=%s resource=%s trace=%s points=%s",
+            self.instrument_type,
+            self.resource_name,
+            trace_name,
+            trace_values.size,
         )
 
         return SpectrumAcquisitionResult(
@@ -255,7 +375,7 @@ class BaseScpiSpectrumAnalyzer(SpectrumAnalyzer):
             metadata={
                 "resource_name": self.resource_name,
                 "raw_trace_text": raw_trace_text,
-                "trace_name": self._config.trace_name,
+                "trace_name": trace_name,
             },
         )
 
@@ -288,6 +408,11 @@ class BaseScpiSpectrumAnalyzer(SpectrumAnalyzer):
             return self.fetch_point_value()
         return self.fetch_trace()
 
+    def _active_trace_name(self) -> str:
+        """Return the currently active trace name in SCPI-safe form."""
+
+        return self._normalize_trace_name(self._config.trace_name)
+
     def _format_setting_value(self, setting_key: str, value: str | float | int) -> str:
         """Normalize one caller-facing setting value into SCPI text."""
 
@@ -307,6 +432,22 @@ class BaseScpiSpectrumAnalyzer(SpectrumAnalyzer):
         if numeric_value is None:
             raise SpectrumConfigurationError(f"Setting {setting_key} requires a numeric value.")
         return f"{numeric_value:.6f}"
+
+    def _normalize_trace_name(self, trace_name: str | None) -> str:
+        """Normalize caller-provided trace aliases into one stable SCPI name."""
+
+        normalized = (trace_name or "").strip()
+        if not normalized:
+            return self.default_trace_name
+
+        compact = re.sub(r"\s+", "", normalized).upper()
+        if compact.isdigit():
+            return f"TRACE{compact}"
+
+        match = re.fullmatch(r"TRAC(?:E)?(\d+)", compact)
+        if match is not None:
+            return f"TRACE{match.group(1)}"
+        return compact
 
     def _query_frequency_settings(self):
         """Read the current frequency window from the instrument."""
@@ -336,3 +477,26 @@ class BaseScpiSpectrumAnalyzer(SpectrumAnalyzer):
             return None
         normalized = raw_value.strip()
         return normalized or None
+
+    def _raise_transport_error(
+        self,
+        error: SpectrumAnalyzerError,
+        *,
+        context: str,
+        command: str | None = None,
+    ) -> None:
+        """Raise one transport error with instrument and resource context."""
+
+        command_suffix = f" | command={command}" if command else ""
+        raise error.__class__(
+            f"{context} | instrument={self.instrument_type} resource={self.resource_name}"
+            f"{command_suffix} | {error}"
+        ) from error
+
+    def _preview_text(self, value: str, *, limit: int = 160) -> str:
+        """Return one trimmed preview string for long SCPI payloads."""
+
+        preview = value.strip()
+        if len(preview) <= limit:
+            return preview
+        return f"{preview[:limit]}..."

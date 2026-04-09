@@ -23,6 +23,7 @@ class SpectrumPanel(QWidget):
     """Right-side structured panel for spectrum-related settings."""
 
     DEFAULT_DEVICE_TYPE = "TCPIP-SCPI"
+    DEVICE_TYPE_OPTIONS = ("FSW", "N9020A", "ZNA67", "TCPIP-SCPI", "USB-TMC", "Mock-Spectrum")
     DEFAULT_START_FREQ = "100MHz"
     DEFAULT_STOP_FREQ = "3GHz"
     DEFAULT_RBW = "100kHz"
@@ -61,7 +62,7 @@ class SpectrumPanel(QWidget):
         layout.setSpacing(10)
 
         self.device_type_combo = QComboBox(group_box)
-        self.device_type_combo.addItems(["TCPIP-SCPI", "USB-TMC", "Mock-Spectrum"])
+        self.device_type_combo.addItems(list(self.DEVICE_TYPE_OPTIONS))
         self.device_type_combo.setCurrentText(self.DEFAULT_DEVICE_TYPE)
 
         self.device_connect_button = QPushButton("连接", group_box)

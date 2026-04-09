@@ -90,6 +90,7 @@ class PyVisaSpectrumTransport(SpectrumTransport):
         if timeout_ms is not None:
             resource.timeout = timeout_ms
         try:
+            self._logger.debug("[SCPI] write resource=%s command=%s", self.resource_name, command)
             resource.write(command)
         except Exception as error:  # pragma: no cover - requires local VISA stack
             raise self._classify_error(error, command=command, is_query=False) from error
@@ -104,7 +105,10 @@ class PyVisaSpectrumTransport(SpectrumTransport):
         if timeout_ms is not None:
             resource.timeout = timeout_ms
         try:
-            return str(resource.query(command)).strip()
+            self._logger.debug("[SCPI] query resource=%s command=%s", self.resource_name, command)
+            response = str(resource.query(command)).strip()
+            self._logger.debug("[SCPI] response resource=%s command=%s response=%s", self.resource_name, command, response)
+            return response
         except Exception as error:  # pragma: no cover - requires local VISA stack
             raise self._classify_error(error, command=command, is_query=True) from error
         finally:
@@ -130,10 +134,12 @@ class PyVisaSpectrumTransport(SpectrumTransport):
         message = str(error)
         lowered = message.lower()
         if "timeout" in lowered:
-            return SpectrumCommandTimeoutError(f"Command timed out: {command} | {message}")
+            return SpectrumCommandTimeoutError(
+                f"Command timed out on {self.resource_name}: {command} | {message}"
+            )
         if is_query:
-            return SpectrumQueryError(f"Query failed: {command} | {message}")
-        return SpectrumAnalyzerError(f"Command failed: {command} | {message}")
+            return SpectrumQueryError(f"Query failed on {self.resource_name}: {command} | {message}")
+        return SpectrumAnalyzerError(f"Command failed on {self.resource_name}: {command} | {message}")
 
     def _safe_close(self) -> None:
         """Close the resource manager pair without leaking exceptions."""
