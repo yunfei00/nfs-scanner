@@ -272,8 +272,8 @@ class InstrumentPanel(QWidget):
     ) -> None:
         """Add FSW trace-mode radio group with query/set buttons."""
 
-        mode_label = QLabel("模式", self)
-        layout.addWidget(mode_label, row, start_column)
+        set_button = QPushButton("设置模式", self)
+        layout.addWidget(set_button, row, start_column)
 
         self._trace_mode_group = QButtonGroup(self)
         mode_items = (
@@ -289,10 +289,8 @@ class InstrumentPanel(QWidget):
             layout.addWidget(button, row, start_column + index)
         self._trace_mode_buttons["WRIT"].setChecked(True)
 
-        set_button = QPushButton("设置模式", self)
         query_button = QPushButton("查询", self)
-        layout.addWidget(set_button, row, start_column + 5)
-        layout.addWidget(query_button, row, start_column + 6)
+        layout.addWidget(query_button, row, start_column + 5)
 
         query_button.clicked.connect(lambda: self.query_requested.emit(self.instrument_name, "trace_mode"))
         set_button.clicked.connect(
