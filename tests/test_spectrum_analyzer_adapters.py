@@ -83,7 +83,12 @@ class SpectrumAnalyzerAdapterTestCase(unittest.TestCase):
                 "DISPlay:WINDow:TRACe:Y:RLEVel?": "10",
                 "DETector?": "RMS",
                 "TRACe:MODE? TRACE1": "WRIT",
-                "TRACe:DATA? TRACE1": "-70,-60,-65",
+                'MMEM:DATA? "C:\\data.csv"': (
+                    "Freq(Hz),Trace1(dBm)\n"
+                    "1000000,-70\n"
+                    "2000000,-60\n"
+                    "3000000,-65\n"
+                ),
             }
         )
         analyzer = FswSpectrumAnalyzer(transport, time_provider=lambda: datetime(2026, 4, 7, 15, 0, 0))
@@ -112,6 +117,10 @@ class SpectrumAnalyzerAdapterTestCase(unittest.TestCase):
         self.assertIn("BANDwidth:RESolution 100000.000000", transport.writes)
         self.assertIn("INITiate:CONTinuous OFF", transport.writes)
         self.assertIn("INITiate:IMMediate", transport.writes)
+        self.assertIn("DISP TRAC1 ON", transport.writes)
+        self.assertIn(":FORM:DEXP:DSEP POIN", transport.writes)
+        self.assertIn(":FORM:DEXP:FORM CSV", transport.writes)
+        self.assertIn('MMEM:STOR1:TRAC 1,"C:\\data.csv"', transport.writes)
 
     def test_fsw_adapter_configures_start_stop_window(self) -> None:
         """FSW should support explicit start/stop configuration."""
@@ -168,7 +177,12 @@ class SpectrumAnalyzerAdapterTestCase(unittest.TestCase):
                 "DISPlay:WINDow:TRACe:Y:RLEVel?": "0",
                 "DETector?": "RMS",
                 "TRACe:MODE? TRACE1": "MAXH",
-                "TRACe:DATA? TRACE1": '"-82; -61;\n-70"',
+                'MMEM:DATA? "C:\\data.csv"': (
+                    "Freq(Hz),Trace1(dBm)\n"
+                    "2400000000,-82\n"
+                    "2450000000,-61\n"
+                    "2500000000,-70\n"
+                ),
             }
         )
         analyzer = FswSpectrumAnalyzer(transport)
@@ -192,7 +206,7 @@ class SpectrumAnalyzerAdapterTestCase(unittest.TestCase):
         self.assertEqual(result.point_value, -61.0)
         self.assertIn("TRACe:MODE TRACE1, MAXH", transport.writes)
         self.assertIn("TRACe:MODE? TRACE1", transport.queries)
-        self.assertIn("TRACe:DATA? TRACE1", transport.queries)
+        self.assertIn('MMEM:DATA? "C:\\data.csv"', transport.queries)
 
     def test_fsw_adapter_raises_clear_error_for_invalid_trace_payload(self) -> None:
         """Invalid FSW trace payloads should surface a query error."""
@@ -209,7 +223,7 @@ class SpectrumAnalyzerAdapterTestCase(unittest.TestCase):
                 "DISPlay:WINDow:TRACe:Y:RLEVel?": "10",
                 "DETector?": "RMS",
                 "TRACe:MODE? TRACE1": "WRIT",
-                "TRACe:DATA? TRACE1": "INVALID_TRACE_DATA",
+                'MMEM:DATA? "C:\\data.csv"': "INVALID_TRACE_DATA",
             }
         )
         analyzer = FswSpectrumAnalyzer(transport)
