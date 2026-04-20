@@ -130,11 +130,11 @@ class InstrumentPanel(QWidget):
         preset_button.clicked.connect(lambda: self.action_requested.emit(self.instrument_name, "preset"))
         layout.addWidget(preset_button, 3, 4)
 
-        save_data_button = QPushButton("保存数据", self)
+        save_data_button = QPushButton("保存仪表数据", self)
         save_data_button.clicked.connect(lambda: self.action_requested.emit(self.instrument_name, "save_data"))
         layout.addWidget(save_data_button, 3, 5)
 
-        save_param_demo_button = QPushButton("参数存储Demo", self)
+        save_param_demo_button = QPushButton("存储数据测试", self)
         save_param_demo_button.clicked.connect(
             lambda: self.action_requested.emit(self.instrument_name, "save_param_demo")
         )
