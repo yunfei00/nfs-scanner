@@ -69,13 +69,13 @@ ZnaDiscoveryResult = InstrumentDiscoveryResult
 
 
 def discover_supported_instruments_via_visa(timeout_ms: int = 1200) -> InstrumentDiscoveryResult:
-    """Scan VISA resources and identify supported instruments from ``*IDN?``."""
+    """Scan TCPIP VISA resources and identify supported instruments from ``*IDN?``."""
 
     if not _HAS_PYVISA:
         return InstrumentDiscoveryResult(probes=[], pyvisa_available=False)
 
     resource_manager = pyvisa.ResourceManager()
-    resources = resource_manager.list_resources()
+    resources = _filter_tcpip_resources(resource_manager.list_resources())
     probes = probe_resources(resource_names=resources, timeout_ms=timeout_ms)
     resource_manager.close()
     return InstrumentDiscoveryResult(probes=probes, pyvisa_available=True)
@@ -121,6 +121,16 @@ def probe_resources(resource_names: tuple[str, ...], timeout_ms: int = 1200) -> 
 
     resource_manager.close()
     return probes
+
+
+def _filter_tcpip_resources(resource_names: tuple[str, ...]) -> tuple[str, ...]:
+    """Keep only TCPIP VISA resources to reduce irrelevant serial/USB/GPIB probes."""
+
+    return tuple(
+        resource_name
+        for resource_name in resource_names
+        if resource_name.upper().startswith("TCPIP")
+    )
 
 
 def _match_instrument_name(idn_text: str) -> str | None:
