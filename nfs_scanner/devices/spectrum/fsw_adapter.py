@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 from io import StringIO
+import time
 
 import numpy as np
 
@@ -62,6 +63,7 @@ class FswSpectrumAnalyzer(BaseScpiSpectrumAnalyzer):
     default_trace_name = "TRACE1"
     command_set = FSW_COMMAND_SET
     mmem_temp_trace_path = r"C:\data.csv"
+    clear_write_settle_seconds = 0.2
     trace_mode_aliases = {
         "CLEAR WRITE": "WRIT",
         "CLEARWRITE": "WRIT",
@@ -162,6 +164,14 @@ class FswSpectrumAnalyzer(BaseScpiSpectrumAnalyzer):
             return
 
         super().set_setting(setting_key, value)
+
+    def acquire_spectrum(self) -> SpectrumAcquisitionResult:
+        """Run one FSW acquisition with clear-write to max-hold handoff."""
+
+        self.set_trace_mode("WRIT")
+        time.sleep(self.clear_write_settle_seconds)
+        self.set_trace_mode("MAXH")
+        return super().acquire_spectrum()
 
     def _capture_mmem_csv_text(self) -> str:
         """Run FSW MMEM store/read cycle using one single-trace CSV export."""
