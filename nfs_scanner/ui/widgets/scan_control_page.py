@@ -638,6 +638,7 @@ class ScanControlPage(QWidget):
         self.step_x_edit: QLineEdit
         self.step_y_edit: QLineEdit
         self.step_z_edit: QLineEdit
+        self.delay_seconds_edit: QLineEdit
         self.project_name_edit: QLineEdit
         self.test_name_edit: QLineEdit
         self.start_button: QPushButton
@@ -859,7 +860,7 @@ class ScanControlPage(QWidget):
         return group
 
     def _create_step_config_group(self) -> QGroupBox:
-        group = QGroupBox("步长设置", self)
+        group = QGroupBox("扫描参数设置", self)
         grid = QGridLayout(group)
         grid.setHorizontalSpacing(6)
         grid.setVerticalSpacing(6)
@@ -871,6 +872,9 @@ class ScanControlPage(QWidget):
         self._add_step_row(grid, 0, "StepX", self.step_x_edit)
         self._add_step_row(grid, 1, "StepY", self.step_y_edit)
         self._add_step_row(grid, 2, "StepZ", self.step_z_edit)
+        self.delay_seconds_edit = self._default_step_line_edit()
+        self.delay_seconds_edit.setText(f"{self.SCAN_DWELL_SECONDS:.2f}")
+        self._add_step_row(grid, 3, "延时", self.delay_seconds_edit, unit_text="秒")
 
         start_button = QPushButton("设为起点", self)
         end_button = QPushButton("设为终点", self)
@@ -878,16 +882,24 @@ class ScanControlPage(QWidget):
         end_button.setFixedHeight(30)
         start_button.clicked.connect(self.on_set_start_point)
         end_button.clicked.connect(self.on_set_end_point)
-        grid.addWidget(start_button, 3, 0, 1, 2)
-        grid.addWidget(end_button, 3, 2, 1, 2)
+        grid.addWidget(start_button, 4, 0, 1, 2)
+        grid.addWidget(end_button, 4, 2, 1, 2)
         return group
 
-    def _add_step_row(self, layout: QGridLayout, row: int, label: str, step_edit: QLineEdit) -> None:
+    def _add_step_row(
+        self,
+        layout: QGridLayout,
+        row: int,
+        label: str,
+        step_edit: QLineEdit,
+        *,
+        unit_text: str = "mm",
+    ) -> None:
         """Add one configurable scan step row."""
 
         layout.addWidget(QLabel(label, self), row, 0)
         layout.addWidget(step_edit, row, 1, 1, 2)
-        layout.addWidget(QLabel("mm", self), row, 3)
+        layout.addWidget(QLabel(unit_text, self), row, 3)
 
     def _create_test_info_group(self) -> QGroupBox:
         group = QGroupBox("测试说明", self)
@@ -1059,6 +1071,18 @@ class ScanControlPage(QWidget):
         edit.setText("0.50")
         edit.setFixedWidth(76)
         return edit
+
+    def _read_dwell_seconds(self) -> float:
+        """读取扫描点延时（秒）。"""
+
+        value_text = self.delay_seconds_edit.text().strip()
+        try:
+            dwell_seconds = float(value_text)
+        except ValueError as error:
+            raise ValueError("延时必须为数字") from error
+        if dwell_seconds < 0:
+            raise ValueError("延时不能小于 0 秒")
+        return dwell_seconds
 
     def _populate_scan_table_defaults(self) -> None:
         defaults = {
@@ -1379,9 +1403,14 @@ class ScanControlPage(QWidget):
         self._executed_scan_points = []
         self._scan_stop_requested = False
         try:
+            dwell_seconds = self._read_dwell_seconds()
+        except ValueError as error:
+            self.append_log(f"开始扫描失败：{error}")
+            return
+        try:
             self.scan_manager.begin_scan(
                 total_points=len(self._scan_points),
-                minimum_point_seconds=self.SCAN_DWELL_SECONDS,
+                minimum_point_seconds=dwell_seconds,
             )
         except RuntimeError as error:
             self.append_log(f"开始扫描失败：{error}")
@@ -1411,8 +1440,9 @@ class ScanControlPage(QWidget):
             "扫描开始："
             f"共 {len(self._scan_points)} 点，顺序为 Z 外层（增大）、Y 中层（减小）、X 内层（增大）"
         )
+        self.append_log(f"扫描点延时: {dwell_seconds:.2f} 秒")
         self.append_log("扫描将复用当前已打开串口句柄与已连接仪表句柄，不再重复获取。")
-        self._start_scan_worker(panel)
+        self._start_scan_worker(panel, dwell_seconds=dwell_seconds)
 
     def on_pause_scan(self) -> None:
         self.append_log("暂停功能暂未开放；当前版本优先保证 stop 可靠性。")
@@ -1425,7 +1455,7 @@ class ScanControlPage(QWidget):
         self._scan_worker.request_stop()
         self.append_log("已请求停止扫描，正在等待当前阶段安全退出。")
 
-    def _start_scan_worker(self, panel: InstrumentPanel) -> None:
+    def _start_scan_worker(self, panel: InstrumentPanel, *, dwell_seconds: float) -> None:
         instrument_name = panel.instrument_name
         if not self._serial_port.isOpen():
             self.append_log("开始扫描失败：串口未打开")
@@ -1441,7 +1471,7 @@ class ScanControlPage(QWidget):
             ui_thread=self.thread(),
             scan_points=self._scan_points,
             feed_rate=self.current_feed_rate,
-            dwell_seconds=self.SCAN_DWELL_SECONDS,
+            dwell_seconds=dwell_seconds,
             motion_timeout_seconds=self.MOTION_WAIT_TIMEOUT_SECONDS,
             instrument_name=instrument_name,
             output_dir=self._get_current_output_dir(),
