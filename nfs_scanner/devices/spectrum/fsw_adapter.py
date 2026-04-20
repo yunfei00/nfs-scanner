@@ -9,7 +9,7 @@ import numpy as np
 
 from nfs_scanner.core.models import SpectrumAcquisitionResult
 
-from .exceptions import SpectrumQueryError
+from .exceptions import SpectrumConfigurationError, SpectrumQueryError
 from .scpi_adapter import BaseScpiSpectrumAnalyzer, SpectrumCommandSet
 from .utils import build_frequency_axis
 
@@ -25,7 +25,10 @@ FSW_COMMAND_SET = SpectrumCommandSet(
         "points": "SWEep:POINts?",
         "scale": "DISPlay:WINDow:TRACe:Y:SCALe:PDIVision?",
         "detector": "DETector?",
-        "trace_mode": "TRACe:MODE? {trace_name}",
+        "att": "INP:ATT?",
+        "preamp_status": "INP:GAIN:STAT?",
+        "preamp_value": "INP:GAIN:VAL?",
+        "trace_mode": "DISP:TRAC1:MODE?",
     },
     set_commands={
         "start_freq": "FREQuency:STARt",
@@ -38,7 +41,10 @@ FSW_COMMAND_SET = SpectrumCommandSet(
         "points": "SWEep:POINts",
         "scale": "DISPlay:WINDow:TRACe:Y:SCALe:PDIVision",
         "detector": "DETector",
-        "trace_mode": "TRACe:MODE {trace_name},",
+        "att": "INP:ATT",
+        "preamp_status": "INP:GAIN:STAT",
+        "preamp_value": "INP:GAIN:VAL",
+        "trace_mode": "DISP:TRAC1:MODE",
     },
     preset_command="SYSTem:PRESet",
     trigger_single_command="INITiate:IMMediate",
@@ -56,6 +62,20 @@ class FswSpectrumAnalyzer(BaseScpiSpectrumAnalyzer):
     default_trace_name = "TRACE1"
     command_set = FSW_COMMAND_SET
     mmem_temp_trace_path = r"C:\data.csv"
+    trace_mode_aliases = {
+        "CLEAR WRITE": "WRIT",
+        "CLEARWRITE": "WRIT",
+        "CLRW": "WRIT",
+        "MAX HOLD": "MAXH",
+        "MAXHOLD": "MAXH",
+        "MAXH": "MAXH",
+        "AVERAGE": "AVER",
+        "AVER": "AVER",
+        "MIN HOLD": "MINH",
+        "MINHOLD": "MINH",
+        "MINH": "MINH",
+        "WRIT": "WRIT",
+    }
 
     def fetch_trace(self) -> SpectrumAcquisitionResult:
         """Fetch one trace via FSW MMEM CSV export workflow."""
@@ -101,6 +121,47 @@ class FswSpectrumAnalyzer(BaseScpiSpectrumAnalyzer):
                 "trace_point_mismatch": False,
             },
         )
+
+    def query_setting(self, setting_key: str) -> str:
+        """Query one setting with FSW-specific normalization."""
+
+        if setting_key != "preamp":
+            return super().query_setting(setting_key)
+
+        status_raw = super().query_setting("preamp_status").strip().upper()
+        if status_raw in {"0", "OFF"}:
+            return "OFF"
+        if status_raw not in {"1", "ON"}:
+            raise SpectrumQueryError(f"Unsupported FSW preamp status value: {status_raw}")
+
+        value_raw = super().query_setting("preamp_value").strip()
+        if value_raw in {"15", "30"}:
+            return value_raw
+        raise SpectrumQueryError(f"Unsupported FSW preamp value: {value_raw}")
+
+    def set_setting(self, setting_key: str, value: str | float | int) -> None:
+        """Apply one setting with FSW-specific normalization."""
+
+        if setting_key == "preamp":
+            normalized = str(value).strip().upper()
+            if normalized == "OFF":
+                self._transport.write("INP:GAIN:STAT OFF")
+                return
+            if normalized in {"15", "30"}:
+                self._transport.write("INP:GAIN:STAT ON")
+                super().set_setting("preamp_value", normalized)
+                return
+            raise SpectrumConfigurationError(f"Unsupported FSW preamp value: {value}")
+
+        if setting_key == "trace_mode":
+            normalized = str(value).strip().upper()
+            aliased = self.trace_mode_aliases.get(normalized, normalized)
+            if aliased not in {"WRIT", "MAXH", "AVER", "MINH"}:
+                raise SpectrumConfigurationError(f"Unsupported FSW trace mode: {value}")
+            super().set_setting(setting_key, aliased)
+            return
+
+        super().set_setting(setting_key, value)
 
     def _capture_mmem_csv_text(self) -> str:
         """Run FSW MMEM store/read cycle using one single-trace CSV export."""

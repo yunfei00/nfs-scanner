@@ -82,7 +82,7 @@ class SpectrumAnalyzerAdapterTestCase(unittest.TestCase):
                 "BANDwidth:VIDeo?": "300000",
                 "DISPlay:WINDow:TRACe:Y:RLEVel?": "10",
                 "DETector?": "RMS",
-                "TRACe:MODE? TRACE1": "WRIT",
+                "DISP:TRAC1:MODE?": "WRIT",
                 'MMEM:DATA? "C:\\data.csv"': (
                     "Freq(Hz),Trace1(dBm)\n"
                     "1000000,-70\n"
@@ -176,7 +176,7 @@ class SpectrumAnalyzerAdapterTestCase(unittest.TestCase):
                 "BANDwidth:VIDeo?": "100000",
                 "DISPlay:WINDow:TRACe:Y:RLEVel?": "0",
                 "DETector?": "RMS",
-                "TRACe:MODE? TRACE1": "MAXH",
+                "DISP:TRAC1:MODE?": "MAXH",
                 'MMEM:DATA? "C:\\data.csv"': (
                     "Freq(Hz),Trace1(dBm)\n"
                     "2400000000,-82\n"
@@ -204,8 +204,8 @@ class SpectrumAnalyzerAdapterTestCase(unittest.TestCase):
         self.assertEqual(result.instrument_type, "FSW")
         self.assertEqual(result.acquisition_mode, "point")
         self.assertEqual(result.point_value, -61.0)
-        self.assertIn("TRACe:MODE TRACE1, MAXH", transport.writes)
-        self.assertIn("TRACe:MODE? TRACE1", transport.queries)
+        self.assertIn("DISP:TRAC1:MODE MAXH", transport.writes)
+        self.assertIn("DISP:TRAC1:MODE?", transport.queries)
         self.assertIn('MMEM:DATA? "C:\\data.csv"', transport.queries)
 
     def test_fsw_adapter_raises_clear_error_for_invalid_trace_payload(self) -> None:
@@ -222,7 +222,7 @@ class SpectrumAnalyzerAdapterTestCase(unittest.TestCase):
                 "BANDwidth:VIDeo?": "300000",
                 "DISPlay:WINDow:TRACe:Y:RLEVel?": "10",
                 "DETector?": "RMS",
-                "TRACe:MODE? TRACE1": "WRIT",
+                "DISP:TRAC1:MODE?": "WRIT",
                 'MMEM:DATA? "C:\\data.csv"': "INVALID_TRACE_DATA",
             }
         )
@@ -233,6 +233,31 @@ class SpectrumAnalyzerAdapterTestCase(unittest.TestCase):
 
         with self.assertRaises(SpectrumQueryError):
             analyzer.acquire_spectrum()
+
+    def test_fsw_adapter_supports_att_and_preamp_settings(self) -> None:
+        """FSW should support ATT and preamp query/set semantics."""
+
+        transport = FakeTransport(
+            {
+                "INP:ATT?": "20",
+                "INP:GAIN:STAT?": "1",
+                "INP:GAIN:VAL?": "30",
+            }
+        )
+        analyzer = FswSpectrumAnalyzer(transport)
+
+        analyzer.connect()
+        self.assertEqual(analyzer.query_setting("att"), "20")
+        self.assertEqual(analyzer.query_setting("preamp"), "30")
+
+        analyzer.set_setting("att", 10.0)
+        analyzer.set_setting("preamp", "OFF")
+        analyzer.set_setting("preamp", "15")
+
+        self.assertIn("INP:ATT 10.000000", transport.writes)
+        self.assertIn("INP:GAIN:STAT OFF", transport.writes)
+        self.assertIn("INP:GAIN:STAT ON", transport.writes)
+        self.assertIn("INP:GAIN:VAL 15.000000", transport.writes)
 
     def test_n9020a_point_mode_returns_peak_value(self) -> None:
         """Point mode should still provide a normalized point value for the caller."""
