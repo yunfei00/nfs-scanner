@@ -562,6 +562,9 @@ class ScanControlPage(QWidget):
             "rbw": ("100.000", "kHz"),
             "points": ("2001", None),
             "scale": ("10.000", None),
+            "att": ("10.000", None),
+            "preamp": ("OFF", None),
+            "trace_mode": ("WRIT", None),
         },
     }
     QUERY_LABELS = {
@@ -572,6 +575,9 @@ class ScanControlPage(QWidget):
         "rbw": "RBW",
         "points": "扫描点数",
         "scale": "Scale",
+        "att": "ATT 衰减",
+        "preamp": "Preamp",
+        "trace_mode": "模式",
     }
     UNIT_SCALE = {"Hz": 1.0, "kHz": 1_000.0, "MHz": 1_000_000.0, "GHz": 1_000_000_000.0}
 
@@ -1680,6 +1686,12 @@ class ScanControlPage(QWidget):
             except ValueError:
                 return cleaned_value, None
 
+        if query_key == "att":
+            try:
+                return f"{float(cleaned_value):.3f}", None
+            except ValueError:
+                return cleaned_value, None
+
         return cleaned_value, None
 
     def _to_preferred_frequency_unit(self, value_hz: float) -> tuple[str, str]:
@@ -1749,6 +1761,39 @@ class ScanControlPage(QWidget):
                 return float(value_text)
             except ValueError:
                 return None
+
+        if query_key == "att":
+            try:
+                return float(value_text)
+            except ValueError:
+                return None
+
+        if query_key == "preamp":
+            normalized = value_text.strip().upper()
+            if normalized in {"OFF", "15", "30"}:
+                return normalized
+            return None
+
+        if query_key == "trace_mode":
+            normalized = value_text.strip().upper()
+            alias_map = {
+                "CLEAR WRITE": "WRIT",
+                "CLEARWRITE": "WRIT",
+                "CLRW": "WRIT",
+                "WRIT": "WRIT",
+                "MAX HOLD": "MAXH",
+                "MAXHOLD": "MAXH",
+                "MAXH": "MAXH",
+                "AVERAGE": "AVER",
+                "AVER": "AVER",
+                "MIN HOLD": "MINH",
+                "MINHOLD": "MINH",
+                "MINH": "MINH",
+            }
+            normalized = alias_map.get(normalized, normalized)
+            if normalized in {"WRIT", "MAXH", "AVER", "MINH"}:
+                return normalized
+            return None
 
         return None
 
