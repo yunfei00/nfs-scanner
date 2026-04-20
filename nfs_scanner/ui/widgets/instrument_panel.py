@@ -134,6 +134,7 @@ class InstrumentPanel(QWidget):
             unit_label="dB/div",
         )
         if self.instrument_name == "FSW":
+            self._add_preamp_field(layout=layout, row=3, start_column=4)
             self._add_plain_field(
                 layout=layout,
                 row=4,
@@ -142,29 +143,37 @@ class InstrumentPanel(QWidget):
                 button_text="ATT 衰减",
                 unit_label="dB",
             )
-            self._add_preamp_field(layout=layout, row=4, start_column=4)
             self._add_trace_mode_field(layout=layout, row=5, start_column=0)
 
         preset_button = QPushButton("Preset", self)
         preset_button.clicked.connect(lambda: self.action_requested.emit(self.instrument_name, "preset"))
-        action_row = 6 if self.instrument_name == "FSW" else 3
-        layout.addWidget(preset_button, action_row, 4)
+        if self.instrument_name == "FSW":
+            layout.addWidget(preset_button, 4, 4)
+        else:
+            layout.addWidget(preset_button, 3, 4)
 
         save_data_button = QPushButton("保存仪表数据", self)
         save_data_button.clicked.connect(lambda: self.action_requested.emit(self.instrument_name, "save_data"))
-        layout.addWidget(save_data_button, action_row, 5)
+        if self.instrument_name == "FSW":
+            layout.addWidget(save_data_button, 4, 5)
+        else:
+            layout.addWidget(save_data_button, 3, 5)
 
         save_param_demo_button = QPushButton("存储数据测试", self)
         save_param_demo_button.clicked.connect(
             lambda: self.action_requested.emit(self.instrument_name, "save_param_demo")
         )
-        layout.addWidget(save_param_demo_button, action_row, 6)
+        if self.instrument_name == "FSW":
+            layout.addWidget(save_param_demo_button, 4, 6)
+        else:
+            layout.addWidget(save_param_demo_button, 3, 6)
 
         self.discovered_label = QLabel("未发现设备", self)
-        layout.addWidget(QLabel("设备发现", self), action_row + 1, 0)
-        layout.addWidget(self.discovered_label, action_row + 1, 1, 1, 7)
+        discovery_row = 6 if self.instrument_name == "FSW" else 4
+        layout.addWidget(QLabel("设备发现", self), discovery_row, 0)
+        layout.addWidget(self.discovered_label, discovery_row, 1, 1, 7)
 
-        for column in (1, 5):
+        for column in (1, 2, 3, 4, 5, 6):
             layout.setColumnStretch(column, 1)
 
     def _add_frequency_field(
