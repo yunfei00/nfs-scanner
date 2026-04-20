@@ -38,10 +38,12 @@ from nfs_scanner.devices.spectrum import (
     InstrumentDiscoveryResult,
     SUPPORTED_INSTRUMENTS,
     SpectrumAnalyzerError,
+    append_fsw_trace_csv,
     append_zna_trace_csv,
     convert_zna_mmem_csv_to_row_text,
     discover_supported_instruments_via_visa,
     probe_resources,
+    save_fsw_trace_csv,
     save_zna_trace_csv,
 )
 from nfs_scanner.core import DeviceManager, ScanManager, ScanRuntimeSnapshot, SpectrumConfig
@@ -425,6 +427,31 @@ class ScanWorker(QObject):
                 append_zna_trace_csv(raw_text=raw_text, file_path=combined_csv_file)
             except (OSError, ValueError) as error:
                 return False, str(error)
+        elif instrument_name == "FSW":
+            data_file = data_dir / f"point_{point_index:06d}_fsw.csv"
+            combined_csv_file = data_dir / "all_points_fsw.csv"
+            if not measurement.has_trace_data:
+                return False, "FSW 采集结果不包含 trace 数据"
+            frequencies, values = measurement.to_trace()
+            try:
+                save_fsw_trace_csv(
+                    frequencies=frequencies,
+                    values=values,
+                    x=x,
+                    y=y,
+                    z=z,
+                    file_path=data_file,
+                )
+                append_fsw_trace_csv(
+                    frequencies=frequencies,
+                    values=values,
+                    x=x,
+                    y=y,
+                    z=z,
+                    file_path=combined_csv_file,
+                )
+            except (OSError, ValueError) as error:
+                return False, str(error)
         else:
             data_file = data_dir / f"point_{point_index:06d}_{instrument_name.lower()}_snapshot.json"
             snapshot = measurement.to_serializable_dict()
@@ -491,6 +518,7 @@ class ScanControlPage(QWidget):
     INSTRUMENT_CACHE_PATH = Path("config") / "instrument_devices.json"
     SNAPSHOT_OUTPUT_DIR = Path("output") / "instrument_snapshots"
     ZNA67_DEMO_FILE_PATH = Path(r"D:/zna67_demo.csv")
+    FSW_DEMO_FILE_PATH = Path(r"D:/fsw_demo.csv")
     ZNA67_TEMP_TRACE_PATH = r"C:\temp\data.csv"
     INSTRUMENT_ORDER = tuple(SUPPORTED_INSTRUMENTS)
     SERIAL_FALLBACK_INSTRUMENTS = frozenset({"ZNA67"})
@@ -1748,26 +1776,40 @@ class ScanControlPage(QWidget):
         if action_key == "save_data":
             saved, message = self._save_instrument_snapshot(instrument_name)
             if saved:
-                self.append_log(f"仪表数据已保存: {instrument_name} -> {message}")
+                self.append_log(f"仪表参数快照已保存: {instrument_name} -> {message}")
             else:
-                self.append_log(f"仪表保存失败: {instrument_name} - {message}")
+                self.append_log(f"仪表参数快照保存失败: {instrument_name} - {message}")
             return
 
         if action_key == "save_param_demo":
-            if instrument_name != "ZNA67":
-                self.append_log(f"参数存储Demo仅支持 ZNA67，当前仪表: {instrument_name}")
+            if instrument_name == "ZNA67":
+                saved, message = self._save_zna67_demo_data(
+                    x=1.0,
+                    y=2.0,
+                    z=3.0,
+                    delay_time=100,
+                    file_name=str(self.ZNA67_DEMO_FILE_PATH),
+                )
+                if saved:
+                    self.append_log(f"ZNA67 存储数据测试成功: {message}")
+                else:
+                    self.append_log(f"ZNA67 存储数据测试失败: {message}")
                 return
-            saved, message = self._save_zna67_demo_data(
-                x=1.0,
-                y=2.0,
-                z=3.0,
-                delay_time=100,
-                file_name=str(self.ZNA67_DEMO_FILE_PATH),
-            )
-            if saved:
-                self.append_log(f"ZNA67 参数存储Demo成功: {message}")
-            else:
-                self.append_log(f"ZNA67 参数存储Demo失败: {message}")
+
+            if instrument_name == "FSW":
+                saved, message = self._save_fsw_demo_data(
+                    x=1.0,
+                    y=2.0,
+                    z=3.0,
+                    file_name=str(self.FSW_DEMO_FILE_PATH),
+                )
+                if saved:
+                    self.append_log(f"FSW 存储数据测试成功: {message}")
+                else:
+                    self.append_log(f"FSW 存储数据测试失败: {message}")
+                return
+
+            self.append_log(f"存储数据测试仅支持 ZNA67/FSW，当前仪表: {instrument_name}")
             return
 
         if action_key != "preset":
@@ -1814,6 +1856,36 @@ class ScanControlPage(QWidget):
             return False, str(error)
 
         return True, str(snapshot_path)
+
+    def _save_fsw_demo_data(
+        self,
+        *,
+        x: float,
+        y: float,
+        z: float,
+        file_name: str,
+    ) -> tuple[bool, str]:
+        """执行 FSW 行式 trace 存储（单条 trace）。"""
+
+        target_path = Path(file_name)
+        measurement = self._acquire_instrument_measurement("FSW")
+        if not measurement.has_trace_data:
+            return False, "FSW 采集结果不包含 trace 数据"
+
+        frequencies, values = measurement.to_trace()
+        try:
+            point_count = save_fsw_trace_csv(
+                frequencies=frequencies,
+                values=values,
+                x=x,
+                y=y,
+                z=z,
+                file_path=target_path,
+            )
+        except (OSError, ValueError) as error:
+            return False, str(error)
+
+        return True, f"{target_path}（共 {point_count} 个频点）"
 
     def _save_zna67_demo_data(
         self,

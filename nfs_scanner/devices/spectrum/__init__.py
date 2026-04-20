@@ -16,6 +16,7 @@ from .factory import (
     get_spectrum_plugin_metadata,
 )
 from .fsw_adapter import FswSpectrumAnalyzer
+from .fsw_storage import append_fsw_trace_csv, save_fsw_trace_csv
 from .mock_spectrum import MockSpectrumAnalyzer
 from .n9020a_adapter import N9020ASpectrumAnalyzer
 from .scpi_adapter import BaseScpiSpectrumAnalyzer, SpectrumCommandSet
@@ -64,6 +65,8 @@ __all__ = [
     "get_spectrum_plugin",
     "get_spectrum_plugin_metadata",
     "probe_resources",
+    "append_fsw_trace_csv",
+    "save_fsw_trace_csv",
     "convert_zna_mmem_csv_to_row_text",
     "append_zna_trace_csv",
     "parse_zna_trace_text",
