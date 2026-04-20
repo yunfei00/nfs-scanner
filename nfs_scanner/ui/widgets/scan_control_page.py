@@ -2323,11 +2323,13 @@ class ScanControlPage(QWidget):
 
         if self.serial_is_open:
             return
+        self.append_log("开始搜索可用串口设备...")
         configured_port = self._pending_serial_port_name.strip()
         found_count = self._refresh_available_ports(selected_port=configured_port or None)
         if found_count <= 0:
             self._start_serial_reconnect_monitoring()
             return
+        self.append_log(f"已找到 {found_count} 个匹配串口设备")
 
         if configured_port:
             index = self.port_combo.findData(configured_port)
@@ -2355,12 +2357,13 @@ class ScanControlPage(QWidget):
             self._auto_reconnect_notified = False
             return
 
-        self.append_log("串口仍未恢复，正在自动重连...")
         configured_port = self._pending_serial_port_name.strip()
         found_count = self._refresh_available_ports(selected_port=configured_port or None)
         if found_count <= 0:
-            self.append_log("未发现匹配串口，5 秒后重试")
             return
+        if self._auto_reconnect_notified:
+            self.append_log(f"已找到 {found_count} 个匹配串口设备")
+            self._auto_reconnect_notified = False
 
         if configured_port:
             index = self.port_combo.findData(configured_port)
