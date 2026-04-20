@@ -65,7 +65,12 @@ class InstrumentSearchWorker(QObject):
         """执行搜索并发出结果。"""
         try:
             if self.preferred_resources:
-                cached_probes = probe_resources(resource_names=self.preferred_resources)
+                tcpip_resources = tuple(
+                    resource_name
+                    for resource_name in self.preferred_resources
+                    if resource_name.upper().startswith("TCPIP")
+                )
+                cached_probes = probe_resources(resource_names=tcpip_resources)
                 cached_result = InstrumentDiscoveryResult(probes=cached_probes, pyvisa_available=True)
                 cached_matches = {
                     name
