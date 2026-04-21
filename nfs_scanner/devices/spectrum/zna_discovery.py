@@ -96,19 +96,28 @@ def probe_resources(resource_names: tuple[str, ...], timeout_ms: int = 1200) -> 
     resource_manager = pyvisa.ResourceManager()
     probes: list[InstrumentProbeResult] = []
 
-    for resource_name in resource_names:
+    ordered_resource_names = _sort_resource_names(resource_names)
+    matched_hosts: set[str] = set()
+
+    for resource_name in ordered_resource_names:
+        host_key = _resource_host_key(resource_name)
+        if host_key and host_key in matched_hosts:
+            continue
         try:
             instrument = resource_manager.open_resource(resource_name)
             instrument.timeout = timeout_ms
             idn_text = str(instrument.query("*IDN?")).strip()
             instrument.close()
+            matched_instrument = _match_instrument_name(idn_text)
             probes.append(
                 InstrumentProbeResult(
                     resource_name=resource_name,
                     idn_text=idn_text,
-                    matched_instrument=_match_instrument_name(idn_text),
+                    matched_instrument=matched_instrument,
                 )
             )
+            if matched_instrument and host_key:
+                matched_hosts.add(host_key)
         except Exception as error:  # pragma: no cover - depends on local VISA environment
             probes.append(
                 InstrumentProbeResult(
@@ -131,6 +140,26 @@ def _filter_tcpip_resources(resource_names: tuple[str, ...]) -> tuple[str, ...]:
         for resource_name in resource_names
         if resource_name.upper().startswith("TCPIP")
     )
+
+
+def _sort_resource_names(resource_names: tuple[str, ...]) -> tuple[str, ...]:
+    """Prefer HiSLIP resources first so one instrument can connect with lower latency."""
+
+    return tuple(
+        sorted(
+            resource_names,
+            key=lambda name: (0 if "HISLIP" in name.upper() else 1, name.upper()),
+        )
+    )
+
+
+def _resource_host_key(resource_name: str) -> str:
+    """Extract TCPIP host segment from VISA resource string for dedup probing."""
+
+    tokens = [item for item in resource_name.split("::") if item]
+    if len(tokens) < 2:
+        return ""
+    return tokens[1].strip().upper()
 
 
 def _match_instrument_name(idn_text: str) -> str | None:

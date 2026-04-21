@@ -34,6 +34,42 @@ class _FakePyvisa:
         return _FakeResourceManager(self._resources)
 
 
+class _FakeVisaInstrument:
+    def __init__(self, idn_text: str) -> None:
+        self.timeout = 0
+        self._idn_text = idn_text
+
+    def query(self, command: str) -> str:
+        assert command == "*IDN?"
+        return self._idn_text
+
+    def close(self) -> None:
+        return None
+
+
+class _FakeProbeResourceManager:
+    def __init__(self, idn_by_resource: dict[str, str], opened_resources: list[str]) -> None:
+        self._idn_by_resource = idn_by_resource
+        self._opened_resources = opened_resources
+
+    def open_resource(self, resource_name: str) -> _FakeVisaInstrument:
+        self._opened_resources.append(resource_name)
+        idn_text = self._idn_by_resource.get(resource_name, "")
+        return _FakeVisaInstrument(idn_text)
+
+    def close(self) -> None:
+        return None
+
+
+class _FakeProbePyvisa:
+    def __init__(self, idn_by_resource: dict[str, str], opened_resources: list[str]) -> None:
+        self._idn_by_resource = idn_by_resource
+        self._opened_resources = opened_resources
+
+    def ResourceManager(self) -> _FakeProbeResourceManager:  # noqa: N802 - keep pyvisa naming style
+        return _FakeProbeResourceManager(self._idn_by_resource, self._opened_resources)
+
+
 class InstrumentDiscoveryTestCase(unittest.TestCase):
     """Verify VISA discovery filtering behavior."""
 
@@ -79,6 +115,51 @@ class InstrumentDiscoveryTestCase(unittest.TestCase):
                 "TCPIP0::192.168.0.10::inst0::INSTR",
                 "TCPIP0::192.168.0.11::inst0::INSTR",
             ),
+        )
+
+    def test_probe_resources_prefers_hislip_and_skips_same_host_after_match(self) -> None:
+        """Probe order should prefer HiSLIP and stop probing duplicate interfaces for one host."""
+
+        original_has_pyvisa = zna_discovery._HAS_PYVISA
+        original_pyvisa = getattr(zna_discovery, "pyvisa", None)
+        opened_resources: list[str] = []
+        idn_by_resource = {
+            "TCPIP0::192.168.0.60::hislip0,4880::INSTR": "Rohde&Schwarz,FSW,1324.5000K02,4.70",
+            "TCPIP0::192.168.0.60::inst0::INSTR": "Rohde&Schwarz,FSW,1324.5000K02,4.70",
+            "TCPIP0::192.168.0.61::inst0::INSTR": "Keysight Technologies,N9020A,MY12345678,A.25.05",
+        }
+
+        try:
+            zna_discovery._HAS_PYVISA = True
+            zna_discovery.pyvisa = _FakeProbePyvisa(idn_by_resource, opened_resources)
+
+            result = zna_discovery.probe_resources(
+                (
+                    "TCPIP0::192.168.0.60::inst0::INSTR",
+                    "TCPIP0::192.168.0.60::hislip0,4880::INSTR",
+                    "TCPIP0::192.168.0.61::inst0::INSTR",
+                )
+            )
+        finally:
+            zna_discovery._HAS_PYVISA = original_has_pyvisa
+            if original_pyvisa is None:
+                del zna_discovery.pyvisa
+            else:
+                zna_discovery.pyvisa = original_pyvisa
+
+        self.assertEqual(
+            opened_resources,
+            [
+                "TCPIP0::192.168.0.60::hislip0,4880::INSTR",
+                "TCPIP0::192.168.0.61::inst0::INSTR",
+            ],
+        )
+        self.assertEqual(
+            [probe.resource_name for probe in result],
+            [
+                "TCPIP0::192.168.0.60::hislip0,4880::INSTR",
+                "TCPIP0::192.168.0.61::inst0::INSTR",
+            ],
         )
 
 
