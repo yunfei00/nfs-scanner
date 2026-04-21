@@ -77,7 +77,7 @@ class InstrumentSearchWorker(QObject):
                     for name in SUPPORTED_INSTRUMENTS
                     if cached_result.matched_resources_for(name)
                 }
-                if cached_matches == set(SUPPORTED_INSTRUMENTS):
+                if cached_matches:
                     self.finished.emit(cached_result)
                     return
             result = discover_supported_instruments_via_visa()
