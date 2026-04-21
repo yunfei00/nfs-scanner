@@ -33,7 +33,17 @@ class InstrumentPanel(QWidget):
         "points",
         "scale",
     )
-    FSW_EXTRA_QUERY_KEYS = ("att", "preamp", "trace_mode")
+    FSW_QUERY_KEYS = (
+        "start_freq",
+        "center_freq",
+        "stop_freq",
+        "span",
+        "rbw",
+        "points",
+        "att",
+        "preamp",
+        "trace_mode",
+    )
     STANDARD_ACTION_KEYS = ("preset", "save_data", "save_param_demo")
     FREQUENCY_UNITS = ("Hz", "kHz", "MHz", "GHz")
     RBW_UNITS = ("Hz", "kHz", "MHz")
@@ -62,7 +72,7 @@ class InstrumentPanel(QWidget):
         if self.instrument_name in self.STANDARD_INSTRUMENTS:
             self._query_keys = self.STANDARD_QUERY_KEYS
             if self.instrument_name == "FSW":
-                self._query_keys = self.STANDARD_QUERY_KEYS + self.FSW_EXTRA_QUERY_KEYS
+                self._query_keys = self.FSW_QUERY_KEYS
             self._action_keys = self.STANDARD_ACTION_KEYS
             self._setup_standard_ui()
             return
@@ -125,37 +135,38 @@ class InstrumentPanel(QWidget):
             query_key="points",
             button_text="扫描点数",
         )
-        self._add_plain_field(
-            layout=layout,
-            row=3,
-            start_column=0,
-            query_key="scale",
-            button_text="Scale",
-            unit_label="dB/div",
-        )
         if self.instrument_name == "FSW":
-            self._add_preamp_field(layout=layout, row=3, start_column=4)
             self._add_plain_field(
                 layout=layout,
-                row=4,
+                row=3,
                 start_column=0,
                 query_key="att",
                 button_text="ATT 衰减",
                 unit_label="dB",
             )
-            self._add_trace_mode_field(layout=layout, row=5, start_column=0)
+            self._add_preamp_field(layout=layout, row=3, start_column=4)
+            self._add_trace_mode_field(layout=layout, row=4, start_column=0)
+        else:
+            self._add_plain_field(
+                layout=layout,
+                row=3,
+                start_column=0,
+                query_key="scale",
+                button_text="Scale",
+                unit_label="dB/div",
+            )
 
         preset_button = QPushButton("Preset", self)
         preset_button.clicked.connect(lambda: self.action_requested.emit(self.instrument_name, "preset"))
         if self.instrument_name == "FSW":
-            layout.addWidget(preset_button, 4, 4)
+            layout.addWidget(preset_button, 5, 4)
         else:
             layout.addWidget(preset_button, 3, 4)
 
         save_data_button = QPushButton("保存仪表数据", self)
         save_data_button.clicked.connect(lambda: self.action_requested.emit(self.instrument_name, "save_data"))
         if self.instrument_name == "FSW":
-            layout.addWidget(save_data_button, 4, 5)
+            layout.addWidget(save_data_button, 5, 5)
         else:
             layout.addWidget(save_data_button, 3, 5)
 
@@ -164,14 +175,17 @@ class InstrumentPanel(QWidget):
             lambda: self.action_requested.emit(self.instrument_name, "save_param_demo")
         )
         if self.instrument_name == "FSW":
-            layout.addWidget(save_param_demo_button, 4, 6)
+            layout.addWidget(save_param_demo_button, 5, 6)
         else:
             layout.addWidget(save_param_demo_button, 3, 6)
 
         self.discovered_label = QLabel("未发现设备", self)
-        discovery_row = 6 if self.instrument_name == "FSW" else 4
+        discovery_row = 5 if self.instrument_name == "FSW" else 4
         layout.addWidget(QLabel("设备发现", self), discovery_row, 0)
-        layout.addWidget(self.discovered_label, discovery_row, 1, 1, 7)
+        if self.instrument_name == "FSW":
+            layout.addWidget(self.discovered_label, discovery_row, 1, 1, 3)
+        else:
+            layout.addWidget(self.discovered_label, discovery_row, 1, 1, 7)
 
         for column in (1, 2, 3, 4, 5, 6):
             layout.setColumnStretch(column, 1)
