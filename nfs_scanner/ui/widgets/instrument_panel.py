@@ -159,14 +159,14 @@ class InstrumentPanel(QWidget):
         preset_button = QPushButton("Preset", self)
         preset_button.clicked.connect(lambda: self.action_requested.emit(self.instrument_name, "preset"))
         if self.instrument_name == "FSW":
-            layout.addWidget(preset_button, 5, 4)
+            layout.addWidget(preset_button, 4, 6)
         else:
             layout.addWidget(preset_button, 3, 4)
 
         save_data_button = QPushButton("保存仪表数据", self)
         save_data_button.clicked.connect(lambda: self.action_requested.emit(self.instrument_name, "save_data"))
         if self.instrument_name == "FSW":
-            layout.addWidget(save_data_button, 5, 5)
+            layout.addWidget(save_data_button, 4, 7)
         else:
             layout.addWidget(save_data_button, 3, 5)
 
@@ -175,7 +175,7 @@ class InstrumentPanel(QWidget):
             lambda: self.action_requested.emit(self.instrument_name, "save_param_demo")
         )
         if self.instrument_name == "FSW":
-            layout.addWidget(save_param_demo_button, 5, 6)
+            layout.addWidget(save_param_demo_button, 4, 8)
         else:
             layout.addWidget(save_param_demo_button, 3, 6)
 
@@ -187,7 +187,7 @@ class InstrumentPanel(QWidget):
         else:
             layout.addWidget(self.discovered_label, discovery_row, 1, 1, 7)
 
-        for column in (1, 2, 3, 4, 5, 6):
+        for column in (1, 2, 3, 4, 5, 6, 7, 8):
             layout.setColumnStretch(column, 1)
 
     def _add_frequency_field(
