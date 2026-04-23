@@ -126,12 +126,23 @@ class ScanWorker(QObject):
         self._output_dir = output_dir
         self._scan_manager = scan_manager
         self._stop_requested = False
+        self._pause_requested = False
         self._serial_rx_buffer = ""
 
     def request_stop(self) -> None:
         """请求停止扫描，worker 会在阶段检查点尽快退出。"""
 
         self._stop_requested = True
+
+    def request_pause(self) -> None:
+        """请求暂停扫描。"""
+
+        self._pause_requested = True
+
+    def request_resume(self) -> None:
+        """请求继续扫描。"""
+
+        self._pause_requested = False
 
     def run(self) -> None:
         """逐点执行：移动 -> 等待到位 -> 驻留 -> 采集 -> 存储。"""
@@ -147,6 +158,10 @@ class ScanWorker(QObject):
 
             for point_index, (x, y, z) in enumerate(self._scan_points, start=1):
                 if self._stop_requested:
+                    self._send_stop(self._serial_port)
+                    self.finished.emit("stopped", "扫描已停止")
+                    return
+                if not self._wait_if_paused():
                     self._send_stop(self._serial_port)
                     self.finished.emit("stopped", "扫描已停止")
                     return
@@ -174,6 +189,10 @@ class ScanWorker(QObject):
                     return
 
                 if self._stop_requested:
+                    self._send_stop(self._serial_port)
+                    self.finished.emit("stopped", "扫描已停止")
+                    return
+                if not self._wait_if_paused():
                     self._send_stop(self._serial_port)
                     self.finished.emit("stopped", "扫描已停止")
                     return
@@ -304,7 +323,18 @@ class ScanWorker(QObject):
         while time.monotonic() < end_time:
             if self._stop_requested:
                 return False
+            if not self._wait_if_paused():
+                return False
             time.sleep(min(0.05, max(end_time - time.monotonic(), 0.0)))
+        return True
+
+    def _wait_if_paused(self) -> bool:
+        """暂停期间阻塞执行，持续监听停止请求。"""
+
+        while self._pause_requested:
+            if self._stop_requested:
+                return False
+            time.sleep(0.05)
         return True
 
     def _query_motion_status(self, serial_port: QSerialPort) -> str | None:
@@ -1185,11 +1215,19 @@ class ScanControlPage(QWidget):
         if state == "扫描中":
             self.start_button.setText("开始")
             self.start_button.setEnabled(False)
-            self.pause_button.setEnabled(False)
+            self.pause_button.setText("暂停")
+            self.pause_button.setEnabled(True)
+            self.stop_button.setEnabled(True)
+        elif state == "暂停":
+            self.start_button.setText("开始")
+            self.start_button.setEnabled(False)
+            self.pause_button.setText("继续")
+            self.pause_button.setEnabled(True)
             self.stop_button.setEnabled(True)
         else:
             self.start_button.setText("开始")
             self.start_button.setEnabled(not is_worker_active)
+            self.pause_button.setText("暂停")
             self.pause_button.setEnabled(False)
             self.stop_button.setEnabled(False)
 
@@ -1452,7 +1490,34 @@ class ScanControlPage(QWidget):
         self._start_scan_worker(panel, dwell_seconds=self.FIXED_SCAN_POINT_DWELL_SECONDS)
 
     def on_pause_scan(self) -> None:
-        self.append_log("暂停功能暂未开放；当前版本优先保证 stop 可靠性。")
+        if self._scan_worker is None:
+            self.append_log("暂停/继续失败：当前没有运行中的任务")
+            return
+
+        snapshot = self.scan_manager.get_scan_runtime_snapshot()
+        if snapshot.status == "running":
+            try:
+                self.scan_manager.pause_scan()
+            except RuntimeError as error:
+                self.append_log(f"暂停失败：{error}")
+                return
+            self._scan_worker.request_pause()
+            self.append_log("扫描已暂停")
+            self._refresh_clock()
+            return
+
+        if snapshot.status == "paused":
+            try:
+                self.scan_manager.resume_scan()
+            except RuntimeError as error:
+                self.append_log(f"继续失败：{error}")
+                return
+            self._scan_worker.request_resume()
+            self.append_log("扫描已继续")
+            self._refresh_clock()
+            return
+
+        self.append_log("暂停/继续失败：扫描任务状态异常")
 
     def on_stop_scan(self) -> None:
         if self._scan_worker is None:
