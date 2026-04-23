@@ -52,14 +52,18 @@ class ScanControlPageTimingTestCase(unittest.TestCase):
         self.page.clock_timer.stop()
         self.page.serial_is_open = True
         self.page._serial_port = type("SerialPortStub", (), {"isOpen": lambda self: True})()
-        self.page.SCAN_DWELL_SECONDS = 5.0
+        self.page.SPECTRUM_WAIT_SECONDS = 5.0
         self.page._build_scan_points = lambda: [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (2.0, 0.0, 0.0)]
         self.page._prepare_scan_storage_workspace = lambda: None
         self.page._save_scan_plan_snapshot = lambda: None
         self.page._save_scan_execution_snapshot = lambda completed: None
         self.page._get_instrument_adapter = lambda _instrument_name: object()
-        self.page._build_instrument_measurement_config = lambda _panel: SpectrumConfig()
-        self.page._start_scan_worker = lambda panel: None
+        self.page._build_instrument_measurement_config = (
+            lambda _panel, *, fsw_clear_write_delay_seconds=None: SpectrumConfig(
+                fsw_clear_write_delay_seconds=fsw_clear_write_delay_seconds
+            )
+        )
+        self.page._start_scan_worker = lambda panel, *, dwell_seconds: None
 
     def tearDown(self) -> None:
         self.page.close()

@@ -530,7 +530,8 @@ class ScanControlPage(QWidget):
     SCAN_AREA_CONFIG_PATH = Path("config") / "scan_area_config.json"
     SERIAL_CONFIG_PATH = Path("config") / "serial_port_config.json"
     SERIAL_RECONNECT_INTERVAL_MS = 5000
-    SCAN_DWELL_SECONDS = 0.12
+    SPECTRUM_WAIT_SECONDS = 0.12
+    FIXED_SCAN_POINT_DWELL_SECONDS = 0.1
     MOTION_WAIT_TIMEOUT_SECONDS = 30.0
     RUNTIME_STATUS_LABELS = {
         "idle": "就绪",
@@ -873,8 +874,8 @@ class ScanControlPage(QWidget):
         self._add_step_row(grid, 1, "StepY", self.step_y_edit)
         self._add_step_row(grid, 2, "StepZ", self.step_z_edit)
         self.delay_seconds_edit = self._default_step_line_edit()
-        self.delay_seconds_edit.setText(f"{self.SCAN_DWELL_SECONDS:.2f}")
-        self._add_step_row(grid, 3, "延时", self.delay_seconds_edit, unit_text="秒")
+        self.delay_seconds_edit.setText(f"{self.SPECTRUM_WAIT_SECONDS:.2f}")
+        self._add_step_row(grid, 3, "频谱等待", self.delay_seconds_edit, unit_text="秒")
 
         start_button = QPushButton("设为起点", self)
         end_button = QPushButton("设为终点", self)
@@ -1072,17 +1073,17 @@ class ScanControlPage(QWidget):
         edit.setFixedWidth(76)
         return edit
 
-    def _read_dwell_seconds(self) -> float:
-        """读取扫描点延时（秒）。"""
+    def _read_spectrum_wait_seconds(self) -> float:
+        """读取频谱等待时间（秒）。"""
 
         value_text = self.delay_seconds_edit.text().strip()
         try:
-            dwell_seconds = float(value_text)
+            wait_seconds = float(value_text)
         except ValueError as error:
-            raise ValueError("延时必须为数字") from error
-        if dwell_seconds < 0:
-            raise ValueError("延时不能小于 0 秒")
-        return dwell_seconds
+            raise ValueError("频谱等待时间必须为数字") from error
+        if wait_seconds < 0:
+            raise ValueError("频谱等待时间不能小于 0 秒") from None
+        return wait_seconds
 
     def _populate_scan_table_defaults(self) -> None:
         defaults = {
@@ -1403,14 +1404,14 @@ class ScanControlPage(QWidget):
         self._executed_scan_points = []
         self._scan_stop_requested = False
         try:
-            dwell_seconds = self._read_dwell_seconds()
+            spectrum_wait_seconds = self._read_spectrum_wait_seconds()
         except ValueError as error:
             self.append_log(f"开始扫描失败：{error}")
             return
         try:
             self.scan_manager.begin_scan(
                 total_points=len(self._scan_points),
-                minimum_point_seconds=dwell_seconds,
+                minimum_point_seconds=self.FIXED_SCAN_POINT_DWELL_SECONDS,
             )
         except RuntimeError as error:
             self.append_log(f"开始扫描失败：{error}")
@@ -1429,7 +1430,7 @@ class ScanControlPage(QWidget):
             self.scan_manager.set_spectrum_config(
                 self._build_instrument_measurement_config(
                     panel,
-                    fsw_clear_write_delay_seconds=dwell_seconds,
+                    fsw_clear_write_delay_seconds=spectrum_wait_seconds,
                 )
             )
         except SpectrumAnalyzerError as error:
@@ -1445,9 +1446,10 @@ class ScanControlPage(QWidget):
             "扫描开始："
             f"共 {len(self._scan_points)} 点，顺序为 Z 外层（增大）、Y 中层（减小）、X 内层（增大）"
         )
-        self.append_log(f"扫描点延时: {dwell_seconds:.2f} 秒")
+        self.append_log(f"扫描点驻留（固定）: {self.FIXED_SCAN_POINT_DWELL_SECONDS:.2f} 秒")
+        self.append_log(f"频谱等待时间: {spectrum_wait_seconds:.2f} 秒")
         self.append_log("扫描将复用当前已打开串口句柄与已连接仪表句柄，不再重复获取。")
-        self._start_scan_worker(panel, dwell_seconds=dwell_seconds)
+        self._start_scan_worker(panel, dwell_seconds=self.FIXED_SCAN_POINT_DWELL_SECONDS)
 
     def on_pause_scan(self) -> None:
         self.append_log("暂停功能暂未开放；当前版本优先保证 stop 可靠性。")
