@@ -1426,7 +1426,12 @@ class ScanControlPage(QWidget):
         try:
             analyzer = self._get_instrument_adapter(panel.instrument_name)
             self.scan_manager.set_spectrum_analyzer(analyzer)
-            self.scan_manager.set_spectrum_config(self._build_instrument_measurement_config(panel))
+            self.scan_manager.set_spectrum_config(
+                self._build_instrument_measurement_config(
+                    panel,
+                    fsw_clear_write_delay_seconds=dwell_seconds,
+                )
+            )
         except SpectrumAnalyzerError as error:
             self.append_log(f"开始扫描失败：仪表连接失败：{error}")
             self.scan_manager.fail_scan(f"仪表连接失败：{error}")
@@ -2061,7 +2066,12 @@ class ScanControlPage(QWidget):
             resource_names=resources,
         )
 
-    def _build_instrument_measurement_config(self, panel: InstrumentPanel) -> SpectrumConfig:
+    def _build_instrument_measurement_config(
+        self,
+        panel: InstrumentPanel,
+        *,
+        fsw_clear_write_delay_seconds: float | None = None,
+    ) -> SpectrumConfig:
         """Build one best-effort spectrum config from the current panel values."""
 
         displayed_values = panel.get_displayed_values()
@@ -2094,6 +2104,7 @@ class ScanControlPage(QWidget):
             ref_level=read_field("ref_level"),
             detector=read_field("detector"),
             trace_mode=read_field("trace_mode"),
+            fsw_clear_write_delay_seconds=fsw_clear_write_delay_seconds if panel.instrument_name == "FSW" else None,
             acquisition_mode="trace",
         )
 

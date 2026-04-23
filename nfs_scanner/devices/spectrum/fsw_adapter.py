@@ -168,9 +168,21 @@ class FswSpectrumAnalyzer(BaseScpiSpectrumAnalyzer):
     def acquire_spectrum(self) -> SpectrumAcquisitionResult:
         """Run one FSW acquisition with clear-write to max-hold handoff."""
 
+        configured_delay = self._config.fsw_clear_write_delay_seconds
+        delay_seconds = self.clear_write_settle_seconds
+        if configured_delay is not None:
+            delay_seconds = max(float(configured_delay), 0.0)
+
+        configured_mode = (self._config.trace_mode or "").strip().upper()
+        configured_mode = self.trace_mode_aliases.get(configured_mode, configured_mode)
+        if configured_mode == "WRIT" or not configured_mode:
+            hold_mode = "MAXH"
+        else:
+            hold_mode = configured_mode
+
         self.set_trace_mode("WRIT")
-        time.sleep(self.clear_write_settle_seconds)
-        self.set_trace_mode("MAXH")
+        time.sleep(delay_seconds)
+        self.set_trace_mode(hold_mode)
         return super().acquire_spectrum()
 
     def _capture_mmem_csv_text(self) -> str:
