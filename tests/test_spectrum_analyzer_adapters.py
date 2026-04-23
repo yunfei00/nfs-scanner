@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 
@@ -258,6 +259,102 @@ class SpectrumAnalyzerAdapterTestCase(unittest.TestCase):
         self.assertIn("INP:GAIN:STAT OFF", transport.writes)
         self.assertIn("INP:GAIN:STAT ON", transport.writes)
         self.assertIn("INP:GAIN:VAL 15.000000", transport.writes)
+
+    def test_fsw_adapter_uses_configured_clear_write_delay(self) -> None:
+        """FSW clear-write dwell should follow ``SpectrumConfig``."""
+
+        transport = FakeTransport(
+            {
+                "*OPC?": "1",
+                "FREQuency:STARt?": "1000000",
+                "FREQuency:STOP?": "3000000",
+                "FREQuency:CENTer?": "2000000",
+                "FREQuency:SPAN?": "2000000",
+                "BANDwidth:RESolution?": "100000",
+                "BANDwidth:VIDeo?": "300000",
+                "DISPlay:WINDow:TRACe:Y:RLEVel?": "10",
+                "DETector?": "RMS",
+                "DISP:TRAC1:MODE?": "MAXH",
+                'MMEM:DATA? "C:\\data.csv"': (
+                    "Freq(Hz),Trace1(dBm)\n"
+                    "1000000,-70\n"
+                    "2000000,-60\n"
+                    "3000000,-65\n"
+                ),
+            }
+        )
+        analyzer = FswSpectrumAnalyzer(transport)
+        analyzer.connect()
+        analyzer.configure(SpectrumConfig(trace_mode="WRIT", fsw_clear_write_delay_seconds=0.35))
+
+        with patch("nfs_scanner.devices.spectrum.fsw_adapter.time.sleep") as sleep_mock:
+            analyzer.acquire_spectrum()
+
+        sleep_mock.assert_called_once_with(0.35)
+
+    def test_fsw_adapter_maps_clear_write_to_max_hold_during_acquisition(self) -> None:
+        """When configured as clear-write, FSW should switch to MAXH for acquisition."""
+
+        transport = FakeTransport(
+            {
+                "*OPC?": "1",
+                "FREQuency:STARt?": "1000000",
+                "FREQuency:STOP?": "3000000",
+                "FREQuency:CENTer?": "2000000",
+                "FREQuency:SPAN?": "2000000",
+                "BANDwidth:RESolution?": "100000",
+                "BANDwidth:VIDeo?": "300000",
+                "DISPlay:WINDow:TRACe:Y:RLEVel?": "10",
+                "DETector?": "RMS",
+                "DISP:TRAC1:MODE?": "MAXH",
+                'MMEM:DATA? "C:\\data.csv"': (
+                    "Freq(Hz),Trace1(dBm)\n"
+                    "1000000,-70\n"
+                    "2000000,-60\n"
+                    "3000000,-65\n"
+                ),
+            }
+        )
+        analyzer = FswSpectrumAnalyzer(transport)
+        analyzer.connect()
+        analyzer.configure(SpectrumConfig(trace_mode="WRIT", fsw_clear_write_delay_seconds=0.0))
+        analyzer.acquire_spectrum()
+
+        trace_mode_commands = [command for command in transport.writes if command.startswith("DISP:TRAC1:MODE ")]
+        self.assertGreaterEqual(len(trace_mode_commands), 2)
+        self.assertEqual(trace_mode_commands[-2:], ["DISP:TRAC1:MODE WRIT", "DISP:TRAC1:MODE MAXH"])
+
+    def test_fsw_adapter_respects_user_selected_hold_mode(self) -> None:
+        """Non-clear-write modes should be honored after clear-write priming."""
+
+        transport = FakeTransport(
+            {
+                "*OPC?": "1",
+                "FREQuency:STARt?": "1000000",
+                "FREQuency:STOP?": "3000000",
+                "FREQuency:CENTer?": "2000000",
+                "FREQuency:SPAN?": "2000000",
+                "BANDwidth:RESolution?": "100000",
+                "BANDwidth:VIDeo?": "300000",
+                "DISPlay:WINDow:TRACe:Y:RLEVel?": "10",
+                "DETector?": "RMS",
+                "DISP:TRAC1:MODE?": "MINH",
+                'MMEM:DATA? "C:\\data.csv"': (
+                    "Freq(Hz),Trace1(dBm)\n"
+                    "1000000,-70\n"
+                    "2000000,-60\n"
+                    "3000000,-65\n"
+                ),
+            }
+        )
+        analyzer = FswSpectrumAnalyzer(transport)
+        analyzer.connect()
+        analyzer.configure(SpectrumConfig(trace_mode="MINH", fsw_clear_write_delay_seconds=0.0))
+        analyzer.acquire_spectrum()
+
+        trace_mode_commands = [command for command in transport.writes if command.startswith("DISP:TRAC1:MODE ")]
+        self.assertGreaterEqual(len(trace_mode_commands), 2)
+        self.assertEqual(trace_mode_commands[-2:], ["DISP:TRAC1:MODE WRIT", "DISP:TRAC1:MODE MINH"])
 
     def test_n9020a_point_mode_returns_peak_value(self) -> None:
         """Point mode should still provide a normalized point value for the caller."""

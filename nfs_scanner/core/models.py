@@ -46,6 +46,7 @@ class SpectrumConfig:
     ref_level: str | None = None
     detector: str | None = None
     trace_mode: str | None = None
+    fsw_clear_write_delay_seconds: float | None = None
     acquisition_mode: Literal["trace", "point"] = "trace"
     trace_name: str = "TRACE1"
     apply_preset: bool = False
