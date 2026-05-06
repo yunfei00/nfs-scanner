@@ -617,6 +617,7 @@ class ScanControlPage(QWidget):
             "rbw": ("100.000", "kHz"),
             "points": ("1001", None),
             "scale": ("10.000", None),
+            "trace_mode": ("WRIT", None),
         },
         "FSW": {
             "start_freq": ("10.000", "MHz"),
