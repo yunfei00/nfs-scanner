@@ -18,6 +18,7 @@ from .factory import (
 from .fsw_adapter import FswSpectrumAnalyzer
 from .fsw_storage import append_fsw_trace_csv, save_fsw_trace_csv
 from .mock_spectrum import MockSpectrumAnalyzer
+from .n9020a_storage import append_n9020a_trace_csv, save_n9020a_trace_csv
 from .n9020a_adapter import N9020ASpectrumAnalyzer
 from .scpi_adapter import BaseScpiSpectrumAnalyzer, SpectrumCommandSet
 from .scpi_transport import PyVisaSpectrumTransport, SpectrumTransport
@@ -67,6 +68,8 @@ __all__ = [
     "probe_resources",
     "append_fsw_trace_csv",
     "save_fsw_trace_csv",
+    "append_n9020a_trace_csv",
+    "save_n9020a_trace_csv",
     "convert_zna_mmem_csv_to_row_text",
     "append_zna_trace_csv",
     "parse_zna_trace_text",
