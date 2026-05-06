@@ -20,7 +20,7 @@ N9020A_COMMAND_SET = SpectrumCommandSet(
         "points": "SWE:POIN?",
         "scale": "DISP:WIND:TRAC:Y:PDIV?",
         "detector": "DET?",
-        "trace_mode": "TRAC:TYPE? {trace_name}",
+        "trace_mode": "TRACe1:TYPE?",
     },
     set_commands={
         "start_freq": "FREQ:STAR",
@@ -34,7 +34,7 @@ N9020A_COMMAND_SET = SpectrumCommandSet(
         "points": "SWE:POIN",
         "scale": "DISP:WIND:TRAC:Y:PDIV",
         "detector": "DET",
-        "trace_mode": "TRAC:TYPE {trace_name},",
+        "trace_mode": "TRACe1:TYPE",
     },
     preset_command="*RST",
     trigger_single_command="INIT:IMM",
@@ -57,11 +57,13 @@ class N9020ASpectrumAnalyzer(BaseScpiSpectrumAnalyzer):
     abort_command = "ABOR"
     ascii_format_command = "FORM ASC"
     trace_mode_aliases = {
-        "WRIT": "CLRW",
-        "WRITE": "CLRW",
-        "CLEARWRITE": "CLRW",
-        "AVER": "AVG",
+        "WRITE": "WRIT",
+        "CLEARWRITE": "WRIT",
+        "AVERAGE": "AVER",
+        "MAXHOLD": "MAXH",
+        "MINHOLD": "MINH",
     }
+
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)

@@ -373,7 +373,7 @@ class SpectrumAnalyzerAdapterTestCase(unittest.TestCase):
                 "SWE:POIN?": "3",
                 "DISP:WIND:TRAC:Y:RLEV?": "0",
                 "DET?": "POS",
-                "TRAC:TYPE? TRACE1": "CLRW",
+                "TRACe1:TYPE?": "WRIT",
                 "TRAC:DATA? TRACE1": "-90,-55,-60",
             }
         )
@@ -440,7 +440,7 @@ class SpectrumAnalyzerAdapterTestCase(unittest.TestCase):
         self.assertIn("BAND:VID 100000.000000", transport.writes)
         self.assertIn("SWE:POIN 401", transport.writes)
         self.assertIn("DET POS", transport.writes)
-        self.assertIn("TRAC:TYPE TRACE1, AVG", transport.writes)
+        self.assertIn("TRACe1:TYPE AVER", transport.writes)
 
     def test_n9020a_prefers_center_span_configuration(self) -> None:
         """When both window styles are given, N9020A should configure center/span."""
@@ -480,7 +480,7 @@ class SpectrumAnalyzerAdapterTestCase(unittest.TestCase):
                 "SWE:POIN?": "401",
                 "DISP:WIND:TRAC:Y:RLEV?": "0",
                 "DET?": "POS",
-                "TRAC:TYPE? TRACE1": "CLRW",
+                "TRACe1:TYPE?": "WRIT",
                 "TRAC:DATA? TRACE1": "-80,-60,-70",
             }
         )
