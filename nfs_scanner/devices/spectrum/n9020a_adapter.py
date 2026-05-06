@@ -20,6 +20,7 @@ N9020A_COMMAND_SET = SpectrumCommandSet(
         "points": "SWE:POIN?",
         "scale": "DISP:WIND:TRAC:Y:PDIV?",
         "detector": "DET?",
+        "att": "POW:ATT?",
         "trace_mode": "TRACe1:TYPE?",
     },
     set_commands={
@@ -34,6 +35,7 @@ N9020A_COMMAND_SET = SpectrumCommandSet(
         "points": "SWE:POIN",
         "scale": "DISP:WIND:TRAC:Y:PDIV",
         "detector": "DET",
+        "att": "POW:ATT",
         "trace_mode": "TRACe1:TYPE",
     },
     preset_command="*RST",
