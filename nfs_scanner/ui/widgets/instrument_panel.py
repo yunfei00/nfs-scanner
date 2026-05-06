@@ -33,7 +33,7 @@ class InstrumentPanel(QWidget):
         "points",
         "scale",
     )
-    FSW_QUERY_KEYS = (
+    ADVANCED_TRACE_QUERY_KEYS = (
         "start_freq",
         "center_freq",
         "stop_freq",
@@ -71,8 +71,8 @@ class InstrumentPanel(QWidget):
 
         if self.instrument_name in self.STANDARD_INSTRUMENTS:
             self._query_keys = self.STANDARD_QUERY_KEYS
-            if self.instrument_name == "FSW":
-                self._query_keys = self.FSW_QUERY_KEYS
+            if self.instrument_name in {"FSW", "N9020A"}:
+                self._query_keys = self.ADVANCED_TRACE_QUERY_KEYS
             self._action_keys = self.STANDARD_ACTION_KEYS
             self._setup_standard_ui()
             return
@@ -135,7 +135,7 @@ class InstrumentPanel(QWidget):
             query_key="points",
             button_text="扫描点数",
         )
-        if self.instrument_name == "FSW":
+        if self.instrument_name in {"FSW", "N9020A"}:
             self._add_plain_field(
                 layout=layout,
                 row=3,
@@ -144,7 +144,8 @@ class InstrumentPanel(QWidget):
                 button_text="ATT 衰减",
                 unit_label="dB",
             )
-            self._add_preamp_field(layout=layout, row=3, start_column=4)
+            if self.instrument_name == "FSW":
+                self._add_preamp_field(layout=layout, row=3, start_column=4)
             self._add_trace_mode_field(layout=layout, row=4, start_column=0)
         else:
             self._add_plain_field(
@@ -158,14 +159,14 @@ class InstrumentPanel(QWidget):
 
         preset_button = QPushButton("Preset", self)
         preset_button.clicked.connect(lambda: self.action_requested.emit(self.instrument_name, "preset"))
-        if self.instrument_name == "FSW":
+        if self.instrument_name in {"FSW", "N9020A"}:
             layout.addWidget(preset_button, 4, 6)
         else:
             layout.addWidget(preset_button, 3, 4)
 
         save_data_button = QPushButton("保存仪表数据", self)
         save_data_button.clicked.connect(lambda: self.action_requested.emit(self.instrument_name, "save_data"))
-        if self.instrument_name == "FSW":
+        if self.instrument_name in {"FSW", "N9020A"}:
             layout.addWidget(save_data_button, 4, 7)
         else:
             layout.addWidget(save_data_button, 3, 5)
@@ -174,15 +175,15 @@ class InstrumentPanel(QWidget):
         save_param_demo_button.clicked.connect(
             lambda: self.action_requested.emit(self.instrument_name, "save_param_demo")
         )
-        if self.instrument_name == "FSW":
+        if self.instrument_name in {"FSW", "N9020A"}:
             layout.addWidget(save_param_demo_button, 4, 8)
         else:
             layout.addWidget(save_param_demo_button, 3, 6)
 
         self.discovered_label = QLabel("未发现设备", self)
-        discovery_row = 5 if self.instrument_name == "FSW" else 4
+        discovery_row = 5 if self.instrument_name in {"FSW", "N9020A"} else 4
         layout.addWidget(QLabel("设备发现", self), discovery_row, 0)
-        if self.instrument_name == "FSW":
+        if self.instrument_name in {"FSW", "N9020A"}:
             layout.addWidget(self.discovered_label, discovery_row, 1, 1, 3)
         else:
             layout.addWidget(self.discovered_label, discovery_row, 1, 1, 7)
@@ -293,7 +294,7 @@ class InstrumentPanel(QWidget):
         row: int,
         start_column: int,
     ) -> None:
-        """Add FSW trace-mode radio group with query/set buttons."""
+        """Add trace-mode radio group with query/set buttons."""
 
         set_button = QPushButton("设置模式", self)
         layout.addWidget(set_button, row, start_column)
@@ -321,7 +322,7 @@ class InstrumentPanel(QWidget):
         )
 
     def _selected_trace_mode(self) -> str:
-        """Return currently selected FSW trace mode code."""
+        """Return currently selected trace mode code."""
 
         for mode_code, button in self._trace_mode_buttons.items():
             if button.isChecked():
