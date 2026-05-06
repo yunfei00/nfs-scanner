@@ -39,11 +39,13 @@ from nfs_scanner.devices.spectrum import (
     SUPPORTED_INSTRUMENTS,
     SpectrumAnalyzerError,
     append_fsw_trace_csv,
+    append_n9020a_trace_csv,
     append_zna_trace_csv,
     convert_zna_mmem_csv_to_row_text,
     discover_supported_instruments_via_visa,
     probe_resources,
     save_fsw_trace_csv,
+    save_n9020a_trace_csv,
     save_zna_trace_csv,
 )
 from nfs_scanner.core import DeviceManager, ScanManager, ScanRuntimeSnapshot, SpectrumConfig
@@ -487,6 +489,31 @@ class ScanWorker(QObject):
                 )
             except (OSError, ValueError) as error:
                 return False, str(error)
+        elif instrument_name == "N9020A":
+            data_file = data_dir / f"point_{point_index:06d}_n9020a.csv"
+            combined_csv_file = data_dir / "all_points_n9020a.csv"
+            if not measurement.has_trace_data:
+                return False, "N9020A 采集结果不包含 trace 数据"
+            frequencies, values = measurement.to_trace()
+            try:
+                save_n9020a_trace_csv(
+                    frequencies=frequencies,
+                    values=values,
+                    x=x,
+                    y=y,
+                    z=z,
+                    file_path=data_file,
+                )
+                append_n9020a_trace_csv(
+                    frequencies=frequencies,
+                    values=values,
+                    x=x,
+                    y=y,
+                    z=z,
+                    file_path=combined_csv_file,
+                )
+            except (OSError, ValueError) as error:
+                return False, str(error)
         else:
             data_file = data_dir / f"point_{point_index:06d}_{instrument_name.lower()}_snapshot.json"
             snapshot = measurement.to_serializable_dict()
@@ -554,6 +581,7 @@ class ScanControlPage(QWidget):
     SNAPSHOT_OUTPUT_DIR = Path("output") / "instrument_snapshots"
     ZNA67_DEMO_FILE_PATH = Path(r"D:/zna67_demo.csv")
     FSW_DEMO_FILE_PATH = Path(r"D:/fsw_demo.csv")
+    N9020A_DEMO_FILE_PATH = Path(r"D:/n9020a_demo.csv")
     ZNA67_TEMP_TRACE_PATH = r"C:\temp\data.csv"
     INSTRUMENT_ORDER = tuple(SUPPORTED_INSTRUMENTS)
     SERIAL_FALLBACK_INSTRUMENTS = frozenset({"ZNA67"})
@@ -1961,7 +1989,20 @@ class ScanControlPage(QWidget):
                     self.append_log(f"FSW 存储数据测试失败: {message}")
                 return
 
-            self.append_log(f"存储数据测试仅支持 ZNA67/FSW，当前仪表: {instrument_name}")
+            if instrument_name == "N9020A":
+                saved, message = self._save_n9020a_demo_data(
+                    x=1.0,
+                    y=2.0,
+                    z=3.0,
+                    file_name=str(self.N9020A_DEMO_FILE_PATH),
+                )
+                if saved:
+                    self.append_log(f"N9020A 存储数据测试成功: {message}")
+                else:
+                    self.append_log(f"N9020A 存储数据测试失败: {message}")
+                return
+
+            self.append_log(f"存储数据测试仅支持 ZNA67/N9020A/FSW，当前仪表: {instrument_name}")
             return
 
         if action_key != "preset":
@@ -2065,6 +2106,37 @@ class ScanControlPage(QWidget):
 
         trace_summary = "、".join(sorted(trace_names))
         return True, f"{target_path}（共 {row_count} 行，trace: {trace_summary}）"
+
+
+    def _save_n9020a_demo_data(
+        self,
+        *,
+        x: float,
+        y: float,
+        z: float,
+        file_name: str,
+    ) -> tuple[bool, str]:
+        """执行 N9020A 行式 trace 存储（单条 trace）。"""
+
+        target_path = Path(file_name)
+        measurement = self._acquire_instrument_measurement("N9020A")
+        if not measurement.has_trace_data:
+            return False, "N9020A 采集结果不包含 trace 数据"
+
+        frequencies, values = measurement.to_trace()
+        try:
+            point_count = save_n9020a_trace_csv(
+                frequencies=frequencies,
+                values=values,
+                x=x,
+                y=y,
+                z=z,
+                file_path=target_path,
+            )
+        except (OSError, ValueError) as error:
+            return False, str(error)
+
+        return True, f"{target_path}（共 {point_count} 个频点）"
 
     def _acquire_zna67_raw_text(self, *, x: float, y: float, z: float, delay_time: int) -> str:
         """采集 ZNA67 原始文本，并统一转换为行式文本。"""
