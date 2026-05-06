@@ -404,6 +404,24 @@ class SpectrumAnalyzerAdapterTestCase(unittest.TestCase):
         self.assertIn("INIT:CONT OFF", transport.writes)
         self.assertIn("INIT:IMM", transport.writes)
 
+
+    def test_n9020a_adapter_supports_att_setting_via_pow_att(self) -> None:
+        """N9020A ATT should map to POW:ATT query/set commands."""
+
+        transport = FakeTransport(
+            {
+                "*IDN?": "Keysight Technologies,N9020A,MY00000001,A.25.05",
+                "POW:ATT?": "20",
+            }
+        )
+        analyzer = N9020ASpectrumAnalyzer(transport)
+
+        analyzer.connect()
+        self.assertEqual(analyzer.query_setting("att"), "20")
+        analyzer.set_setting("att", 15)
+
+        self.assertIn("POW:ATT 15.000000", transport.writes)
+
     def test_n9020a_connect_rejects_wrong_identity(self) -> None:
         """N9020A adapter should fail fast when the resource identifies as another model."""
 
