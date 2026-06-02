@@ -58,6 +58,10 @@ python -m nfs_scanner.main
 
 如果需要真实 VISA 设备联调，还需要本机安装 `pyvisa` 与对应厂商 VISA Runtime。
 
+## 舵机联调说明
+
+舵机程序运行前必须先执行复位。运行命令格式、`S` 指标含义和当前测试记录见 [`docs/servo_bringup.md`](docs/servo_bringup.md)。
+
 ## 联调脚本
 
 本轮新增通用联调脚本：
