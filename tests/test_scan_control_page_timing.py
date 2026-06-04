@@ -114,6 +114,40 @@ class ScanControlPageTimingTestCase(unittest.TestCase):
         self.page._set_scan_button_states(completed_label)
         self.assertTrue(self.page.start_button.isEnabled())
 
+    def test_mock_spectrum_scan_still_requires_open_serial(self) -> None:
+        """Mock spectrum mode should not bypass real serial preflight."""
+
+        self.page.mock_spectrum_checkbox.setChecked(True)
+        self.page.serial_is_open = False
+        self.page._serial_port = type("SerialPortStub", (), {"isOpen": lambda self: False})()
+
+        self.page.on_start_scan()
+
+        self.assertIn("开始扫描失败：请先打开串口并完成复位", self.page.log_edit.toPlainText())
+
+    def test_mock_spectrum_scan_does_not_require_real_instrument_resource(self) -> None:
+        """Mock spectrum mode should configure MockSpectrumAnalyzer without VISA lookup."""
+
+        calls = {"adapter": 0, "worker_instrument_name": None}
+
+        def fail_if_adapter_requested(_instrument_name):
+            calls["adapter"] += 1
+            raise AssertionError("真实仪表资源不应在模拟频谱模式下被请求")
+
+        def capture_start_worker(panel, *, dwell_seconds, instrument_name=None):
+            del panel, dwell_seconds
+            calls["worker_instrument_name"] = instrument_name
+
+        self.page.mock_spectrum_checkbox.setChecked(True)
+        self.page._get_instrument_adapter = fail_if_adapter_requested
+        self.page._start_scan_worker = capture_start_worker
+
+        self.page.on_start_scan()
+
+        self.assertEqual(calls["adapter"], 0)
+        self.assertEqual(calls["worker_instrument_name"], "Mock-Spectrum")
+        self.assertIn("当前为模拟频谱模式", self.page.log_edit.toPlainText())
+
 
 class ScanWorkerSerialParsingTestCase(unittest.TestCase):
     """Verify serial status extraction is stable across fragmented input chunks."""

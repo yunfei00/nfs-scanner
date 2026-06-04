@@ -132,6 +132,11 @@ class ScanManager:
     def acquire_spectrum_measurement(
         self,
         spectrum_config: SpectrumConfig | None = None,
+        *,
+        x: float | None = None,
+        y: float | None = None,
+        z: float | None = None,
+        point_index: int | None = None,
     ) -> SpectrumAcquisitionResult:
         """Acquire one normalized spectrum result from the active adapter."""
 
@@ -140,6 +145,9 @@ class ScanManager:
 
         self._spectrum_analyzer.connect()
         self._spectrum_analyzer.configure(self._spectrum_config)
+        set_scan_context = getattr(self._spectrum_analyzer, "set_scan_context", None)
+        if callable(set_scan_context):
+            set_scan_context(x=x, y=y, z=z, point_index=point_index)
         measurement = self._spectrum_analyzer.acquire_spectrum()
         self._logger.info("[SCAN] spectrum measurement acquired from %s", measurement.instrument_type)
         return measurement
