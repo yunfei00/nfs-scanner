@@ -14,6 +14,7 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtSerialPort import QSerialPort, QSerialPortInfo
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QCheckBox,
     QComboBox,
     QFrame,
     QGridLayout,
@@ -36,6 +37,7 @@ from PySide6.QtWidgets import (
 
 from nfs_scanner.devices.spectrum import (
     InstrumentDiscoveryResult,
+    MockSpectrumAnalyzer,
     SUPPORTED_INSTRUMENTS,
     SpectrumAnalyzerError,
     append_fsw_trace_csv,
@@ -200,7 +202,12 @@ class ScanWorker(QObject):
                     return
 
                 try:
-                    measurement = self._scan_manager.acquire_spectrum_measurement()
+                    measurement = self._scan_manager.acquire_spectrum_measurement(
+                        x=x,
+                        y=y,
+                        z=z,
+                        point_index=point_index,
+                    )
                 except SpectrumAnalyzerError as error:
                     self.finished.emit("error", f"采集失败: {error}")
                     return
@@ -705,6 +712,7 @@ class ScanControlPage(QWidget):
         self.pause_button: QPushButton
         self.stop_button: QPushButton
         self.search_button: QPushButton
+        self.mock_spectrum_checkbox: QCheckBox
 
         self.scan_table: QTableWidget
         self.instrument_tabs: QTabWidget
@@ -991,6 +999,8 @@ class ScanControlPage(QWidget):
         self.stop_button.setObjectName("dangerButton")
         clear_log_button = QPushButton("清除日志", self)
         self.search_button = QPushButton("搜索仪表", self)
+        self.mock_spectrum_checkbox = QCheckBox("模拟频谱仪（仅运动平台真实运行）", self)
+        self.mock_spectrum_checkbox.setChecked(False)
 
         for button in [self.start_button, self.pause_button, self.stop_button, clear_log_button, self.search_button]:
             button.setFixedHeight(32)
@@ -1006,6 +1016,7 @@ class ScanControlPage(QWidget):
         grid.addWidget(self.stop_button, 1, 0)
         grid.addWidget(clear_log_button, 1, 1)
         grid.addWidget(self.search_button, 2, 0, 1, 2)
+        grid.addWidget(self.mock_spectrum_checkbox, 3, 0, 1, 2)
 
         self._set_scan_button_states("就绪")
         return group
@@ -1491,20 +1502,33 @@ class ScanControlPage(QWidget):
             self._refresh_clock()
             return
 
-        try:
-            analyzer = self._get_instrument_adapter(panel.instrument_name)
-            self.scan_manager.set_spectrum_analyzer(analyzer)
-            self.scan_manager.set_spectrum_config(
-                self._build_instrument_measurement_config(
+        mock_spectrum_enabled = self.mock_spectrum_checkbox.isChecked()
+        if mock_spectrum_enabled:
+            self.scan_manager.set_spectrum_analyzer(MockSpectrumAnalyzer())
+            try:
+                spectrum_config = self._build_instrument_measurement_config(
                     panel,
                     fsw_clear_write_delay_seconds=spectrum_wait_seconds,
                 )
-            )
-        except SpectrumAnalyzerError as error:
-            self.append_log(f"开始扫描失败：仪表连接失败：{error}")
-            self.scan_manager.fail_scan(f"仪表连接失败：{error}")
-            self._refresh_clock()
-            return
+            except (KeyError, TypeError, ValueError):
+                spectrum_config = SpectrumConfig()
+            self.scan_manager.set_spectrum_config(spectrum_config)
+            self.append_log("当前为模拟频谱模式：运动平台真实运行，频谱数据由 MockSpectrumAnalyzer 生成。")
+        else:
+            try:
+                analyzer = self._get_instrument_adapter(panel.instrument_name)
+                self.scan_manager.set_spectrum_analyzer(analyzer)
+                self.scan_manager.set_spectrum_config(
+                    self._build_instrument_measurement_config(
+                        panel,
+                        fsw_clear_write_delay_seconds=spectrum_wait_seconds,
+                    )
+                )
+            except SpectrumAnalyzerError as error:
+                self.append_log(f"开始扫描失败：仪表连接失败：{error}")
+                self.scan_manager.fail_scan(f"仪表连接失败：{error}")
+                self._refresh_clock()
+                return
 
         self._prepare_scan_storage_workspace()
         self._refresh_clock()
@@ -1515,8 +1539,16 @@ class ScanControlPage(QWidget):
         )
         self.append_log(f"扫描点驻留（固定）: {self.FIXED_SCAN_POINT_DWELL_SECONDS:.2f} 秒")
         self.append_log(f"频谱等待时间: {spectrum_wait_seconds:.2f} 秒")
-        self.append_log("扫描将复用当前已打开串口句柄与已连接仪表句柄，不再重复获取。")
-        self._start_scan_worker(panel, dwell_seconds=self.FIXED_SCAN_POINT_DWELL_SECONDS)
+        if mock_spectrum_enabled:
+            self.append_log("扫描将复用当前已打开串口句柄，频谱仪使用 MockSpectrumAnalyzer。")
+            self._start_scan_worker(
+                panel,
+                dwell_seconds=self.FIXED_SCAN_POINT_DWELL_SECONDS,
+                instrument_name="Mock-Spectrum",
+            )
+        else:
+            self.append_log("扫描将复用当前已打开串口句柄与已连接仪表句柄，不再重复获取。")
+            self._start_scan_worker(panel, dwell_seconds=self.FIXED_SCAN_POINT_DWELL_SECONDS)
 
     def on_pause_scan(self) -> None:
         if self._scan_worker is None:
@@ -1556,8 +1588,14 @@ class ScanControlPage(QWidget):
         self._scan_worker.request_stop()
         self.append_log("已请求停止扫描，正在等待当前阶段安全退出。")
 
-    def _start_scan_worker(self, panel: InstrumentPanel, *, dwell_seconds: float) -> None:
-        instrument_name = panel.instrument_name
+    def _start_scan_worker(
+        self,
+        panel: InstrumentPanel,
+        *,
+        dwell_seconds: float,
+        instrument_name: str | None = None,
+    ) -> None:
+        instrument_name = instrument_name or panel.instrument_name
         if not self._serial_port.isOpen():
             self.append_log("开始扫描失败：串口未打开")
             self.scan_manager.fail_scan("串口未打开")

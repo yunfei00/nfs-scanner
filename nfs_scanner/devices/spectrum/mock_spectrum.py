@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 
 import numpy as np
@@ -11,6 +12,16 @@ from nfs_scanner.core.models import SpectrumAcquisitionResult, SpectrumConfig
 from .base_spectrum import SpectrumAnalyzer
 from .exceptions import SpectrumConfigurationError, SpectrumQueryError
 from .utils import build_frequency_axis, normalize_frequency_window, parse_frequency_value, parse_numeric_value
+
+
+@dataclass(slots=True)
+class _MockScanContext:
+    """Current scan point context for synthetic spatial response."""
+
+    x: float | None = None
+    y: float | None = None
+    z: float | None = None
+    point_index: int | None = None
 
 
 class MockSpectrumAnalyzer(SpectrumAnalyzer):
@@ -24,6 +35,7 @@ class MockSpectrumAnalyzer(SpectrumAnalyzer):
         self._config = SpectrumConfig()
         self._rng = np.random.default_rng(20260313)
         self._continuous_enabled = True
+        self._scan_context = _MockScanContext()
         self.resource_name = "mock://local"
 
     def connect(self) -> bool:
@@ -157,6 +169,18 @@ class MockSpectrumAnalyzer(SpectrumAnalyzer):
         self._ensure_connected()
         self._config = config
 
+    def set_scan_context(
+        self,
+        *,
+        x: float | None = None,
+        y: float | None = None,
+        z: float | None = None,
+        point_index: int | None = None,
+    ) -> None:
+        """Store scan coordinates used by the synthetic hotspot model."""
+
+        self._scan_context = _MockScanContext(x=x, y=y, z=z, point_index=point_index)
+
     def trigger_single(self) -> None:
         """Accept the single-trigger request without extra delay."""
 
@@ -184,8 +208,10 @@ class MockSpectrumAnalyzer(SpectrumAnalyzer):
         baseline = -82.0 + 2.0 * np.sin(np.linspace(0.0, 6.0 * np.pi, self.TRACE_POINTS))
         peak_one = 24.0 * np.exp(-((frequencies - (start_hz + span * 0.28)) ** 2) / (2.0 * (span * 0.035) ** 2))
         peak_two = 18.0 * np.exp(-((frequencies - (start_hz + span * 0.72)) ** 2) / (2.0 * (span * 0.055) ** 2))
+        hotspot = self._calculate_hotspot_gain()
+        hotspot_gain = 16.0
         noise = self._rng.normal(0.0, 0.9, self.TRACE_POINTS)
-        trace_values = (baseline + peak_one + peak_two + noise).astype(np.float64)
+        trace_values = (baseline + peak_one + peak_two + hotspot_gain * hotspot + noise).astype(np.float64)
 
         return SpectrumAcquisitionResult(
             instrument_type=self.instrument_type,
@@ -203,6 +229,12 @@ class MockSpectrumAnalyzer(SpectrumAnalyzer):
             metadata={
                 "resource_name": self.resource_name,
                 "continuous_enabled": self._continuous_enabled,
+                "simulated": True,
+                "scan_x": self._scan_context.x,
+                "scan_y": self._scan_context.y,
+                "scan_z": self._scan_context.z,
+                "point_index": self._scan_context.point_index,
+                "simulation_model": "gaussian_hotspot",
             },
         )
 
@@ -233,6 +265,18 @@ class MockSpectrumAnalyzer(SpectrumAnalyzer):
         if self._config.acquisition_mode == "point":
             return self.fetch_point_value()
         return self.fetch_trace()
+
+    def _calculate_hotspot_gain(self) -> float:
+        """Return a 2D Gaussian hotspot strength for the current scan point."""
+
+        x = self._scan_context.x if self._scan_context.x is not None else 0.0
+        y = self._scan_context.y if self._scan_context.y is not None else 0.0
+        cx = 50.0
+        cy = 50.0
+        sigma_x = 22.0
+        sigma_y = 18.0
+        exponent = -(((x - cx) ** 2) / (2.0 * sigma_x**2) + ((y - cy) ** 2) / (2.0 * sigma_y**2))
+        return float(np.exp(exponent))
 
     def _ensure_connected(self) -> None:
         """Guard operations that require a connection."""

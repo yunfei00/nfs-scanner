@@ -59,5 +59,50 @@ class ScanManagerSpectrumIntegrationTestCase(unittest.TestCase):
         np.testing.assert_allclose(point_result.spectrum_trace[1], np.asarray([-40.0, -35.0, -45.0]))
 
 
+class ContextAwareSpectrumAnalyzer(MockSpectrumAnalyzer):
+    """Mock analyzer that records scan context passed by ScanManager."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.received_context = None
+
+    def set_scan_context(self, *, x=None, y=None, z=None, point_index=None) -> None:
+        super().set_scan_context(x=x, y=y, z=z, point_index=point_index)
+        self.received_context = {"x": x, "y": y, "z": z, "point_index": point_index}
+
+
+class MockSpectrumAnalyzerContextTestCase(unittest.TestCase):
+    """Verify mock spectrum output can vary by scan coordinates."""
+
+    def test_scan_manager_passes_scan_context_to_supported_adapter(self) -> None:
+        analyzer = ContextAwareSpectrumAnalyzer()
+        manager = ScanManager(spectrum_analyzer=analyzer)
+
+        measurement = manager.acquire_spectrum_measurement(x=12.0, y=34.0, z=5.0, point_index=7)
+
+        self.assertEqual(analyzer.received_context, {"x": 12.0, "y": 34.0, "z": 5.0, "point_index": 7})
+        self.assertTrue(measurement.metadata["simulated"])
+        self.assertEqual(measurement.metadata["scan_x"], 12.0)
+        self.assertEqual(measurement.metadata["scan_y"], 34.0)
+        self.assertEqual(measurement.metadata["scan_z"], 5.0)
+        self.assertEqual(measurement.metadata["point_index"], 7)
+        self.assertEqual(measurement.metadata["simulation_model"], "gaussian_hotspot")
+
+    def test_mock_spectrum_point_value_varies_by_xy_context(self) -> None:
+        center_analyzer = MockSpectrumAnalyzer()
+        edge_analyzer = MockSpectrumAnalyzer()
+        for analyzer in (center_analyzer, edge_analyzer):
+            analyzer.connect()
+            analyzer.configure(SpectrumConfig(start_freq="1MHz", stop_freq="10MHz"))
+
+        center_analyzer.set_scan_context(x=50.0, y=50.0, z=0.0, point_index=1)
+        edge_analyzer.set_scan_context(x=0.0, y=0.0, z=0.0, point_index=2)
+
+        center_measurement = center_analyzer.acquire_spectrum()
+        edge_measurement = edge_analyzer.acquire_spectrum()
+
+        self.assertGreater(center_measurement.point_value, edge_measurement.point_value)
+
+
 if __name__ == "__main__":
     unittest.main()
