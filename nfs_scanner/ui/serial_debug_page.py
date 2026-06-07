@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from PySide6.QtCore import QIODevice, QTimer, Qt, Signal
-from PySide6.QtSerialPort import QSerialPort, QSerialPortInfo
+from PySide6.QtSerialPort import QSerialPort
 from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
@@ -24,6 +24,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from nfs_scanner.ui.serial_ports import (
+    SerialPortCandidate,
+    collect_serial_port_candidates,
+    filter_target_serial_ports,
+    format_serial_port_diagnostic_lines,
+)
+
 
 @dataclass
 class MotionStatus:
@@ -39,8 +46,6 @@ class MotionStatus:
 class SerialTransport(QWidget):
     """串口传输层，负责端口枚举、连接、发送和接收。"""
 
-    _PORT_KEYWORDS: tuple[str, ...] = ("CH340", "CH341", "wchusbserial")
-
     connected_changed = Signal(bool, str)
     lines_received = Signal(list)
     error_occurred = Signal(str)
@@ -51,6 +56,7 @@ class SerialTransport(QWidget):
         self._serial_port.readyRead.connect(self._on_ready_read)
         self._serial_port.errorOccurred.connect(self._on_error)
         self._read_buffer = ""
+        self._last_scanned_ports: list[SerialPortCandidate] = []
 
     @property
     def is_connected(self) -> bool:
@@ -67,17 +73,18 @@ class SerialTransport(QWidget):
     def list_ports(self) -> list[tuple[str, str]]:
         """列举可用串口，仅保留目标关键词设备。"""
 
-        ports: list[tuple[str, str]] = []
-        for info in QSerialPortInfo.availablePorts():
-            description = info.description() or "未知设备"
-            manufacturer = info.manufacturer() or ""
-            port_name = info.portName() or ""
-            identity_text = f"{port_name} {description} {manufacturer}".lower()
-            if not any(keyword.lower() in identity_text for keyword in self._PORT_KEYWORDS):
-                continue
-            ports.append((info.portName(), f"{info.portName()} - {description}"))
-        ports.sort(key=lambda item: item[0])
-        return ports
+        self._last_scanned_ports = collect_serial_port_candidates()
+        return [(port.port_name, port.display_name) for port in filter_target_serial_ports(self._last_scanned_ports)]
+
+    def list_last_scanned_ports(self) -> list[SerialPortCandidate]:
+        """返回上一次枚举到的全部串口。"""
+
+        return list(self._last_scanned_ports)
+
+    def format_last_scan_diagnostics(self) -> list[str]:
+        """返回上一次串口搜索的诊断日志。"""
+
+        return format_serial_port_diagnostic_lines(self._last_scanned_ports)
 
     def connect_port(self, port_name: str, baudrate: int) -> tuple[bool, str]:
         """连接指定串口。"""
@@ -485,9 +492,17 @@ class SerialDebugPage(QWidget):
         self.port_combo.clear()
         ports = self._transport.list_ports()
         if not ports:
-            self.port_combo.addItem("未发现可用串口", "")
-            self.port_combo.setEnabled(False)
-            self._append_log("[WARN] 未发现可用串口")
+            scanned_ports = self._transport.list_last_scanned_ports()
+            if scanned_ports:
+                self.port_combo.setEnabled(True)
+                for port in scanned_ports:
+                    self.port_combo.addItem(f"{port.display_name}（未匹配）", port.port_name)
+            else:
+                self.port_combo.addItem("未发现可用串口", "")
+                self.port_combo.setEnabled(False)
+            self._append_log("[WARN] 未发现匹配串口")
+            for line in self._transport.format_last_scan_diagnostics():
+                self._append_log(f"[WARN] {line}")
             return
 
         self.port_combo.setEnabled(True)

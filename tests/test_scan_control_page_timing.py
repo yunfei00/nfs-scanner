@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from datetime import datetime, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("NFS_SCANNER_DISABLE_AUTO_STARTUP_TASKS", "1")
@@ -14,6 +15,7 @@ os.environ.setdefault("NFS_SCANNER_DISABLE_AUTO_STARTUP_TASKS", "1")
 from PySide6.QtWidgets import QApplication
 
 from nfs_scanner.core import ScanManager, SpectrumConfig
+from nfs_scanner.ui.serial_ports import SerialPortCandidate, filter_target_serial_ports
 from nfs_scanner.ui.widgets.scan_control_page import ScanControlPage, ScanWorker
 
 
@@ -220,6 +222,50 @@ class ScanWorkerSerialParsingTestCase(unittest.TestCase):
         self.assertFalse(done)
         self.assertIn("状态异常", reason)
         self.assertIn("Alarm", reason)
+
+
+class SerialPortDiscoveryTestCase(unittest.TestCase):
+    """Verify serial-port matching and diagnostics fallback."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_ch9340_adapter_matches_supported_serial_keywords(self) -> None:
+        """CH9340 USB serial adapters should be treated as target motion ports."""
+
+        ch9340_port = SerialPortCandidate(
+            port_name="COM3",
+            description="USB-SERIAL CH9340",
+            manufacturer="WCH",
+        )
+
+        self.assertEqual(filter_target_serial_ports([ch9340_port]), [ch9340_port])
+
+    def test_refresh_available_ports_shows_unmatched_ports_when_no_target_found(self) -> None:
+        """When matching fails, all scanned ports should stay visible for diagnosis."""
+
+        page = ScanControlPage()
+        page.clock_timer.stop()
+        scanned_ports = [
+            SerialPortCandidate(port_name="COM1", description="通信端口", manufacturer="Microsoft"),
+            SerialPortCandidate(port_name="COM9", description="未知 USB 串口", manufacturer="Vendor"),
+        ]
+        try:
+            with patch(
+                "nfs_scanner.ui.widgets.scan_control_page.collect_serial_port_candidates",
+                return_value=scanned_ports,
+            ):
+                found_count = page._refresh_available_ports()
+
+            self.assertEqual(found_count, 0)
+            self.assertEqual(page.port_combo.count(), 2)
+            self.assertEqual(page.port_combo.itemData(0), "COM1")
+            self.assertIn("未匹配", page.port_combo.itemText(0))
+            self.assertEqual(page.port_combo.itemData(1), "COM9")
+            self.assertIn("未匹配", page.port_combo.itemText(1))
+        finally:
+            page.close()
 
 
 class ScanControlPageSerialConfigTestCase(unittest.TestCase):

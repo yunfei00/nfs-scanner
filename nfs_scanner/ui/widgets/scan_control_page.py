@@ -9,9 +9,9 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QCoreApplication, QIODevice, QObject, QThread, QTimer, Qt, Signal
+from PySide6.QtCore import QCoreApplication, QIODevice, QObject, QSignalBlocker, QThread, QTimer, Qt, Signal
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtSerialPort import QSerialPort, QSerialPortInfo
+from PySide6.QtSerialPort import QSerialPort
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -52,6 +52,12 @@ from nfs_scanner.devices.spectrum import (
 )
 from nfs_scanner.core import DeviceManager, ScanManager, ScanRuntimeSnapshot, SpectrumConfig
 from nfs_scanner.infra.logging_config import get_logger
+from nfs_scanner.ui.serial_ports import (
+    SerialPortCandidate,
+    collect_serial_port_candidates,
+    filter_target_serial_ports,
+    format_serial_port_diagnostic_lines,
+)
 
 from .collapsible_section import CollapsibleSection
 from .instrument_panel import InstrumentPanel
@@ -582,7 +588,6 @@ class ScanControlPage(QWidget):
     X_RANGE = (0.0, 200.0)
     Y_RANGE = (-300.0, 0.0)
     Z_RANGE = (0.0, 10.0)
-    PORT_KEYWORDS = ("CH340", "CH341", "wchusbserial")
     INSTRUMENT_SEARCH_LOG_PATH = Path("output") / "instrument_search.log"
     INSTRUMENT_CACHE_PATH = Path("config") / "instrument_devices.json"
     SNAPSHOT_OUTPUT_DIR = Path("output") / "instrument_snapshots"
@@ -684,6 +689,8 @@ class ScanControlPage(QWidget):
         self._instrument_search_thread: QThread | None = None
         self._instrument_search_worker: InstrumentSearchWorker | None = None
         self._pending_serial_port_name: str = ""
+        self._last_serial_port_scan: list[SerialPortCandidate] = []
+        self._last_serial_port_diagnostic_signature: tuple[str, ...] = ()
         self._auto_reconnect_notified = False
 
         self._serial_reconnect_timer = QTimer(self)
@@ -1363,7 +1370,9 @@ class ScanControlPage(QWidget):
         found_count = self._refresh_available_ports(selected_port=selected_port)
         if found_count == 0:
             self.append_log("串口列表已刷新：未发现匹配设备")
+            self._append_serial_port_scan_diagnostics(force=True)
             return
+        self._last_serial_port_diagnostic_signature = ()
         self.append_log(f"串口列表已刷新：共发现 {found_count} 个匹配设备")
 
     def on_close_serial(self) -> None:
@@ -2440,28 +2449,41 @@ class ScanControlPage(QWidget):
         self.append_log("显示热力图操作触发（占位）")
 
     def _refresh_available_ports(self, selected_port: str | None = None) -> int:
-        """刷新可用串口列表，仅显示目标关键词设备。"""
+        """刷新可用串口列表；没有匹配设备时展示全部枚举结果。"""
 
         previous_port = selected_port or self.port_combo.currentData()
-        self.port_combo.clear()
-        matched_ports: list[tuple[str, str]] = []
-        for info in QSerialPortInfo.availablePorts():
-            description = info.description() or "未知设备"
-            manufacturer = info.manufacturer() or ""
-            port_name = info.portName() or ""
-            identity_text = f"{port_name} {description} {manufacturer}".lower()
-            if not any(keyword.lower() in identity_text for keyword in self.PORT_KEYWORDS):
-                continue
-            matched_ports.append((info.portName(), f"{info.portName()} - {description}"))
+        self._last_serial_port_scan = collect_serial_port_candidates()
+        matched_ports = filter_target_serial_ports(self._last_serial_port_scan)
+        visible_ports = matched_ports or self._last_serial_port_scan
 
-        for port_name, display_name in sorted(matched_ports, key=lambda item: item[0]):
-            self.port_combo.addItem(display_name, port_name)
+        blocker = QSignalBlocker(self.port_combo)
+        try:
+            self.port_combo.clear()
+            if not visible_ports:
+                self.port_combo.addItem("未发现可用串口", "")
+            for port in visible_ports:
+                display_name = port.display_name
+                if not matched_ports:
+                    display_name = f"{display_name}（未匹配）"
+                self.port_combo.addItem(display_name, port.port_name)
 
-        if previous_port:
-            index = self.port_combo.findData(previous_port)
-            if index >= 0:
-                self.port_combo.setCurrentIndex(index)
+            if previous_port:
+                index = self.port_combo.findData(previous_port)
+                if index >= 0:
+                    self.port_combo.setCurrentIndex(index)
+        finally:
+            del blocker
         return len(matched_ports)
+
+    def _append_serial_port_scan_diagnostics(self, *, force: bool = False) -> None:
+        """输出最近一次串口搜索的完整枚举结果。"""
+
+        lines = tuple(format_serial_port_diagnostic_lines(self._last_serial_port_scan))
+        if not force and lines == self._last_serial_port_diagnostic_signature:
+            return
+        for line in lines:
+            self.append_log(f"串口诊断: {line}")
+        self._last_serial_port_diagnostic_signature = lines
 
     def _load_scan_area_config(self) -> None:
         """加载上次保存的扫描区域配置。"""
@@ -2668,8 +2690,10 @@ class ScanControlPage(QWidget):
         configured_port = self._pending_serial_port_name.strip()
         found_count = self._refresh_available_ports(selected_port=configured_port or None)
         if found_count <= 0:
+            self._append_serial_port_scan_diagnostics(force=True)
             self._start_serial_reconnect_monitoring()
             return
+        self._last_serial_port_diagnostic_signature = ()
         self.append_log(f"已找到 {found_count} 个匹配串口设备")
 
         if configured_port:
@@ -2701,7 +2725,9 @@ class ScanControlPage(QWidget):
         configured_port = self._pending_serial_port_name.strip()
         found_count = self._refresh_available_ports(selected_port=configured_port or None)
         if found_count <= 0:
+            self._append_serial_port_scan_diagnostics()
             return
+        self._last_serial_port_diagnostic_signature = ()
         if self._auto_reconnect_notified:
             self.append_log(f"已找到 {found_count} 个匹配串口设备")
             self._auto_reconnect_notified = False
