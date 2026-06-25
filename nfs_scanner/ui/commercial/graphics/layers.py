@@ -208,12 +208,31 @@ class ScanPathLayer(BaseLayer):
 
 
 class MarkerLayer(BaseLayer):
-    """Marker layer. Expanded in Task 07."""
+    """Display mock markers with tooltip metadata."""
 
     kind = LayerKind.MARKER
 
     def build_mock(self) -> None:
-        return
+        from .marker_items import MarkerData, MarkerItem
+
+        self.clear()
+        marker = MarkerItem(
+            MarkerData(
+                x=320.0,
+                y=240.0,
+                z=5.0,
+                frequency="1.00 GHz",
+                amplitude="-41.2 dBm",
+            )
+        )
+        self._register_item(marker)
+
+    def add_marker(self, data) -> "MarkerItem":
+        from .marker_items import MarkerItem
+
+        marker = MarkerItem(data)
+        self._register_item(marker)
+        return marker
 
 
 class AnnotationLayer(BaseLayer):

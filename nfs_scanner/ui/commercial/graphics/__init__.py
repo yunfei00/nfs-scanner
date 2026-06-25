@@ -3,7 +3,7 @@
 from .colorbar import ColorBar
 from .layer_manager import LayerManager
 from .layers import AnnotationLayer, HeatmapLayer, MarkerLayer, PhotoLayer, ScanPathLayer
-from .marker_items import MarkerItem
+from .marker_items import MarkerData, MarkerItem
 from .minimap import MiniMap
 from .realtime_canvas import RealtimeCanvas
 
@@ -13,6 +13,7 @@ __all__ = [
     "ColorBar",
     "HeatmapLayer",
     "LayerManager",
+    "MarkerData",
     "MarkerItem",
     "MarkerLayer",
     "MiniMap",

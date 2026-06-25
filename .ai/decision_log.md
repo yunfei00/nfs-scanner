@@ -24,7 +24,14 @@ Needs Review: yes/no
 - Impact: Cursor/Codex 可以在低风险细节上继续推进，并把非重大决策记录下来。
 - Needs Review: no
 
-### 2026-06-25 - Sprint 002 Task 06 Snake Path Mock
+### 2026-06-25 - Sprint 002 Task 07 Marker Tooltip
+
+- Date: 2026-06-25
+- Task: sprint-002-task-07-marker-layer
+- Decision: Marker tooltip 使用 Qt setToolTip 展示 X/Y/Z/Frequency/Amplitude。
+- Reason: Sprint 002 仅需可见 tooltip，不引入自定义 popup 组件。
+- Impact: 缩放平移后 marker 仍绑定 scene 坐标。
+- Needs Review: no
 
 - Date: 2026-06-25
 - Task: sprint-002-task-06-scan-path-layer
