@@ -2,14 +2,33 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QFormLayout,
+    QLabel,
+    QLineEdit,
     QScrollArea,
     QTabWidget,
     QVBoxLayout,
     QWidget,
+)
+
+from nfs_scanner.core.path_planner import calculate_preview_stats, generate_preview_points
+from nfs_scanner.core.scan_config import (
+    DEFAULT_DWELL_MS,
+    DEFAULT_SPEED_MM_MIN,
+    DEFAULT_X_START,
+    DEFAULT_X_STOP,
+    DEFAULT_X_STEP,
+    DEFAULT_Y_START,
+    DEFAULT_Y_STEP,
+    DEFAULT_Y_STOP,
+    DEFAULT_Z_HEIGHT,
+    ScanPathConfig,
+    ScanPreviewStats,
+    ScanRegion,
 )
 
 from .widgets import NFSCard, NFSDangerButton, NFSParameterGroup, NFSPrimaryButton
@@ -18,12 +37,24 @@ from .widgets import NFSCard, NFSDangerButton, NFSParameterGroup, NFSPrimaryButt
 class CommercialPropertyPanel(QScrollArea):
     """Scrollable property panel with scan, display and instrument tabs."""
 
+    scan_config_changed = Signal(ScanRegion, ScanPathConfig)
+    scan_preview_updated = Signal(ScanPreviewStats)
+
+    _DEBOUNCE_MS = 250
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("commercialPropertyPanel")
         self.setWidgetResizable(True)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._debounce_timer = QTimer(self)
+        self._debounce_timer.setSingleShot(True)
+        self._debounce_timer.timeout.connect(self._emit_scan_config)
+        self._field_map: dict[str, QLineEdit] = {}
+        self._mode_combo: QComboBox | None = None
+        self._validation_label: QLabel | None = None
         self._setup_ui()
+        QTimer.singleShot(0, self._emit_scan_config)
 
     def _setup_ui(self) -> None:
         container = QWidget(self)
@@ -47,13 +78,45 @@ class CommercialPropertyPanel(QScrollArea):
 
         area_card = NFSCard("扫描区域", page)
         area_form = NFSParameterGroup(parent=area_card.body)
-        area_form.add_row("起始 X", "0")
-        area_form.add_row("终止 X", "100")
-        area_form.add_row("起始 Y", "0")
-        area_form.add_row("终止 Y", "100")
-        area_form.add_row("步长", "1.0")
+        self._register_field(area_form, "x_start", "起始 X", f"{DEFAULT_X_START:g}")
+        self._register_field(area_form, "x_stop", "终止 X", f"{DEFAULT_X_STOP:g}")
+        self._register_field(area_form, "y_start", "起始 Y", f"{DEFAULT_Y_START:g}")
+        self._register_field(area_form, "y_stop", "终止 Y", f"{DEFAULT_Y_STOP:g}")
+        self._register_field(area_form, "z_height", "Z 高度", f"{DEFAULT_Z_HEIGHT:g}")
+        self._register_field(area_form, "x_step", "步长 X", f"{DEFAULT_X_STEP:g}")
+        self._register_field(area_form, "y_step", "步长 Y", f"{DEFAULT_Y_STEP:g}")
         area_card.body_layout.addWidget(area_form)
         layout.addWidget(area_card)
+
+        path_card = NFSCard("路径策略", page)
+        path_form = QFormLayout()
+        path_form.setContentsMargins(0, 0, 0, 0)
+        path_form.setVerticalSpacing(8)
+
+        self._mode_combo = QComboBox(path_card.body)
+        self._mode_combo.addItems(["snake", "raster"])
+        self._mode_combo.currentTextChanged.connect(self._schedule_emit_scan_config)
+        path_form.addRow(QLabel("扫描模式", path_card.body), self._mode_combo)
+
+        dwell_field = QLineEdit(path_card.body)
+        dwell_field.setText(str(DEFAULT_DWELL_MS))
+        dwell_field.textChanged.connect(self._schedule_emit_scan_config)
+        self._field_map["dwell_ms"] = dwell_field
+        path_form.addRow(QLabel("驻留 (ms)", path_card.body), dwell_field)
+
+        speed_field = QLineEdit(path_card.body)
+        speed_field.setText(f"{DEFAULT_SPEED_MM_MIN:g}")
+        speed_field.textChanged.connect(self._schedule_emit_scan_config)
+        self._field_map["speed_mm_min"] = speed_field
+        path_form.addRow(QLabel("速度 (mm/min)", path_card.body), speed_field)
+
+        path_card.body_layout.addLayout(path_form)
+        layout.addWidget(path_card)
+
+        self._validation_label = QLabel("", page)
+        self._validation_label.setObjectName("nfsMutedLabel")
+        self._validation_label.setWordWrap(True)
+        layout.addWidget(self._validation_label)
 
         freq_card = NFSCard("频率设置", page)
         freq_form = NFSParameterGroup(parent=freq_card.body)
@@ -71,6 +134,65 @@ class CommercialPropertyPanel(QScrollArea):
         layout.addWidget(button_row)
         layout.addStretch(1)
         return page
+
+    def _register_field(self, form: NFSParameterGroup, key: str, label: str, value: str) -> None:
+        field = form.add_row(label, value)
+        field.textChanged.connect(self._schedule_emit_scan_config)
+        self._field_map[key] = field
+
+    def _schedule_emit_scan_config(self) -> None:
+        self._debounce_timer.start(self._DEBOUNCE_MS)
+
+    def _parse_float(self, key: str, default: float) -> float:
+        text = self._field_map[key].text().strip()
+        try:
+            return float(text)
+        except ValueError:
+            return default
+
+    def _parse_int(self, key: str, default: int) -> int:
+        text = self._field_map[key].text().strip()
+        try:
+            return int(float(text))
+        except ValueError:
+            return default
+
+    def current_scan_region(self) -> ScanRegion:
+        return ScanRegion(
+            x_start=self._parse_float("x_start", DEFAULT_X_START),
+            x_stop=self._parse_float("x_stop", DEFAULT_X_STOP),
+            y_start=self._parse_float("y_start", DEFAULT_Y_START),
+            y_stop=self._parse_float("y_stop", DEFAULT_Y_STOP),
+            z_height=self._parse_float("z_height", DEFAULT_Z_HEIGHT),
+            x_step=self._parse_float("x_step", DEFAULT_X_STEP),
+            y_step=self._parse_float("y_step", DEFAULT_Y_STEP),
+        )
+
+    def current_scan_path_config(self) -> ScanPathConfig:
+        mode = self._mode_combo.currentText() if self._mode_combo is not None else "snake"
+        return ScanPathConfig(
+            scan_mode=mode if mode in ("snake", "raster") else "snake",
+            dwell_ms=self._parse_int("dwell_ms", DEFAULT_DWELL_MS),
+            speed_mm_min=self._parse_float("speed_mm_min", DEFAULT_SPEED_MM_MIN),
+        )
+
+    def _emit_scan_config(self) -> None:
+        region = self.current_scan_region()
+        path_config = self.current_scan_path_config()
+        errors = region.validate() + path_config.validate()
+
+        if errors:
+            if self._validation_label is not None:
+                self._validation_label.setText("参数无效，已使用安全默认值预览：" + "；".join(errors))
+            region = region.clamped()
+            path_config = path_config.clamped()
+        elif self._validation_label is not None:
+            self._validation_label.setText("")
+
+        points = generate_preview_points(region, path_config)
+        stats = calculate_preview_stats(points, region, path_config)
+        self.scan_config_changed.emit(region, path_config)
+        self.scan_preview_updated.emit(stats)
 
     def _build_display_tab(self, parent: QWidget) -> QWidget:
         page = QWidget(parent)
