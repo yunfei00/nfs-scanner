@@ -370,3 +370,31 @@ QScrollArea#commercialLeftScroll {
     background-color: transparent;
     border: none;
 }
+
+/* --- Scan preview statistics --- */
+
+QFrame#nfsCard[cardRole="previewStats"] {
+    background-color: #1A2840;
+    border: 1px solid #0EA5FF;
+}
+
+QLabel#nfsPreviewStatValue {
+    color: #E8EEF8;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+QLineEdit#nfsNumericInput[fieldState="invalid"] {
+    border-color: #EF4444;
+    background-color: #2A1820;
+}
+
+QLineEdit#nfsNumericInput[fieldState="valid"] {
+    border-color: #2A3A52;
+}
+
+QLabel#nfsNumericUnit {
+    color: #69788D;
+    font-size: 12px;
+    padding-left: 4px;
+}

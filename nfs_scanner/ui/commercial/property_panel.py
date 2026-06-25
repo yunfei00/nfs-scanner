@@ -32,6 +32,7 @@ from nfs_scanner.core.scan_config import (
     ScanRegion,
 )
 
+from .preview_stats_display import update_density_badge, update_mode_badge, update_preview_stat_labels
 from .widgets import NFSCard, NFSDangerButton, NFSParameterGroup, NFSPrimaryButton, NFSStatusBadge
 
 
@@ -56,6 +57,7 @@ class CommercialPropertyPanel(QScrollArea):
         self._validation_label: QLabel | None = None
         self._preview_stat_labels: dict[str, QLabel] = {}
         self._mode_badge: NFSStatusBadge | None = None
+        self._density_badge: NFSStatusBadge | None = None
         self._setup_ui()
         QTimer.singleShot(0, self._emit_scan_config)
 
@@ -78,6 +80,45 @@ class CommercialPropertyPanel(QScrollArea):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
+
+        preview_card = NFSCard("预览统计", page)
+        preview_card.setProperty("cardRole", "previewStats")
+        preview_form = QFormLayout()
+        preview_form.setContentsMargins(0, 0, 0, 0)
+        preview_form.setVerticalSpacing(8)
+
+        header_row = QWidget(preview_card.body)
+        header_layout = QHBoxLayout(header_row)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(6)
+        self._mode_badge = NFSStatusBadge("Snake", "running", header_row)
+        self._density_badge = NFSStatusBadge("高密度预览", "warning", header_row)
+        self._density_badge.setVisible(False)
+        header_layout.addWidget(self._mode_badge)
+        header_layout.addWidget(self._density_badge)
+        header_layout.addStretch(1)
+        preview_form.addRow(header_row)
+
+        for key, label in (
+            ("point_count", "点数"),
+            ("area_mm2", "区域面积"),
+            ("path_length_mm", "路径长度"),
+            ("estimated_seconds", "预计时间"),
+        ):
+            value_label = QLabel("--", preview_card.body)
+            value_label.setObjectName("nfsPreviewStatValue")
+            label_widget = QLabel(label, preview_card.body)
+            label_widget.setObjectName("nfsMutedLabel")
+            preview_form.addRow(label_widget, value_label)
+            self._preview_stat_labels[key] = value_label
+
+        preview_card.body_layout.addLayout(preview_form)
+        layout.addWidget(preview_card)
+
+        self._validation_label = QLabel("", page)
+        self._validation_label.setObjectName("nfsMutedLabel")
+        self._validation_label.setWordWrap(True)
+        layout.addWidget(self._validation_label)
 
         area_card = NFSCard("扫描区域", page)
         area_form = NFSParameterGroup(parent=area_card.body)
@@ -115,43 +156,6 @@ class CommercialPropertyPanel(QScrollArea):
 
         path_card.body_layout.addLayout(path_form)
         layout.addWidget(path_card)
-
-        self._validation_label = QLabel("", page)
-        self._validation_label.setObjectName("nfsMutedLabel")
-        self._validation_label.setWordWrap(True)
-        layout.addWidget(self._validation_label)
-
-        preview_card = NFSCard("预览统计", page)
-        preview_form = QFormLayout()
-        preview_form.setContentsMargins(0, 0, 0, 0)
-        preview_form.setVerticalSpacing(6)
-
-        mode_row = QWidget(preview_card.body)
-        mode_layout = QHBoxLayout(mode_row)
-        mode_layout.setContentsMargins(0, 0, 0, 0)
-        mode_label = QLabel("当前模式", mode_row)
-        mode_label.setObjectName("nfsMutedLabel")
-        self._mode_badge = NFSStatusBadge("snake", "running", mode_row)
-        mode_layout.addWidget(mode_label)
-        mode_layout.addStretch(1)
-        mode_layout.addWidget(self._mode_badge)
-        preview_form.addRow(mode_row)
-
-        for key, label in (
-            ("point_count", "点数"),
-            ("area_mm2", "区域面积 (mm²)"),
-            ("path_length_mm", "路径长度 (mm)"),
-            ("estimated_seconds", "预计时间"),
-        ):
-            value_label = QLabel("--", preview_card.body)
-            value_label.setObjectName("nfsValueLabel")
-            label_widget = QLabel(label, preview_card.body)
-            label_widget.setObjectName("nfsMutedLabel")
-            preview_form.addRow(label_widget, value_label)
-            self._preview_stat_labels[key] = value_label
-
-        preview_card.body_layout.addLayout(preview_form)
-        layout.addWidget(preview_card)
 
         freq_card = NFSCard("频率设置", page)
         freq_form = NFSParameterGroup(parent=freq_card.body)
@@ -231,30 +235,9 @@ class CommercialPropertyPanel(QScrollArea):
         self.scan_preview_updated.emit(stats)
 
     def _update_preview_stats_display(self, stats: ScanPreviewStats) -> None:
-        mode_label = "Snake" if stats.scan_mode == "snake" else "Raster"
-        if self._mode_badge is not None:
-            self._mode_badge.setText(mode_label)
-            self._mode_badge.set_status("running")
-
-        values = {
-            "point_count": str(stats.point_count),
-            "area_mm2": f"{stats.area_mm2:.1f}",
-            "path_length_mm": f"{stats.path_length_mm:.1f}",
-            "estimated_seconds": self._format_duration(stats.estimated_seconds),
-        }
-        for key, text in values.items():
-            label = self._preview_stat_labels.get(key)
-            if label is not None:
-                label.setText(text)
-
-    @staticmethod
-    def _format_duration(total_seconds: float) -> str:
-        seconds = max(int(total_seconds), 0)
-        minutes, sec = divmod(seconds, 60)
-        hours, minutes = divmod(minutes, 60)
-        if hours:
-            return f"{hours:02d}:{minutes:02d}:{sec:02d}"
-        return f"{minutes:02d}:{sec:02d}"
+        update_mode_badge(self._mode_badge, stats)
+        update_density_badge(self._density_badge, stats)
+        update_preview_stat_labels(self._preview_stat_labels, stats)
 
     def _build_display_tab(self, parent: QWidget) -> QWidget:
         page = QWidget(parent)
