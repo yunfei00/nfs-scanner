@@ -21,7 +21,7 @@ class NFSNumericField(QWidget):
 
         self._input = QLineEdit(self)
         self._input.setObjectName("nfsNumericInput")
-        self._input.textChanged.connect(self.valueChanged.emit)
+        self._input.textChanged.connect(self._on_text_changed)
         layout.addWidget(self._input, 1)
 
         self._unit_label = QLabel(unit, self)
@@ -30,6 +30,9 @@ class NFSNumericField(QWidget):
         layout.addWidget(self._unit_label)
 
         self.set_valid(True)
+
+    def _on_text_changed(self, _text: str) -> None:
+        self.valueChanged.emit()
 
     def text(self) -> str:
         return self._input.text()

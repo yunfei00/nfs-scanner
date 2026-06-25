@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QLabel
 
 from nfs_scanner.core.scan_config import ScanPreviewStats
 
-from .nfs_status_badge import NFSStatusBadge
+from .widgets import NFSStatusBadge
 
 
 def format_duration(total_seconds: float) -> str:

@@ -194,3 +194,30 @@ Needs Review: yes/no
 - Reason: 符合 constitution 与 review_gate 要求。
 - Impact: 需人工验证参数变更→路径预览→统计联动。
 - Needs Review: yes
+
+### 2026-06-25 - Sprint 006 Path Display Density
+
+- Date: 2026-06-25
+- Task: sprint-006-task-01
+- Decision: ScanPathLayer 按点数分三级显示（full/reduced/minimal），仅影响绘制密度，不改变 planner 点列表。
+- Reason: 高密度预览时点+箭头叠加导致路径不可读。
+- Impact: >400 点显示 warning badge 并抽样绘制 marker。
+- Needs Review: no
+
+### 2026-06-25 - Sprint 006 Fit Behavior
+
+- Date: 2026-06-25
+- Task: sprint-006-task-04
+- Decision: 参数微调不自动 fit_view；区域面积/中心显著变化或勾选「自动适应路径」时才 fit。
+- Reason: 避免预览更新打断用户 zoom/pan。
+- Impact: snake/raster 切换仍立即更新路径层。
+- Needs Review: no
+
+### 2026-06-25 - Sprint 006 Review Gate Stop
+
+- Date: 2026-06-25
+- Task: sprint-006-review
+- Decision: Sprint 006 在 Review Gate 停止，不自动进入 Sprint 007。
+- Reason: 符合 constitution 与 review_gate 要求。
+- Impact: 需人工验证高密度路径可读性与参数输入 UX。
+- Needs Review: yes

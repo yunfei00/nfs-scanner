@@ -83,6 +83,25 @@ class CommercialUiSmokeTestCase(unittest.TestCase):
         finally:
             shell.close()
 
+    def test_high_density_preview_samples_path_markers(self) -> None:
+        view = RealtimeView()
+        try:
+            region = ScanRegion(
+                x_start=0.0,
+                x_stop=100.0,
+                y_start=0.0,
+                y_stop=100.0,
+                x_step=1.0,
+                y_step=1.0,
+            )
+            config = ScanPathConfig(scan_mode="snake", dwell_ms=100, speed_mm_min=600.0)
+            view.update_path_preview(region, config)
+            path_layer = view.layer_manager.ensure_layer(LayerKind.PATH)
+            self.assertGreater(path_layer.point_count, 400)
+            self.assertLess(len(path_layer.items()), path_layer.point_count)
+        finally:
+            view.close()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -56,6 +56,20 @@ class PathPlannerTestCase(unittest.TestCase):
         self.assertEqual(points[3], (0.0, 5.0, 5.0))
         self.assertEqual(stats.scan_mode, "raster")
 
+    def test_high_density_stats_flag(self) -> None:
+        dense_region = ScanRegion(
+            x_start=0.0,
+            x_stop=100.0,
+            y_start=0.0,
+            y_stop=100.0,
+            x_step=1.0,
+            y_step=1.0,
+        )
+        points = generate_preview_points(dense_region, self.config)
+        stats = calculate_preview_stats(points, dense_region, self.config)
+        self.assertGreater(stats.point_count, 400)
+        self.assertTrue(stats.is_high_density)
+
     def test_invalid_region_is_clamped(self) -> None:
         invalid = ScanRegion(x_start=20.0, x_stop=0.0, y_start=30.0, y_stop=0.0, x_step=0.0, y_step=0.0)
         points = generate_snake_points(invalid, self.config)
