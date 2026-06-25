@@ -49,6 +49,8 @@ class CommercialUiSmokeTestCase(unittest.TestCase):
         shell = create_commercial_shell()
         try:
             self.assertEqual(shell.objectName(), "commercialMainShell")
+            self.assertTrue(shell.uses_custom_title_bar())
+            self.assertIsNotNone(shell.title_bar)
             self.assertIsNotNone(shell.toolbar)
             self.assertIsNotNone(shell.workflow_panel)
             self.assertIsNotNone(shell.device_status_panel)
