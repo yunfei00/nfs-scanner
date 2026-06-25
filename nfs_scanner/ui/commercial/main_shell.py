@@ -50,6 +50,7 @@ class CommercialMainShell(QMainWindow):
         self._apply_initial_window_size()
         self._connect_scan_preview()
         self._connect_mock_scan()
+        self.toolbar.apply_integration_safety()
 
     def _connect_scan_preview(self) -> None:
         self.property_panel.scan_config_changed.connect(self._on_scan_config_changed)

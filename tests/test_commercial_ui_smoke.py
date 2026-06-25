@@ -59,6 +59,7 @@ class CommercialUiSmokeTestCase(unittest.TestCase):
             shell.close()
 
     def test_shell_uses_service_bundle(self) -> None:
+        from nfs_scanner.core.integration_safety import is_real_device_control_allowed
         from nfs_scanner.ui.commercial.services import create_commercial_services
 
         services = create_commercial_services()
@@ -66,6 +67,11 @@ class CommercialUiSmokeTestCase(unittest.TestCase):
         try:
             self.assertIs(services.runtime, shell.mock_scan.service)
             self.assertEqual(len(services.devices.list_devices()), 3)
+            if shell.toolbar._connect_device_button is not None:
+                self.assertEqual(
+                    shell.toolbar._connect_device_button.isEnabled(),
+                    is_real_device_control_allowed(),
+                )
         finally:
             shell.close()
 

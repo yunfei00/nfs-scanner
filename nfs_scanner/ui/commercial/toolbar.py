@@ -5,6 +5,8 @@ from __future__ import annotations
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
+from nfs_scanner.core.integration_safety import REAL_DEVICE_ENV_VAR, is_real_device_control_allowed
+
 from .widgets import NFSDangerButton, NFSPrimaryButton, NFSSecondaryButton
 
 
@@ -21,6 +23,7 @@ class CommercialToolbar(QWidget):
         self.setMaximumHeight(64)
         self._start_scan_button: NFSPrimaryButton | None = None
         self._stop_scan_button: NFSDangerButton | None = None
+        self._connect_device_button: NFSSecondaryButton | None = None
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -45,9 +48,11 @@ class CommercialToolbar(QWidget):
             (NFSSecondaryButton, "新建"),
             (NFSSecondaryButton, "打开"),
             (NFSSecondaryButton, "保存"),
-            (NFSSecondaryButton, "连接设备"),
         ):
             layout.addWidget(button_cls(text, self))
+
+        self._connect_device_button = NFSSecondaryButton("连接设备", self)
+        layout.addWidget(self._connect_device_button)
 
         self._start_scan_button = NFSPrimaryButton("开始扫描", self)
         self._stop_scan_button = NFSDangerButton("停止", self)
@@ -61,6 +66,19 @@ class CommercialToolbar(QWidget):
         license_label = QLabel("Trial License", self)
         license_label.setObjectName("nfsMutedLabel")
         layout.addWidget(license_label)
+
+    def apply_integration_safety(self) -> None:
+        """Disable real-device entry points unless explicitly enabled."""
+
+        allowed = is_real_device_control_allowed()
+        if self._connect_device_button is not None:
+            self._connect_device_button.setEnabled(allowed)
+            if allowed:
+                self._connect_device_button.setToolTip("真实设备连接（已显式启用）")
+            else:
+                self._connect_device_button.setToolTip(
+                    f"真实设备连接已禁用。需 Major Review 批准后设置 {REAL_DEVICE_ENV_VAR}=1"
+                )
 
     def set_scan_controls_enabled(self, *, start_enabled: bool, stop_enabled: bool) -> None:
         """Enable or disable toolbar mock scan buttons."""
