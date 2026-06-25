@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFontMetrics
 from PySide6.QtWidgets import (
-    QFormLayout,
+    QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QPlainTextEdit,
@@ -18,17 +21,30 @@ from nfs_scanner.core.scan_config import ScanPreviewStats
 
 from .preview_stats_display import update_density_badge, update_mode_badge, update_preview_stat_labels
 from .runtime_display import format_duration_seconds
-from .widgets import NFSCard, NFSDockPanel, NFSStatusBadge
+from .widgets import NFSDockPanel, NFSStatusBadge
 from .widgets.mock_chart_widgets import MockSpectrumWidget
+
+_LOG_SEED_LINES = (
+    "[INFO] Commercial UI shell initialized",
+    "[DEVICE] Motion platform mock connected",
+    "[SCAN] Waiting for scan task",
+    "[PROJECT] Demo project ready",
+    "[INFO] Bottom dock layout refreshed",
+    "[INFO] Use this panel to monitor scan lifecycle",
+    "[DRY RUN] Command layer idle",
+    "[INFO] Log auto-scroll enabled",
+)
 
 
 class CommercialBottomDock(QWidget):
     """Bottom dock region using tabs for compact layouts."""
 
+    _LOG_VISIBLE_LINES = 8
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("commercialBottomDock")
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._dock = NFSDockPanel(self)
         self._preview_stat_labels: dict[str, QLabel] = {}
         self._mode_badge: NFSStatusBadge | None = None
@@ -45,7 +61,8 @@ class CommercialBottomDock(QWidget):
 
         self._dock.add_tab(self._build_spectrum_tab(), "频谱")
         self._dock.add_tab(self._build_statistics_tab(), "统计")
-        self._dock.add_tab(self._build_logs_tab(), "日志")
+        log_index = self._dock.add_tab(self._build_logs_tab(), "日志")
+        self._dock.tab_widget.setCurrentIndex(log_index)
         layout.addWidget(self._dock, 1)
 
     def update_preview_stats(self, stats: ScanPreviewStats) -> None:
@@ -67,10 +84,11 @@ class CommercialBottomDock(QWidget):
             "stopped": "已停止",
             "error": "错误",
         }.get(snapshot.status, snapshot.status)
+        percent = int(snapshot.progress * 100) if snapshot.total_points > 0 else 0
         values = {
             "runtime_status": status_label,
-            "completed_points": str(snapshot.completed_points),
-            "total_points": str(snapshot.total_points),
+            "progress_percent": f"{percent}%",
+            "completed_points": f"{snapshot.completed_points} / {snapshot.total_points}",
             "elapsed": format_duration_seconds(snapshot.elapsed_seconds),
             "remaining": format_duration_seconds(snapshot.estimated_remaining_seconds),
         }
@@ -88,6 +106,8 @@ class CommercialBottomDock(QWidget):
         if self._log_view is None or not message.strip():
             return
         self._log_view.appendPlainText(f"[{level}] {message.strip()}")
+        scrollbar = self._log_view.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
 
     def clear_logs(self) -> None:
         if self._log_view is not None:
@@ -96,28 +116,36 @@ class CommercialBottomDock(QWidget):
 
     def _build_spectrum_tab(self) -> QWidget:
         page = QWidget(self)
+        page.setObjectName("dockTabPage")
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setContentsMargins(6, 4, 6, 4)
+        layout.setSpacing(0)
 
-        card = NFSCard("频谱视图", page)
-        self._spectrum_widget = MockSpectrumWidget(card.body)
-        card.body_layout.addWidget(self._spectrum_widget, 1)
-        layout.addWidget(card, 1)
+        self._spectrum_widget = MockSpectrumWidget(page)
+        self._spectrum_widget.setMinimumHeight(96)
+        layout.addWidget(self._spectrum_widget, 1)
         return page
 
     def _build_statistics_tab(self) -> QWidget:
         page = QWidget(self)
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(6)
+        page.setObjectName("dockTabPage")
+        layout = QHBoxLayout(page)
+        layout.setContentsMargins(6, 4, 6, 4)
+        layout.setSpacing(8)
 
-        card = NFSCard("扫描预览统计", page)
-        card.setProperty("cardRole", "previewStats")
-        stats_form = QFormLayout()
-        stats_form.setContentsMargins(0, 0, 0, 0)
-        stats_form.setVerticalSpacing(4)
+        preview_panel, preview_labels = self._build_stat_panel(
+            "扫描预览统计",
+            (
+                ("point_count", "点数"),
+                ("area_mm2", "区域面积"),
+                ("path_length_mm", "路径长度"),
+                ("estimated_seconds", "预计时间"),
+            ),
+            page,
+        )
+        self._preview_stat_labels = preview_labels
 
-        header_row = QWidget(card.body)
+        header_row = QWidget(preview_panel)
         header_layout = QHBoxLayout(header_row)
         header_layout.setContentsMargins(0, 0, 0, 0)
         header_layout.setSpacing(6)
@@ -127,71 +155,92 @@ class CommercialBottomDock(QWidget):
         header_layout.addWidget(self._mode_badge)
         header_layout.addWidget(self._density_badge)
         header_layout.addStretch(1)
-        stats_form.addRow(header_row)
+        preview_panel.layout().insertWidget(1, header_row)
 
-        for key, label in (
-            ("point_count", "总点数"),
-            ("area_mm2", "区域 (mm²)"),
-            ("path_length_mm", "路径 (mm)"),
-            ("estimated_seconds", "预计时间"),
-        ):
-            label_widget = QLabel(label, card.body)
-            label_widget.setObjectName("nfsMutedLabel")
-            value_label = QLabel("--", card.body)
-            value_label.setObjectName("nfsPreviewStatValue")
-            stats_form.addRow(label_widget, value_label)
-            self._preview_stat_labels[key] = value_label
+        runtime_panel, runtime_labels = self._build_stat_panel(
+            "运行时统计",
+            (
+                ("runtime_status", "任务状态"),
+                ("progress_percent", "进度"),
+                ("completed_points", "已完成 / 总数"),
+                ("elapsed", "已耗时"),
+                ("remaining", "预计剩余"),
+            ),
+            page,
+        )
+        self._runtime_stat_labels = runtime_labels
 
-        card.body_layout.addLayout(stats_form)
-
-        runtime_card = NFSCard("运行时统计", page)
-        runtime_form = QFormLayout()
-        runtime_form.setContentsMargins(0, 0, 0, 0)
-        runtime_form.setVerticalSpacing(4)
-        for key, label in (
-            ("runtime_status", "运行状态"),
-            ("completed_points", "已完成"),
-            ("total_points", "总点数"),
-            ("elapsed", "已用时间"),
-            ("remaining", "预计剩余"),
-        ):
-            label_widget = QLabel(label, runtime_card.body)
-            label_widget.setObjectName("nfsMutedLabel")
-            value_label = QLabel("--", runtime_card.body)
-            value_label.setObjectName("nfsPreviewStatValue")
-            runtime_form.addRow(label_widget, value_label)
-            self._runtime_stat_labels[key] = value_label
-        runtime_card.body_layout.addLayout(runtime_form)
-
-        layout.addWidget(card, 1)
-        layout.addWidget(runtime_card, 0)
+        layout.addWidget(preview_panel, 1)
+        layout.addWidget(runtime_panel, 1)
         return page
+
+    def _build_stat_panel(
+        self,
+        title: str,
+        fields: tuple[tuple[str, str], ...],
+        parent: QWidget,
+    ) -> tuple[QFrame, dict[str, QLabel]]:
+        panel = QFrame(parent)
+        panel.setObjectName("dockStatPanel")
+        panel_layout = QVBoxLayout(panel)
+        panel_layout.setContentsMargins(10, 8, 10, 8)
+        panel_layout.setSpacing(6)
+
+        title_label = QLabel(title, panel)
+        title_label.setObjectName("dockStatTitle")
+        panel_layout.addWidget(title_label)
+
+        grid_host = QWidget(panel)
+        grid = QGridLayout(grid_host)
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(6)
+
+        labels: dict[str, QLabel] = {}
+        for row_index, (key, caption) in enumerate(fields):
+            name_label = QLabel(caption, grid_host)
+            name_label.setObjectName("nfsMutedLabel")
+            value_label = QLabel("--", grid_host)
+            value_label.setObjectName("dockStatValue")
+            value_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            grid.addWidget(name_label, row_index, 0)
+            grid.addWidget(value_label, row_index, 1)
+            labels[key] = value_label
+
+        panel_layout.addWidget(grid_host, 1)
+        panel_layout.addStretch(0)
+        return panel, labels
 
     def _build_logs_tab(self) -> QWidget:
         page = QWidget(self)
+        page.setObjectName("dockTabPage")
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setContentsMargins(6, 4, 6, 4)
+        layout.setSpacing(4)
 
-        card = NFSCard("运行日志", page)
-        toolbar = QWidget(card.body)
+        toolbar = QWidget(page)
         toolbar_layout = QHBoxLayout(toolbar)
         toolbar_layout.setContentsMargins(0, 0, 0, 0)
+        toolbar_layout.setSpacing(4)
+        hint = QLabel("运行日志", toolbar)
+        hint.setObjectName("dockStatTitle")
+        toolbar_layout.addWidget(hint)
         toolbar_layout.addStretch(1)
         clear_button = QPushButton("清空", toolbar)
         clear_button.setObjectName("ghostButton")
         clear_button.clicked.connect(self.clear_logs)
         toolbar_layout.addWidget(clear_button)
 
-        log_view = QPlainTextEdit(card.body)
+        log_view = QPlainTextEdit(page)
         log_view.setObjectName("nfsLogView")
         log_view.setReadOnly(True)
-        log_view.setPlainText(
-            "[INFO] Commercial UI shell initialized\n"
-            "[DEVICE] Motion platform mock connected\n"
-            "[SCAN] Waiting for scan task"
-        )
+        log_view.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+        log_view.setPlainText("\n".join(_LOG_SEED_LINES))
+        metrics = QFontMetrics(log_view.font())
+        line_height = metrics.lineSpacing()
+        log_view.setMinimumHeight(line_height * self._LOG_VISIBLE_LINES + 12)
         self._log_view = log_view
-        card.body_layout.addWidget(toolbar)
-        card.body_layout.addWidget(log_view, 1)
-        layout.addWidget(card, 1)
+
+        layout.addWidget(toolbar, 0)
+        layout.addWidget(log_view, 1)
         return page

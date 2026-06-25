@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QShowEvent
 from PySide6.QtWidgets import QFrame, QMainWindow, QScrollArea, QSizePolicy, QSplitter, QVBoxLayout, QWidget
 
 from nfs_scanner.core.demo_session import DemoServiceBundle, DemoSessionController
@@ -26,9 +27,9 @@ class CommercialMainShell(QMainWindow):
     LEFT_PANEL_WIDTH = 248
     RIGHT_PANEL_WIDTH = 360
     RIGHT_PANEL_MIN_WIDTH = 340
-    BOTTOM_DOCK_HEIGHT = 200
-    BOTTOM_DOCK_MIN_HEIGHT = 160
-    BOTTOM_DOCK_MAX_HEIGHT = 240
+    BOTTOM_DOCK_MIN_HEIGHT = 200
+    BOTTOM_DOCK_RATIO = 0.30
+    UPPER_WORKSPACE_RATIO = 0.70
 
     def __init__(
         self,
@@ -53,6 +54,7 @@ class CommercialMainShell(QMainWindow):
         self._body_splitter: QSplitter | None = None
         self._center_splitter: QSplitter | None = None
         self._upper_splitter: QSplitter | None = None
+        self._dark_title_applied = False
         self._setup_ui()
         self._apply_initial_window_size()
         self._connect_scan_preview()
@@ -69,6 +71,18 @@ class CommercialMainShell(QMainWindow):
         self._services.project.open_mock_project()
         self._refresh_project_ui()
         self.workflow_panel.mark_completed_through(0)
+
+    def showEvent(self, event: QShowEvent) -> None:
+        super().showEvent(event)
+        if not self._dark_title_applied:
+            from .window_chrome import apply_dark_title_bar
+
+            apply_dark_title_bar(self)
+            self._dark_title_applied = True
+        QTimer.singleShot(0, self._reapply_splitter_sizes)
+
+    def _reapply_splitter_sizes(self) -> None:
+        self._apply_splitter_sizes(self.width(), self.height())
 
     def _connect_device_sync(self) -> None:
         """Keep sidebar device summary in sync with device center actions."""
@@ -372,13 +386,12 @@ class CommercialMainShell(QMainWindow):
         upper_splitter.setStretchFactor(1, 0)
 
         self.bottom_dock.setMinimumHeight(self.BOTTOM_DOCK_MIN_HEIGHT)
-        self.bottom_dock.setMaximumHeight(self.BOTTOM_DOCK_MAX_HEIGHT)
-        self.bottom_dock.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.bottom_dock.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         center_splitter.addWidget(upper_splitter)
         center_splitter.addWidget(self.bottom_dock)
-        center_splitter.setStretchFactor(0, 1)
-        center_splitter.setStretchFactor(1, 0)
+        center_splitter.setStretchFactor(0, 7)
+        center_splitter.setStretchFactor(1, 3)
 
         self._center_splitter = center_splitter
         self._upper_splitter = upper_splitter
@@ -415,14 +428,11 @@ class CommercialMainShell(QMainWindow):
                 self.demo_banner.height()
                 + self.toolbar.height()
                 + self.status_bar_widget.height()
-                + 40
+                + 48
             )
-            body_height = max(height - chrome_height, 560)
-            bottom_height = min(
-                max(int(body_height * 0.24), self.BOTTOM_DOCK_MIN_HEIGHT),
-                self.BOTTOM_DOCK_MAX_HEIGHT,
-            )
-            upper_height = max(body_height - bottom_height, 420)
+            body_height = max(height - chrome_height, 480)
+            bottom_height = max(int(body_height * self.BOTTOM_DOCK_RATIO), self.BOTTOM_DOCK_MIN_HEIGHT)
+            upper_height = max(body_height - bottom_height, 360)
             self._center_splitter.setSizes([upper_height, bottom_height])
 
     def _on_scan_config_changed(self, region, path_config) -> None:
