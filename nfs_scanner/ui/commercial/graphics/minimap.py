@@ -12,12 +12,14 @@ from .realtime_canvas import RealtimeCanvas
 class MiniMap(QWidget):
     """Small overview map with a viewport frame placeholder."""
 
+    MAP_WIDTH = 128
+    MAP_HEIGHT = 96
+
     def __init__(self, canvas: RealtimeCanvas | None = None, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setObjectName("commercialMiniMap")
+        self.setObjectName("nfsMiniMap")
         self._canvas = canvas
-        self.setMinimumSize(140, 100)
-        self.setMaximumSize(180, 130)
+        self.setFixedSize(self.MAP_WIDTH, self.MAP_HEIGHT)
 
     def bind_canvas(self, canvas: RealtimeCanvas) -> None:
         """Attach one realtime canvas for viewport updates."""
@@ -48,7 +50,7 @@ class MiniMap(QWidget):
             super().paintEvent(event)
             return
 
-        map_rect = self.rect().adjusted(8, 8, -8, -8)
+        map_rect = self.rect().adjusted(6, 6, -6, -6)
         painter.setPen(QPen(QColor("#2A3A52")))
         painter.drawRect(map_rect)
 

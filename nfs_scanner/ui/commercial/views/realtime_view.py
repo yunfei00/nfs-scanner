@@ -43,7 +43,7 @@ class RealtimeView(QWidget):
         canvas_row = QWidget(self)
         canvas_row_layout = QHBoxLayout(canvas_row)
         canvas_row_layout.setContentsMargins(0, 0, 0, 0)
-        canvas_row_layout.setSpacing(8)
+        canvas_row_layout.setSpacing(4)
 
         canvas_container = QWidget(canvas_row)
         canvas_container_layout = QVBoxLayout(canvas_container)
@@ -71,12 +71,13 @@ class RealtimeView(QWidget):
         self._position_mini_map()
 
     def _position_mini_map(self) -> None:
-        margin = 12
+        margin = 10
         map_width = self.mini_map.width()
         map_height = self.mini_map.height()
         viewport = self.canvas.viewport()
+        scrollbar_reserve = 14 if self.canvas.verticalScrollBar().isVisible() else 0
         self.mini_map.move(
-            max(viewport.width() - map_width - margin, margin),
+            max(viewport.width() - map_width - margin - scrollbar_reserve, margin),
             max(viewport.height() - map_height - margin, margin),
         )
 

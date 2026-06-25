@@ -343,3 +343,30 @@ QPlainTextEdit#nfsLogView {
     font-family: "Cascadia Mono", "Consolas", monospace;
     font-size: 12px;
 }
+
+/* --- Realtime workspace assistive widgets --- */
+
+QGraphicsView#realtimeCanvas {
+    background-color: #0B1220;
+    border: 1px solid #2A3A52;
+    border-radius: 8px;
+}
+
+QWidget#nfsColorBar,
+QWidget#commercialColorBar {
+    background-color: #111A2B;
+    border: 1px solid #2A3A52;
+    border-radius: 8px;
+}
+
+QWidget#nfsMiniMap,
+QWidget#commercialMiniMap {
+    background-color: #111A2B;
+    border: 1px solid #2A3A52;
+    border-radius: 6px;
+}
+
+QScrollArea#commercialLeftScroll {
+    background-color: transparent;
+    border: none;
+}

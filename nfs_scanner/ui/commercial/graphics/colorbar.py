@@ -4,44 +4,47 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QLinearGradient, QPainter
-from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel, QSizePolicy, QVBoxLayout, QWidget
 
 
 class ColorBar(QWidget):
     """Vertical color bar showing a mock dBm range."""
 
+    BAR_WIDTH = 28
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setObjectName("commercialColorBar")
+        self.setObjectName("nfsColorBar")
         self._min_db = -80.0
         self._max_db = -20.0
         self._lut_name = "viridis"
-        self.setMinimumWidth(56)
-        self.setMaximumWidth(72)
+        self.setFixedWidth(56)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
         self._setup_ui()
 
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(6)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(4)
 
         title = QLabel("dBm", self)
-        title.setObjectName("commercialMutedLabel")
+        title.setObjectName("nfsMutedLabel")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.max_label = QLabel(f"{self._max_db:.0f}", self)
-        self.max_label.setObjectName("commercialValueLabel")
+        self.max_label.setObjectName("nfsValueLabel")
         self.max_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.gradient_widget = _GradientBar(self)
+        self.gradient_widget.setFixedWidth(self.BAR_WIDTH)
         self.min_label = QLabel(f"{self._min_db:.0f}", self)
-        self.min_label.setObjectName("commercialValueLabel")
+        self.min_label.setObjectName("nfsValueLabel")
         self.min_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lut_label = QLabel(self._lut_name, self)
-        self.lut_label.setObjectName("commercialMutedLabel")
+        self.lut_label.setObjectName("nfsMutedLabel")
         self.lut_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         layout.addWidget(title)
         layout.addWidget(self.max_label)
-        layout.addWidget(self.gradient_widget, 1)
+        layout.addWidget(self.gradient_widget, 1, alignment=Qt.AlignmentFlag.AlignHCenter)
         layout.addWidget(self.min_label)
         layout.addWidget(self.lut_label)
 
@@ -59,6 +62,10 @@ class ColorBar(QWidget):
 
 class _GradientBar(QWidget):
     """Internal gradient paint area."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setMinimumHeight(120)
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
