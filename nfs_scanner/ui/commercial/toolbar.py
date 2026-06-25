@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
+
+from .widgets import NFSDangerButton, NFSPrimaryButton, NFSSecondaryButton
 
 
 class CommercialToolbar(QWidget):
@@ -26,27 +28,25 @@ class CommercialToolbar(QWidget):
         brand_layout.setSpacing(8)
 
         title = QLabel("近场扫描系统", brand)
-        title.setObjectName("commercialSectionTitle")
+        title.setObjectName("nfsSectionTitle")
         subtitle = QLabel("Near Field Scanner", brand)
-        subtitle.setObjectName("commercialMutedLabel")
+        subtitle.setObjectName("nfsMutedLabel")
         brand_layout.addWidget(title)
         brand_layout.addWidget(subtitle)
         layout.addWidget(brand)
 
-        for text, object_name in (
-            ("新建", "secondaryButton"),
-            ("打开", "secondaryButton"),
-            ("保存", "secondaryButton"),
-            ("连接设备", "secondaryButton"),
-            ("开始扫描", "primaryButton"),
-            ("停止", "dangerButton"),
+        for button_cls, text in (
+            (NFSSecondaryButton, "新建"),
+            (NFSSecondaryButton, "打开"),
+            (NFSSecondaryButton, "保存"),
+            (NFSSecondaryButton, "连接设备"),
+            (NFSPrimaryButton, "开始扫描"),
+            (NFSDangerButton, "停止"),
         ):
-            button = QPushButton(text, self)
-            button.setObjectName(object_name)
-            layout.addWidget(button)
+            layout.addWidget(button_cls(text, self))
 
         layout.addStretch(1)
 
         license_label = QLabel("Trial License", self)
-        license_label.setObjectName("commercialMutedLabel")
+        license_label.setObjectName("nfsMutedLabel")
         layout.addWidget(license_label)

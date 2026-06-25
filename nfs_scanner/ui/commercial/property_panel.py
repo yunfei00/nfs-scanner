@@ -6,14 +6,13 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
-    QPushButton,
     QScrollArea,
     QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
-from .widgets import CommercialCard, ParameterForm
+from .widgets import NFSCard, NFSDangerButton, NFSParameterGroup, NFSPrimaryButton
 
 
 class CommercialPropertyPanel(QScrollArea):
@@ -46,8 +45,8 @@ class CommercialPropertyPanel(QScrollArea):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
 
-        area_card = CommercialCard("扫描区域", page)
-        area_form = ParameterForm(area_card.body)
+        area_card = NFSCard("扫描区域", page)
+        area_form = NFSParameterGroup(parent=area_card.body)
         area_form.add_row("起始 X", "0")
         area_form.add_row("终止 X", "100")
         area_form.add_row("起始 Y", "0")
@@ -56,8 +55,8 @@ class CommercialPropertyPanel(QScrollArea):
         area_card.body_layout.addWidget(area_form)
         layout.addWidget(area_card)
 
-        freq_card = CommercialCard("频率设置", page)
-        freq_form = ParameterForm(freq_card.body)
+        freq_card = NFSCard("频率设置", page)
+        freq_form = NFSParameterGroup(parent=freq_card.body)
         freq_form.add_row("Start Freq", "100 MHz")
         freq_form.add_row("Stop Freq", "3 GHz")
         freq_form.add_row("RBW", "100 kHz")
@@ -67,12 +66,8 @@ class CommercialPropertyPanel(QScrollArea):
         button_row = QWidget(page)
         button_layout = QVBoxLayout(button_row)
         button_layout.setContentsMargins(0, 0, 0, 0)
-        start_button = QPushButton("开始扫描", button_row)
-        start_button.setObjectName("primaryButton")
-        stop_button = QPushButton("停止扫描", button_row)
-        stop_button.setObjectName("dangerButton")
-        button_layout.addWidget(start_button)
-        button_layout.addWidget(stop_button)
+        button_layout.addWidget(NFSPrimaryButton("开始扫描", button_row))
+        button_layout.addWidget(NFSDangerButton("停止扫描", button_row))
         layout.addWidget(button_row)
         layout.addStretch(1)
         return page
@@ -82,8 +77,8 @@ class CommercialPropertyPanel(QScrollArea):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(8, 8, 8, 8)
 
-        card = CommercialCard("显示设置", page)
-        form = ParameterForm(card.body)
+        card = NFSCard("显示设置", page)
+        form = NFSParameterGroup(parent=card.body)
         form.add_row("vmin", "0.0")
         form.add_row("vmax", "1.0")
 
@@ -107,8 +102,8 @@ class CommercialPropertyPanel(QScrollArea):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(8, 8, 8, 8)
 
-        card = CommercialCard("仪表设置", page)
-        form = ParameterForm(card.body)
+        card = NFSCard("仪表设置", page)
+        form = NFSParameterGroup(parent=card.body)
         form.add_row("设备类型", "TCPIP-SCPI")
         form.add_row("Center", "1.5 GHz")
         form.add_row("Span", "2 GHz")

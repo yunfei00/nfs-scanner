@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from PySide6.QtWidgets import QFormLayout, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
-from .widgets import CollapsiblePanel, StatusBadge
+from .widgets import NFSCard, NFSCollapsiblePanel, NFSStatusBadge
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,7 +40,7 @@ MOCK_DEVICES = (
         name="相机",
         model="Mock Camera",
         address="USB-CAM-001",
-        status="scanning",
+        status="running",
         status_label="扫描中",
         summary="1920x1080 / 30 fps",
     ),
@@ -64,25 +64,29 @@ class CommercialDeviceStatusPanel(QWidget):
         for device in MOCK_DEVICES:
             body_layout.addWidget(self._create_device_card(device))
 
-        panel = CollapsiblePanel("设备状态", body, parent=self)
+        panel = NFSCollapsiblePanel("设备状态", body, parent=self)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(panel)
 
-    def _create_device_card(self, device: MockDeviceInfo) -> QWidget:
-        card = QWidget(self)
-        card.setObjectName("commercialCard")
-        layout = QFormLayout(card)
-        layout.setContentsMargins(10, 10, 10, 10)
+    def _create_device_card(self, device: MockDeviceInfo) -> NFSCard:
+        card = NFSCard(device.name, self)
+
+        header = QWidget(card.body)
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.addStretch(1)
+        header_layout.addWidget(NFSStatusBadge(device.status_label, device.status, header))
+        card.body_layout.addWidget(header)
+
+        layout = QFormLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setHorizontalSpacing(8)
         layout.setVerticalSpacing(6)
-
-        title = QLabel(device.name, card)
-        title.setObjectName("commercialSectionTitle")
-        layout.addRow(title, StatusBadge(device.status_label, device.status, card))
-        layout.addRow("型号/协议", QLabel(device.model, card))
-        layout.addRow("连接地址", QLabel(device.address, card))
-        summary = QLabel(device.summary, card)
-        summary.setObjectName("commercialValueLabel")
+        layout.addRow("型号/协议", QLabel(device.model, card.body))
+        layout.addRow("连接地址", QLabel(device.address, card.body))
+        summary = QLabel(device.summary, card.body)
+        summary.setObjectName("nfsValueLabel")
         layout.addRow("参数摘要", summary)
+        card.body_layout.addLayout(layout)
         return card

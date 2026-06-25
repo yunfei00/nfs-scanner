@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QEvent, Qt
-from PySide6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 
 from ..graphics import ColorBar, LayerKind, LayerManager, MiniMap, RealtimeCanvas
+from ..widgets import NFSSecondaryButton
 
 
 class RealtimeView(QWidget):
@@ -31,10 +32,8 @@ class RealtimeView(QWidget):
         toolbar_layout.setContentsMargins(0, 0, 0, 0)
         toolbar_layout.setSpacing(8)
 
-        fit_button = QPushButton("适应视图", toolbar)
-        fit_button.setObjectName("secondaryButton")
-        reset_button = QPushButton("重置视图", toolbar)
-        reset_button.setObjectName("secondaryButton")
+        fit_button = NFSSecondaryButton("适应视图", toolbar)
+        reset_button = NFSSecondaryButton("重置视图", toolbar)
         fit_button.clicked.connect(self.canvas.fit_view)
         reset_button.clicked.connect(self.canvas.reset_view)
         toolbar_layout.addWidget(fit_button)

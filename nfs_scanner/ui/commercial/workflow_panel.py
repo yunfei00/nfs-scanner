@@ -5,7 +5,8 @@ from __future__ import annotations
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QWidget
 
-from .widgets import CollapsiblePanel
+from .widgets import NFSCollapsiblePanel
+
 
 WORKFLOW_STEPS = (
     ("1", "项目管理", "创建或打开扫描项目"),
@@ -24,15 +25,15 @@ class _WorkflowStepFrame(QFrame):
     def __init__(self, index: int, number: str, title: str, description: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._index = index
-        self.setObjectName("commercialWorkflowStep")
+        self.setObjectName("nfsWorkflowStep")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 8, 10, 8)
         layout.setSpacing(2)
 
         header = QLabel(f"{number}. {title}", self)
-        header.setObjectName("commercialSectionTitle")
+        header.setObjectName("nfsSectionTitle")
         detail = QLabel(description, self)
-        detail.setObjectName("commercialMutedLabel")
+        detail.setObjectName("nfsMutedLabel")
         detail.setWordWrap(True)
         layout.addWidget(header)
         layout.addWidget(detail)
@@ -66,7 +67,7 @@ class CommercialWorkflowPanel(QWidget):
             self._step_frames.append(frame)
             body_layout.addWidget(frame)
 
-        panel = CollapsiblePanel("工作流程", body, parent=self)
+        panel = NFSCollapsiblePanel("工作流程", body, parent=self)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(panel)
