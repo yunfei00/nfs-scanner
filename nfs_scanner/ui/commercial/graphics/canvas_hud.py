@@ -13,10 +13,10 @@ class CanvasAxisLegend(QFrame):
         super().__init__(parent)
         self.setObjectName("canvasAxisLegend")
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 4, 8, 4)
-        layout.setSpacing(10)
-        for axis, color, name in (("X", "#EF4444", "X"), ("Y", "#22C55E", "Y"), ("Z", "#3B82F6", "Z")):
-            chip = QLabel(f"{name}", self)
+        layout.setContentsMargins(6, 3, 6, 3)
+        layout.setSpacing(8)
+        for name, color in (("X", "#EF4444"), ("Y", "#22C55E"), ("Z", "#3B82F6")):
+            chip = QLabel(name, self)
             chip.setObjectName("canvasAxisChip")
             chip.setProperty("axisColor", color)
             chip.style().unpolish(chip)
@@ -25,7 +25,7 @@ class CanvasAxisLegend(QFrame):
 
 
 class CanvasCursorHud(QFrame):
-    """Top-left cursor coordinate and measurement readout."""
+    """Top-left scan info readout matching the target screenshot."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -33,10 +33,13 @@ class CanvasCursorHud(QFrame):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 6, 8, 6)
         layout.setSpacing(2)
+        title = QLabel("扫描信息", self)
+        title.setObjectName("canvasCursorTitle")
         self._pos_label = QLabel("X: --  Y: --  Z: --", self)
         self._pos_label.setObjectName("canvasCursorPos")
         self._rf_label = QLabel("Freq: --  Amp: --", self)
         self._rf_label.setObjectName("canvasCursorRf")
+        layout.addWidget(title)
         layout.addWidget(self._pos_label)
         layout.addWidget(self._rf_label)
 

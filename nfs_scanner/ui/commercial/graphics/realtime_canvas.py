@@ -13,7 +13,7 @@ class RealtimeCanvas(QGraphicsView):
     MIN_ZOOM = 0.1
     MAX_ZOOM = 8.0
     ZOOM_FACTOR = 1.15
-    VIEW_FILL_RATIO = 0.72
+    VIEW_FILL_RATIO = 0.90
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)

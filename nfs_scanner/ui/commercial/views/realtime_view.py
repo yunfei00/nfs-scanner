@@ -13,6 +13,7 @@ from nfs_scanner.core.path_planner import generate_preview_points
 from nfs_scanner.core.scan_config import ScanPathConfig, ScanRegion
 
 from ..graphics import ColorBar, LayerKind, LayerManager, MiniMapPanel, RealtimeCanvas
+from ..graphics.mock_assets import create_mock_board_qimage
 from ..graphics.canvas_hud import CanvasAxisLegend, CanvasCursorHud
 from ..scan_scene_mapper import map_points_to_scene
 from ..widgets import NFSSecondaryButton
@@ -143,6 +144,13 @@ class RealtimeView(QWidget):
         self.update_path_preview(self._current_region, self._current_path_config, initial=True)
 
         self.canvas.set_scene_rect(0, 0, photo_layer.canvas_width, photo_layer.canvas_height)
+        board_thumb = create_mock_board_qimage(photo_layer.canvas_width, photo_layer.canvas_height).scaled(
+            112,
+            84,
+            Qt.AspectRatioMode.IgnoreAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        self.mini_map.set_board_image(board_thumb)
         QTimer.singleShot(0, self._finalize_canvas_layout)
 
     def showEvent(self, event) -> None:

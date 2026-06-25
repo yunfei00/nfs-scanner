@@ -142,7 +142,7 @@ class HeatmapLayer(BaseLayer):
     def __init__(self, scene: QGraphicsScene) -> None:
         super().__init__(scene)
         self._pixmap_item: QGraphicsPixmapItem | None = None
-        self._opacity = 0.65
+        self._opacity = 0.52
         self._lut_name = "viridis"
 
     def build_mock(self) -> None:
@@ -228,7 +228,7 @@ class ScanPathLayer(BaseLayer):
             path.lineTo(x_value, y_value)
 
         path_item = QGraphicsPathItem(path)
-        path_item.setPen(QPen(QColor("#06D6E8"), line_width))
+        path_item.setPen(QPen(QColor(255, 255, 255, 210), line_width))
         self._register_item(path_item)
 
         dot_radius = 3.0 if display_level.value == "full" else 2.5
@@ -239,7 +239,7 @@ class ScanPathLayer(BaseLayer):
             if arrow.isEmpty():
                 continue
             arrow_item = QGraphicsPolygonItem(arrow)
-            arrow_item.setBrush(QBrush(QColor("#0EA5FF")))
+            arrow_item.setBrush(QBrush(QColor(255, 255, 255, 200)))
             arrow_item.setPen(QPen(Qt.PenStyle.NoPen))
             self._register_item(arrow_item)
 
@@ -251,8 +251,8 @@ class ScanPathLayer(BaseLayer):
                 dot_radius * 2,
                 dot_radius * 2,
             )
-            dot.setBrush(QBrush(QColor("#E8EEF8")))
-            dot.setPen(QPen(QColor("#2A3A52")))
+            dot.setBrush(QBrush(QColor(255, 255, 255, 230)))
+            dot.setPen(QPen(QColor(180, 190, 200), 1.0))
             self._register_item(dot)
             self._dot_items_by_index[index] = dot
 
@@ -374,11 +374,13 @@ class AnnotationLayer(BaseLayer):
         from .mock_assets import board_content_rect
 
         board_x, board_y, board_w, board_h = board_content_rect()
+        margin_x = board_w * 0.08
+        margin_y = board_h * 0.10
         self.set_roi_rect(
-            board_x + board_w * 0.16,
-            board_y + board_h * 0.18,
-            board_w * 0.58,
-            board_h * 0.54,
+            board_x + margin_x,
+            board_y + margin_y,
+            board_w - 2 * margin_x,
+            board_h - 2 * margin_y,
         )
 
     def set_roi_rect(self, x: float, y: float, width: float, height: float) -> None:
@@ -390,13 +392,13 @@ class AnnotationLayer(BaseLayer):
 
         self.clear()
         rect_item = QGraphicsRectItem(QRectF(x, y, width, height))
-        rect_item.setPen(QPen(QColor("#0EA5FF"), 1.6, Qt.PenStyle.DashLine))
-        rect_item.setBrush(QBrush(QColor(14, 165, 255, 18)))
+        rect_item.setPen(QPen(QColor("#38B6FF"), 2.0, Qt.PenStyle.SolidLine))
+        rect_item.setBrush(QBrush(QColor(56, 182, 255, 28)))
         self._register_item(rect_item)
 
         handle_radius = 4.0
-        handle_pen = QPen(QColor("#E8EEF8"), 1.0)
-        handle_brush = QBrush(QColor("#0EA5FF"))
+        handle_pen = QPen(QColor("#FFFFFF"), 1.2)
+        handle_brush = QBrush(QColor("#38B6FF"))
         anchors = (
             (x, y),
             (x + width / 2, y),

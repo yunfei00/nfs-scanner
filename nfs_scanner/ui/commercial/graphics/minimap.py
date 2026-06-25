@@ -3,29 +3,32 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QEvent, QRectF, Qt
-from PySide6.QtGui import QBrush, QColor, QPainter, QPen
+from PySide6.QtGui import QBrush, QColor, QImage, QPainter, QPen
 from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QWidget
 
 from .realtime_canvas import RealtimeCanvas
 
 
 class MiniMap(QWidget):
-    """Small overview map with a viewport frame placeholder."""
+    """Small overview map with PCB thumbnail and green viewport frame."""
 
-    MAP_WIDTH = 104
-    MAP_HEIGHT = 72
+    MAP_WIDTH = 112
+    MAP_HEIGHT = 84
 
     def __init__(self, canvas: RealtimeCanvas | None = None, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("nfsMiniMap")
         self._canvas = canvas
+        self._board_image: QImage | None = None
         self.setFixedSize(self.MAP_WIDTH, self.MAP_HEIGHT)
 
     def bind_canvas(self, canvas: RealtimeCanvas) -> None:
-        """Attach one realtime canvas for viewport updates."""
-
         self._canvas = canvas
         canvas.viewport().installEventFilter(self)
+        self.update()
+
+    def set_board_image(self, image: QImage) -> None:
+        self._board_image = image.copy()
         self.update()
 
     def eventFilter(self, watched, event) -> bool:
@@ -62,18 +65,16 @@ class MiniMap(QWidget):
         content_height = scene_rect.height() * scale
         origin_x = map_rect.x() + (map_rect.width() - content_width) / 2.0
         origin_y = map_rect.y() + (map_rect.height() - content_height) / 2.0
+        content_rect = QRectF(origin_x, origin_y, content_width, content_height)
 
-        painter.fillRect(
-            int(origin_x),
-            int(origin_y),
-            int(content_width),
-            int(content_height),
-            QColor("#1A3D2E"),
-        )
+        if self._board_image is not None and not self._board_image.isNull():
+            painter.drawImage(content_rect.toRect(), self._board_image)
+        else:
+            painter.fillRect(content_rect.toRect(), QColor("#1F4D38"))
 
         viewport_rect = self._viewport_rect(scene_rect, origin_x, origin_y, scale)
-        painter.setPen(QPen(QColor(14, 165, 255, 140), 1))
-        painter.setBrush(QBrush(QColor(14, 165, 255, 28)))
+        painter.setPen(QPen(QColor("#22C55E"), 2))
+        painter.setBrush(QBrush(QColor(34, 197, 94, 24)))
         painter.drawRect(viewport_rect)
         painter.end()
         super().paintEvent(event)
@@ -100,8 +101,8 @@ class MiniMap(QWidget):
 
         x = origin_x + (visible.left() - scene_rect.left()) * scale
         y = origin_y + (visible.top() - scene_rect.top()) * scale
-        width = max(visible.width() * scale, 12.0)
-        height = max(visible.height() * scale, 12.0)
+        width = max(visible.width() * scale, 10.0)
+        height = max(visible.height() * scale, 10.0)
         return QRectF(x, y, width, height)
 
 
@@ -123,6 +124,9 @@ class MiniMapPanel(QFrame):
 
     def bind_canvas(self, canvas: RealtimeCanvas) -> None:
         self.map.bind_canvas(canvas)
+
+    def set_board_image(self, image: QImage) -> None:
+        self.map.set_board_image(image)
 
     def update(self) -> None:
         self.map.update()

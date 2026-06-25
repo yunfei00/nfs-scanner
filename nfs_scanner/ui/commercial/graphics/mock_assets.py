@@ -8,7 +8,7 @@ from numpy.typing import NDArray
 
 CANVAS_WIDTH = 800
 CANVAS_HEIGHT = 600
-BOARD_INSET_RATIO = 0.12
+BOARD_INSET_RATIO = 0.03
 
 
 def board_content_rect(
@@ -23,10 +23,10 @@ def board_content_rect(
 
 
 def create_mock_board_qimage(width: int = CANVAS_WIDTH, height: int = CANVAS_HEIGHT) -> QImage:
-    """Generate a PCB-like placeholder board image for PhotoLayer."""
+    """Generate a realistic PCB mock image filling most of the canvas."""
 
     base = np.zeros((height, width, 3), dtype=np.uint8)
-    base[:, :] = (11, 18, 15)
+    base[:, :] = (22, 38, 32)
 
     board_x, board_y, board_w, board_h = board_content_rect(width, height)
     left = int(board_x)
@@ -34,101 +34,137 @@ def create_mock_board_qimage(width: int = CANVAS_WIDTH, height: int = CANVAS_HEI
     right = int(board_x + board_w)
     bottom = int(board_y + board_h)
 
-    board = base[top:bottom, left:right]
-    board[:, :] = (26, 58, 42)
+    board = base[top:bottom, left:right].copy()
+    board[:, :] = (32, 72, 52)
 
+    _draw_pcb_silkscreen(board)
     _draw_pcb_traces(board, seed=11)
     _draw_pcb_chips(board, seed=17)
     _draw_pcb_vias(board, seed=23)
     _draw_pcb_connector(board)
+    _draw_pcb_usb(board)
+    _apply_board_shadow(board)
 
     base[top:bottom, left:right] = board
     return _array_to_qimage(base)
 
 
+def _draw_pcb_silkscreen(board: NDArray[np.uint8]) -> None:
+    height, width = board.shape[:2]
+    silk = np.array([58, 78, 66], dtype=np.uint8)
+    board[8 : height - 8 : 48, 8:width - 8 : 3] = silk
+
+
 def _draw_pcb_traces(board: NDArray[np.uint8], *, seed: int) -> None:
     height, width = board.shape[:2]
     rng = np.random.default_rng(seed)
-    trace_color = np.array([48, 92, 68], dtype=np.uint8)
-    for _ in range(18):
-        x = int(rng.integers(8, width - 8))
-        y = int(rng.integers(8, height - 8))
-        length = int(rng.integers(24, min(width, height) // 2))
-        horizontal = rng.random() > 0.5
+    trace_color = np.array([56, 108, 78], dtype=np.uint8)
+    for _ in range(36):
+        x = int(rng.integers(10, width - 10))
+        y = int(rng.integers(10, height - 10))
+        length = int(rng.integers(30, min(width, height) // 2))
+        thickness = 2 if rng.random() > 0.3 else 3
+        horizontal = rng.random() > 0.45
         if horizontal:
             x_end = min(x + length, width - 2)
-            board[y : y + 2, x:x_end] = trace_color
+            board[y : y + thickness, x:x_end] = trace_color
         else:
             y_end = min(y + length, height - 2)
-            board[y:y_end, x : x + 2] = trace_color
+            board[y:y_end, x : x + thickness] = trace_color
 
 
 def _draw_pcb_chips(board: NDArray[np.uint8], *, seed: int) -> None:
     height, width = board.shape[:2]
-    rng = np.random.default_rng(seed)
-    chip_body = np.array([18, 28, 22], dtype=np.uint8)
-    chip_pin = np.array([72, 88, 78], dtype=np.uint8)
+    chip_body = np.array([16, 24, 20], dtype=np.uint8)
+    chip_pin = np.array([168, 178, 162], dtype=np.uint8)
+    chip_shadow = np.array([12, 18, 14], dtype=np.uint8)
     placements = (
-        (0.12, 0.14, 0.22, 0.16),
-        (0.38, 0.10, 0.28, 0.20),
-        (0.62, 0.18, 0.24, 0.18),
-        (0.18, 0.48, 0.30, 0.22),
-        (0.55, 0.52, 0.26, 0.24),
+        (0.10, 0.12, 0.24, 0.18),
+        (0.36, 0.08, 0.30, 0.22),
+        (0.58, 0.14, 0.28, 0.20),
+        (0.14, 0.44, 0.32, 0.24),
+        (0.50, 0.48, 0.30, 0.26),
+        (0.72, 0.52, 0.18, 0.16),
     )
     for px, py, pw, ph in placements:
         x0 = int(px * width)
         y0 = int(py * height)
-        x1 = min(int((px + pw) * width), width - 2)
-        y1 = min(int((py + ph) * height), height - 2)
+        x1 = min(int((px + pw) * width), width - 3)
+        y1 = min(int((py + ph) * height), height - 3)
+        board[y1 : y1 + 2, x0:x1] = chip_shadow
+        board[y0:y1, x1 : x1 + 2] = chip_shadow
         board[y0:y1, x0:x1] = chip_body
-        board[y0 - 2 : y0, x0:x1:4] = chip_pin
-        board[y1 : y1 + 2, x0:x1:4] = chip_pin
-        board[y0:y1:4, x0 - 2 : x0] = chip_pin
-        board[y0:y1:4, x1 : x1 + 2] = chip_pin
-        label_x = x0 + (x1 - x0) // 3
-        label_y = y0 + (y1 - y0) // 3
-        board[label_y : label_y + 4, label_x : label_x + 8] = (12, 18, 14)
+        board[y0 - 2 : y0, x0:x1:3] = chip_pin
+        board[y1 : y1 + 2, x0:x1:3] = chip_pin
+        board[y0:y1:3, x0 - 2 : x0] = chip_pin
+        board[y0:y1:3, x1 : x1 + 2] = chip_pin
 
 
 def _draw_pcb_vias(board: NDArray[np.uint8], *, seed: int) -> None:
     height, width = board.shape[:2]
     rng = np.random.default_rng(seed)
-    via_color = np.array([120, 132, 118], dtype=np.uint8)
-    for _ in range(28):
-        cx = int(rng.integers(6, width - 6))
-        cy = int(rng.integers(6, height - 6))
-        board[cy - 1 : cy + 2, cx - 1 : cx + 2] = via_color
+    via_outer = np.array([148, 156, 140], dtype=np.uint8)
+    via_inner = np.array([96, 104, 92], dtype=np.uint8)
+    for _ in range(48):
+        cx = int(rng.integers(8, width - 8))
+        cy = int(rng.integers(8, height - 8))
+        board[cy - 2 : cy + 3, cx - 2 : cx + 3] = via_outer
+        board[cy - 1 : cy + 2, cx - 1 : cx + 2] = via_inner
 
 
 def _draw_pcb_connector(board: NDArray[np.uint8]) -> None:
     height, width = board.shape[:2]
     x0 = int(width * 0.04)
+    y0 = int(height * 0.68)
+    x1 = int(width * 0.16)
+    y1 = int(height * 0.90)
+    board[y0:y1, x0:x1] = (20, 30, 24)
+    for row in range(y0 + 5, y1 - 5, 5):
+        board[row : row + 3, x0 + 5 : x1 - 5 : 4] = (190, 196, 182)
+
+
+def _draw_pcb_usb(board: NDArray[np.uint8]) -> None:
+    height, width = board.shape[:2]
+    x0 = int(width * 0.78)
     y0 = int(height * 0.72)
-    x1 = int(width * 0.18)
-    y1 = int(height * 0.92)
-    board[y0:y1, x0:x1] = (14, 22, 18)
-    for row in range(y0 + 4, y1 - 4, 6):
-        board[row : row + 3, x0 + 4 : x1 - 4 : 5] = (180, 186, 176)
+    x1 = int(width * 0.92)
+    y1 = int(height * 0.88)
+    board[y0:y1, x0:x1] = (24, 34, 28)
+    board[y0 + 4 : y1 - 4, x0 + 6 : x1 - 6] = (180, 186, 174)
+
+
+def _apply_board_shadow(board: NDArray[np.uint8]) -> None:
+    height, width = board.shape[:2]
+    shadow = board.astype(np.int16)
+    shadow[:, 2:] = np.minimum(shadow[:, 2:] * 0.96, 255).astype(np.int16)
+    shadow[2:, :] = np.minimum(shadow[2:, :] * 0.98, 255).astype(np.int16)
+    board[:, :] = np.clip(shadow, 0, 255).astype(np.uint8)
 
 
 def generate_snake_path_points(
     *,
     width: int = CANVAS_WIDTH,
     height: int = CANVAS_HEIGHT,
-    cols: int = 14,
-    rows: int = 10,
+    cols: int = 16,
+    rows: int = 12,
 ) -> list[tuple[float, float]]:
     """Generate a snake scan path covering the mock board area."""
 
     board_x, board_y, board_w, board_h = board_content_rect(width, height)
-    step_x = board_w / max(cols - 1, 1)
-    step_y = board_h / max(rows - 1, 1)
+    margin_x = board_w * 0.08
+    margin_y = board_h * 0.10
+    inner_x = board_x + margin_x
+    inner_y = board_y + margin_y
+    inner_w = board_w - 2 * margin_x
+    inner_h = board_h - 2 * margin_y
+    step_x = inner_w / max(cols - 1, 1)
+    step_y = inner_h / max(rows - 1, 1)
 
     points: list[tuple[float, float]] = []
     for row in range(rows):
         x_values = range(cols) if row % 2 == 0 else range(cols - 1, -1, -1)
         for col in x_values:
-            points.append((board_x + col * step_x, board_y + row * step_y))
+            points.append((inner_x + col * step_x, inner_y + row * step_y))
     return points
 
 
@@ -138,11 +174,10 @@ def create_mock_heatmap_qimage(
     *,
     seed: int = 20260625,
 ) -> QImage:
-    """Generate one smooth RGBA heatmap image aligned to the board dimensions."""
+    """Generate one smooth RGBA heatmap overlay aligned to the board."""
 
-    board_x, board_y, board_w, board_h = board_content_rect(width, height)
     field = _create_smooth_field(width, height, seed=seed)
-
+    board_x, board_y, board_w, board_h = board_content_rect(width, height)
     board_left = int(board_x)
     board_top = int(board_y)
     board_right = int(board_x + board_w)
@@ -155,35 +190,33 @@ def create_mock_heatmap_qimage(
         | (y_coords < board_top)
         | (y_coords >= board_bottom)
     )
-    field[outside_board] *= 0.08
+    field[outside_board] *= 0.05
 
     rgb = _apply_spectral_lut(field)
-    alpha = np.full((height, width), 165, dtype=np.uint8)
-    alpha[outside_board] = 24
+    alpha = np.full((height, width), 150, dtype=np.uint8)
+    alpha[outside_board] = 0
     rgba = np.dstack((rgb, alpha))
     return _array_to_qimage(rgba, rgba=True)
 
 
 def _create_smooth_field(width: int, height: int, *, seed: int) -> NDArray[np.float64]:
-    """Build a blurred multi-hotspot scalar field for heatmap rendering."""
+    """Build a blurred multi-hotspot scalar field centered on the board."""
 
-    rng = np.random.default_rng(seed)
     y_coords, x_coords = np.mgrid[0:height, 0:width]
     field = np.zeros((height, width), dtype=np.float64)
-
     board_x, board_y, board_w, board_h = board_content_rect(width, height)
+
     hotspots = (
-        (board_x + board_w * 0.35, board_y + board_h * 0.42, 90.0, 1.0),
-        (board_x + board_w * 0.62, board_y + board_h * 0.28, 70.0, 0.85),
-        (board_x + board_w * 0.48, board_y + board_h * 0.68, 110.0, 0.75),
-        (board_x + board_w * 0.22, board_y + board_h * 0.55, 60.0, 0.55),
+        (board_x + board_w * 0.52, board_y + board_h * 0.48, 95.0, 1.0),
+        (board_x + board_w * 0.38, board_y + board_h * 0.35, 75.0, 0.65),
+        (board_x + board_w * 0.62, board_y + board_h * 0.62, 85.0, 0.55),
+        (board_x + board_w * 0.28, board_y + board_h * 0.58, 60.0, 0.40),
     )
     for cx, cy, sigma, weight in hotspots:
         field += weight * np.exp(-((x_coords - cx) ** 2 + (y_coords - cy) ** 2) / (2 * sigma**2))
 
-    field += 0.04 * rng.random((height, width))
-    for _ in range(4):
-        field = _box_blur(field, kernel=7)
+    for _ in range(5):
+        field = _box_blur(field, kernel=9)
     field -= field.min()
     maximum = field.max()
     if maximum > 0:
@@ -192,8 +225,6 @@ def _create_smooth_field(width: int, height: int, *, seed: int) -> NDArray[np.fl
 
 
 def _box_blur(values: NDArray[np.float64], *, kernel: int) -> NDArray[np.float64]:
-    """Apply a simple separable box blur without extra dependencies."""
-
     pad = kernel // 2
     kernel_1d = np.ones(kernel, dtype=np.float64) / kernel
     padded_h = np.pad(values, ((0, 0), (pad, pad)), mode="edge")
@@ -208,25 +239,20 @@ def _box_blur(values: NDArray[np.float64], *, kernel: int) -> NDArray[np.float64
 
 
 def _apply_spectral_lut(values: NDArray[np.float64]) -> NDArray[np.uint8]:
-    """Map normalized values to a blue-green-yellow-red LUT."""
-
     scaled = values * 4.0
     red = np.clip(1.5 - np.abs(scaled - 3.0), 0.0, 1.0)
     green = np.clip(1.5 - np.abs(scaled - 2.0), 0.0, 1.0)
     blue = np.clip(1.5 - np.abs(scaled - 1.0), 0.0, 1.0)
-    rgb = np.dstack(
+    return np.dstack(
         (
             (red * 255.0).astype(np.uint8),
             (green * 255.0).astype(np.uint8),
             (blue * 255.0).astype(np.uint8),
         )
     )
-    return rgb
 
 
 def _array_to_qimage(array: NDArray[np.uint8], *, rgba: bool = False) -> QImage:
-    """Convert a numpy RGB/RGBA array into a QImage."""
-
     height, width = array.shape[:2]
     if rgba:
         image = QImage(array.data, width, height, width * 4, QImage.Format.Format_RGBA8888)
