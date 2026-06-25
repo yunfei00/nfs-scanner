@@ -2,35 +2,48 @@
 
 Last updated: 2026-06-25
 
-## Sprint
+## Current Mode
 
-Sprint 006 - Scan Preview UX Polish (completed, awaiting human review)
+**Autopilot allowed** — Soft Review Gate between Sprints; stop only at Major Review Gate or Stop Conditions.
 
-## Completed Tasks
+## Sprint Progress
 
-### Sprint 001-005
-- [x] Commercial UI Shell through Scan Configuration + Path Preview
+| Sprint | Status | Notes |
+|--------|--------|-------|
+| Sprint 001 | done | Commercial UI Shell |
+| Sprint 002 | done | Realtime Workspace |
+| Sprint 003 | done | Commercial Widget Library |
+| Sprint 004 | done | Commercial Layout Polish |
+| Sprint 005 | done | Scan Configuration + Path Preview |
+| Sprint 006 | done | Scan Preview UX Polish |
+| Sprint 007 | **next** | Mock Scan Runtime |
+| Sprint 008 | planned | Mock Scan Progress + Logs |
+| Sprint 009 | planned | Data View Mock |
+| Sprint 010 | blocked until Major Review | Before Real Device Integration |
 
-### Sprint 006
-- [x] Task 01 - Path density display policy
-- [x] Task 02 - Preview statistics prominence
-- [x] Task 03 - NFSNumericField parameter UX
-- [x] Task 04 - Scan mode and fit behavior polish
-- [x] Task 05 - Tests and review gate
+## Next Actions (Autopilot)
 
-## Review Gate
+1. Start **Sprint 007 — Mock Scan Runtime** from backlog / sprint plan.
+2. Continue through Sprint 008 and 009 without pausing for human review.
+3. **Stop before Sprint 010** — Major Review Gate (real device / real scan integration).
 
-Sprint 006 stopped at review gate. Do not enter Sprint 007 until human review approves.
+## Major Review Gate
 
-## Notes
+Next mandatory stop: **before Sprint 010 / real device integration / real scan runtime / CSV format changes**.
 
-- Legacy UI remains default: `python -m nfs_scanner.main`
+## Application Entry Points
+
+- Legacy UI (default): `python -m nfs_scanner.main`
 - Commercial UI: `NFS_SCANNER_UI=commercial python -m nfs_scanner.main`
-- High-density previews (>400 points) sample dots/arrows; path line always visible.
-- Parameter changes preserve zoom/pan unless region changes significantly or auto-fit enabled.
-- No real device, scan execution, or CSV format changes.
 
-## Next Recommended
+## Recent Capabilities (Sprint 005–006)
 
-- Human review: dense path readability and numeric field UX
-- Sprint 007 planning after review approval
+- PropertyPanel scan params drive ScanPathLayer preview (snake/raster).
+- Preview stats in property panel and bottom dock.
+- High-density path display policy (>400 points sampled).
+- NFSNumericField with units; selective fit / auto-fit checkbox.
+
+## Constraints (unchanged)
+
+- No real device, real scan execution, or CSV format changes until Major Review.
+- Old UI must remain available.
