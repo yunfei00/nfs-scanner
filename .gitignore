@@ -213,5 +213,8 @@ __marimo__/
 # Commercial UI visual self-check screenshots (reports are committed)
 .ai/visual_check/*.png
 
+# Commercial Demo QA screenshots (reports are committed)
+.ai/qa/latest/screenshots/*.png
+
 
 .idea

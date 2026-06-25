@@ -447,3 +447,12 @@ Needs Review: yes/no
 - Impact: 仅商业 UI；138 tests + visual check PASS。
 - Needs Review: no
 
+### 2026-06-26 - Commercial Demo QA Pipeline
+
+- Date: 2026-06-26
+- Task: commercial-demo-qa-pipeline
+- Decision: 新增 `tools/qa_run_commercial_demo.py` + `tools/commercial_qa/`；自动 legacy/commercial 启动、mock demo flow、截图、布局/功能/安全检查、compileall/unittest/visual_check；失败最多 3 轮 runtime 自动修复；报告至 `.ai/qa/latest/`。
+- Reason: 建立 AI 自检闭环，不再依赖用户逐项人工检查。
+- Impact: PNG gitignore；qa_report.md / qa_result.json 提交；142 tests + QA PASS。
+- Needs Review: no
+

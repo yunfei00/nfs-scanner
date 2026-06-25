@@ -1,0 +1,577 @@
+{
+  "generated_at": "2026-06-26 00:24:58",
+  "round_number": 1,
+  "overall_pass": true,
+  "screenshots": {
+    "commercial_default": "D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/commercial_default.png",
+    "realtime_view": "D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/realtime_view.png",
+    "device_center": "D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/device_center.png",
+    "data_view": "D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/data_view.png",
+    "report_center": "D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/report_center.png",
+    "commercial_maximized": "D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/commercial_maximized.png"
+  },
+  "known_issues": [],
+  "checks": [
+    {
+      "name": "real_device_enabled_false",
+      "category": "safety",
+      "expected": "REAL_DEVICE_ENABLED == False",
+      "actual": "False",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": false,
+      "blocked": true
+    },
+    {
+      "name": "real_devices_env_not_set",
+      "category": "safety",
+      "expected": "NFS_SCANNER_REAL_DEVICES not enabled",
+      "actual": "(unset)",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": false,
+      "blocked": true
+    },
+    {
+      "name": "real_device_control_not_allowed",
+      "category": "safety",
+      "expected": "is_real_device_control_allowed() == False",
+      "actual": "False",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": false,
+      "blocked": true
+    },
+    {
+      "name": "commercial_shell_no_scan_manager",
+      "category": "safety",
+      "expected": "Commercial main shell does not import ScanManager",
+      "actual": "not referenced",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": false,
+      "blocked": true
+    },
+    {
+      "name": "mock_runtime_no_scan_manager",
+      "category": "safety",
+      "expected": "Mock runtime does not use ScanManager",
+      "actual": "not referenced",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": false,
+      "blocked": true
+    },
+    {
+      "name": "legacy_ui_entry_preserved",
+      "category": "safety",
+      "expected": "Legacy MainWindow source exists",
+      "actual": "D:\\code_2026\\nfs-scanner\\nfs_scanner\\ui\\main_window.py",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": false,
+      "blocked": true
+    },
+    {
+      "name": "legacy_default_entry",
+      "category": "safety",
+      "expected": "Default startup uses MainWindow unless NFS_SCANNER_UI=commercial",
+      "actual": "is_commercial_ui_enabled",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": false,
+      "blocked": true
+    },
+    {
+      "name": "legacy_ui_startup",
+      "category": "startup",
+      "expected": "MainWindow constructs and shows",
+      "actual": "MainWindow",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": false,
+      "blocked": true
+    },
+    {
+      "name": "commercial_ui_startup",
+      "category": "startup",
+      "expected": "CommercialMainShell constructs with custom title bar",
+      "actual": "visible=True, custom_title=True",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "custom_title_bar",
+      "category": "visual",
+      "expected": "frameless custom title bar",
+      "actual": "custom=True, height=34px",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "no_native_title_bar",
+      "category": "visual",
+      "expected": "FramelessWindowHint enabled",
+      "actual": "custom=True",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "title_bar_height",
+      "category": "visual",
+      "expected": "28–44 px",
+      "actual": "34px",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "demo_indicator_visible",
+      "category": "visual",
+      "expected": "demo banner or DEMO MODE label visible",
+      "actual": "title bar demo label: DEMO MODE",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": false,
+      "blocked": false
+    },
+    {
+      "name": "toolbar_no_overflow",
+      "category": "visual",
+      "expected": "toolbar fits layout",
+      "actual": "overflow=False",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "left_panel_width",
+      "category": "visual",
+      "expected": "240–330 px",
+      "actual": "280px",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "right_panel_width",
+      "category": "visual",
+      "expected": "320–460 px",
+      "actual": "380px",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "canvas_wider_than_right_panel",
+      "category": "visual",
+      "expected": "workspace > right panel",
+      "actual": "596px > 380px",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "bottom_dock_height",
+      "category": "visual",
+      "expected": ">= 195px",
+      "actual": "195px",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "log_view_height",
+      "category": "visual",
+      "expected": ">= 100px",
+      "actual": "111px",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "log_visible_lines",
+      "category": "visual",
+      "expected": ">= 6 visible lines",
+      "actual": "estimated=8",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "statistics_panel_height",
+      "category": "visual",
+      "expected": ">= 100px",
+      "actual": "149px",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "status_bar_visible",
+      "category": "visual",
+      "expected": "status bar visible",
+      "actual": "True",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "default_window_within_screen",
+      "category": "visual",
+      "expected": "window <= available screen",
+      "actual": "1280x720 <= 1280x720",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "new_project_updates_status",
+      "category": "functional",
+      "expected": "project label reflects new session",
+      "actual": "项目: Demo Near Field Scan (未保存)",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "open_mock_project_updates_status",
+      "category": "functional",
+      "expected": "project label reflects mock project",
+      "actual": "项目: Demo Near Field Scan (未保存)",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "save_project_updates_storage",
+      "category": "functional",
+      "expected": "storage status shows saved",
+      "actual": "项目: Demo Near Field Scan (已保存)",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "mock_connect_devices",
+      "category": "functional",
+      "expected": "all mock devices connected",
+      "actual": "相机, 运动平台, 频谱仪",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "scan_params_update_preview_stats",
+      "category": "functional",
+      "expected": "preview point count updates",
+      "actual": "before=441, after=9",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "start_scan_running",
+      "category": "functional",
+      "expected": "runtime status == running",
+      "actual": "running",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "pause_scan_paused",
+      "category": "functional",
+      "expected": "runtime status == paused",
+      "actual": "paused",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "resume_scan_running",
+      "category": "functional",
+      "expected": "runtime status == running",
+      "actual": "running",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "scan_completes_or_stops",
+      "category": "functional",
+      "expected": "runtime status completed or stopped",
+      "actual": "completed",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "data_view_mock_task",
+      "category": "functional",
+      "expected": "data view lists mock scan tasks",
+      "actual": "4",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "report_center_preview",
+      "category": "functional",
+      "expected": "report preview populated",
+      "actual": "Demo Near Field Scan",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "mock_report_export",
+      "category": "functional",
+      "expected": "markdown/txt report file created",
+      "actual": "C:\\Users\\yunfei\\.nfs_scanner\\reports\\report_mock-84a5a7f5_20260626_002500.md",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "reset_demo_restores_state",
+      "category": "functional",
+      "expected": "runtime idle and demo reset applied",
+      "actual": "status=stopped, tasks 4->2",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "dry_run_no_real_motion_commands",
+      "category": "safety",
+      "expected": "Dry run log contains DRY RUN markers, no real G-code",
+      "actual": "forbidden hits=none, lines=21",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": false,
+      "blocked": true
+    },
+    {
+      "name": "no_real_spectrum_connection",
+      "category": "safety",
+      "expected": "No real spectrum connection attempts",
+      "actual": "none",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": false,
+      "blocked": true
+    },
+    {
+      "name": "no_real_camera_connection",
+      "category": "safety",
+      "expected": "No real camera connection attempts",
+      "actual": "none",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": false,
+      "blocked": true
+    },
+    {
+      "name": "maximized_custom_title_bar",
+      "category": "visual",
+      "expected": "frameless custom title bar",
+      "actual": "custom=True, height=34px",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "maximized_no_native_title_bar",
+      "category": "visual",
+      "expected": "FramelessWindowHint enabled",
+      "actual": "custom=True",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "maximized_title_bar_height",
+      "category": "visual",
+      "expected": "28–44 px",
+      "actual": "34px",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "maximized_demo_indicator_visible",
+      "category": "visual",
+      "expected": "demo banner or DEMO MODE label visible",
+      "actual": "title bar demo label: DEMO MODE",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": false,
+      "blocked": false
+    },
+    {
+      "name": "maximized_toolbar_no_overflow",
+      "category": "visual",
+      "expected": "toolbar fits layout",
+      "actual": "overflow=False",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "maximized_left_panel_width",
+      "category": "visual",
+      "expected": "240–330 px",
+      "actual": "280px",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "maximized_right_panel_width",
+      "category": "visual",
+      "expected": "320–460 px",
+      "actual": "380px",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "maximized_canvas_wider_than_right_panel",
+      "category": "visual",
+      "expected": "workspace > right panel",
+      "actual": "596px > 380px",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "maximized_bottom_dock_height",
+      "category": "visual",
+      "expected": ">= 195px",
+      "actual": "195px",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "maximized_log_view_height",
+      "category": "visual",
+      "expected": ">= 100px",
+      "actual": "111px",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "maximized_log_visible_lines",
+      "category": "visual",
+      "expected": ">= 6 visible lines",
+      "actual": "estimated=6",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "maximized_statistics_panel_height",
+      "category": "visual",
+      "expected": ">= 100px",
+      "actual": "149px",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "maximized_status_bar_visible",
+      "category": "visual",
+      "expected": "status bar visible",
+      "actual": "True",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "maximized_maximized_window_capture",
+      "category": "visual",
+      "expected": "custom maximized == True",
+      "actual": "True",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "compileall",
+      "category": "external",
+      "expected": "exit code 0",
+      "actual": "Listing 'nfs_scanner\\\\ui\\\\widgets'...",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": false,
+      "blocked": false
+    },
+    {
+      "name": "unittest",
+      "category": "external",
+      "expected": "exit code 0",
+      "actual": "OK",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "commercial_ui_visual_check",
+      "category": "external",
+      "expected": "exit code 0",
+      "actual": "Overall: PASS",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    }
+  ],
+  "failures": []
+}

@@ -1,0 +1,258 @@
+"""Commercial Demo QA pipeline runner."""
+
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+
+from PySide6.QtWidgets import QApplication
+
+from nfs_scanner.ui.commercial.entry import create_commercial_shell
+from nfs_scanner.ui.commercial.main_shell import CommercialMainShell
+
+from .auto_fix import apply_runtime_mitigations, has_blocked_failures
+from .functional import run_functional_demo_flow
+from .models import QACheck, QAResult
+from .report import write_qa_reports
+from .safety import run_static_safety_checks, verify_dry_run_only, verify_no_real_spectrum_camera
+from .visual import build_qa_visual_checks, collect_qa_layout_metrics
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+QA_OUTPUT_DIR = REPO_ROOT / ".ai" / "qa" / "latest"
+SCREENSHOT_DIR = QA_OUTPUT_DIR / "screenshots"
+
+
+def _headless() -> bool:
+    if os.getenv("NFS_SCANNER_SKIP_GUI_TESTS", "").strip() == "1":
+        return True
+    if sys.platform.startswith("linux") and not os.environ.get("DISPLAY"):
+        return True
+    return False
+
+
+def _save_screenshot(shell: CommercialMainShell, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    shell.grab().save(str(path))
+
+
+def _check_legacy_ui_startup(app: QApplication) -> QACheck:
+    from nfs_scanner.ui.main_window import MainWindow
+
+    window = MainWindow()
+    try:
+        window.show()
+        app.processEvents()
+        passed = window.isVisible() and isinstance(window, MainWindow)
+        actual = type(window).__name__
+    finally:
+        window.close()
+        app.processEvents()
+    return QACheck(
+        name="legacy_ui_startup",
+        category="startup",
+        expected="MainWindow constructs and shows",
+        actual=actual,
+        passed=passed,
+        auto_fixable=False,
+        blocked=True,
+    )
+
+
+def _check_commercial_ui_startup(app: QApplication) -> tuple[QACheck, CommercialMainShell]:
+    shell = create_commercial_shell()
+    shell.show()
+    app.processEvents()
+    passed = shell.isVisible() and shell.uses_custom_title_bar()
+    check = QACheck(
+        name="commercial_ui_startup",
+        category="startup",
+        expected="CommercialMainShell constructs with custom title bar",
+        actual=f"visible={shell.isVisible()}, custom_title={shell.uses_custom_title_bar()}",
+        passed=passed,
+        auto_fixable=True,
+    )
+    return check, shell
+
+
+def _prepare_default_window(shell: CommercialMainShell, app: QApplication) -> None:
+    shell.showNormal()
+    if hasattr(shell, "set_custom_maximized"):
+        shell.set_custom_maximized(False)
+    shell._apply_initial_window_size()
+    shell._update_screen_constraints()
+    shell._reapply_splitter_sizes()
+    app.processEvents()
+
+
+def _capture_view_screenshots(shell: CommercialMainShell, app: QApplication) -> dict[str, str]:
+    mapping = {
+        "realtime_view": shell.workspace.REALTIME_TAB_INDEX,
+        "device_center": shell.workspace.DEVICE_CENTER_TAB_INDEX,
+        "data_view": shell.workspace.DATA_VIEW_TAB_INDEX,
+        "report_center": shell.workspace.REPORT_VIEW_TAB_INDEX,
+    }
+    paths: dict[str, str] = {}
+    for name, tab_index in mapping.items():
+        shell.workspace.switch_to_tab(tab_index)
+        app.processEvents()
+        path = SCREENSHOT_DIR / f"{name}.png"
+        _save_screenshot(shell, path)
+        paths[name] = path.as_posix()
+    shell.workspace.switch_to_tab(shell.workspace.REALTIME_TAB_INDEX)
+    app.processEvents()
+    return paths
+
+
+def run_external_checks(*, venv_python: str | None = None) -> list[QACheck]:
+    """Run compileall, unittest, and visual check subprocesses."""
+
+    python = venv_python or sys.executable
+    checks: list[QACheck] = []
+    steps = (
+        ([python, "-m", "compileall", "nfs_scanner"], "compileall"),
+        ([python, "-m", "unittest", "discover", "-s", "tests"], "unittest"),
+        ([python, str(REPO_ROOT / "tools" / "commercial_ui_visual_check.py")], "commercial_ui_visual_check"),
+    )
+    for command, name in steps:
+        completed = subprocess.run(
+            command,
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        tail = (completed.stdout + completed.stderr).strip().splitlines()
+        summary = tail[-1] if tail else f"exit={completed.returncode}"
+        checks.append(
+            QACheck(
+                name=name,
+                category="external",
+                expected="exit code 0",
+                actual=summary[:240],
+                passed=completed.returncode == 0,
+                auto_fixable=name != "compileall",
+            )
+        )
+    return checks
+
+
+def run_commercial_qa(*, include_external: bool = True, round_number: int = 1) -> QAResult:
+    """Execute one full commercial demo QA round."""
+
+    result = QAResult(
+        generated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        round_number=round_number,
+    )
+
+    result.checks.extend(run_static_safety_checks(repo_root=REPO_ROOT))
+
+    if _headless():
+        result.known_issues.append("GUI checks skipped in headless environment")
+        if include_external:
+            result.checks.extend(run_external_checks())
+        return result
+
+    app = QApplication.instance() or QApplication(sys.argv)
+    shell: CommercialMainShell | None = None
+
+    try:
+        legacy_check = _check_legacy_ui_startup(app)
+        result.checks.append(legacy_check)
+
+        startup_check, shell = _check_commercial_ui_startup(app)
+        result.checks.append(startup_check)
+        if not startup_check.passed:
+            return result
+
+        _prepare_default_window(shell, app)
+        default_path = SCREENSHOT_DIR / "commercial_default.png"
+        _save_screenshot(shell, default_path)
+        result.screenshots["commercial_default"] = default_path.as_posix()
+
+        default_metrics = collect_qa_layout_metrics(shell)
+        result.checks.extend(build_qa_visual_checks(default_metrics, shell=shell))
+
+        view_paths = _capture_view_screenshots(shell, app)
+        result.screenshots.update(view_paths)
+
+        functional_checks, dry_run_lines = run_functional_demo_flow(shell)
+        result.checks.extend(functional_checks)
+
+        result.checks.append(verify_dry_run_only(dry_run_lines))
+        result.checks.extend(verify_no_real_spectrum_camera(dry_run_lines))
+
+        shell.showNormal()
+        if hasattr(shell, "set_custom_maximized"):
+            shell.set_custom_maximized(False)
+        _prepare_default_window(shell, app)
+
+        shell.title_bar._toggle_maximize()
+        app.processEvents()
+        shell._reapply_splitter_sizes()
+        app.processEvents()
+
+        maximized_path = SCREENSHOT_DIR / "commercial_maximized.png"
+        _save_screenshot(shell, maximized_path)
+        result.screenshots["commercial_maximized"] = maximized_path.as_posix()
+
+        maximized_metrics = collect_qa_layout_metrics(shell)
+        maximized_checks = build_qa_visual_checks(maximized_metrics, shell=shell)
+        for check in maximized_checks:
+            check.name = f"maximized_{check.name}"
+        result.checks.extend(maximized_checks)
+
+    finally:
+        if shell is not None:
+            shell.close()
+            app.processEvents()
+
+    if include_external:
+        result.checks.extend(run_external_checks())
+
+    return result
+
+
+def run_qa_with_auto_fix(*, max_rounds: int = 3, include_external: bool = True) -> QAResult:
+    """Run QA with up to ``max_rounds`` auto-fix retries for layout/mock failures."""
+
+    last_result: QAResult | None = None
+    for round_number in range(1, max_rounds + 1):
+        result = run_commercial_qa(include_external=include_external, round_number=round_number)
+        write_qa_reports(result, output_dir=QA_OUTPUT_DIR)
+        last_result = result
+
+        if result.overall_pass():
+            return result
+        if has_blocked_failures(result):
+            result.known_issues.append("Blocked failure detected; auto-fix stopped")
+            write_qa_reports(result, output_dir=QA_OUTPUT_DIR)
+            return result
+
+        fixable = result.auto_fixable_failures()
+        if not fixable or round_number >= max_rounds:
+            result.known_issues.append(f"Remaining failures after round {round_number}")
+            write_qa_reports(result, output_dir=QA_OUTPUT_DIR)
+            return result
+
+        if _headless():
+            return result
+
+        app = QApplication.instance() or QApplication(sys.argv)
+        shell = create_commercial_shell()
+        shell.show()
+        app.processEvents()
+        try:
+            _prepare_default_window(shell, app)
+            applied = apply_runtime_mitigations(shell, fixable)
+            if applied:
+                result.known_issues.append(f"Round {round_number} mitigations: {', '.join(applied)}")
+        finally:
+            shell.close()
+            app.processEvents()
+
+    assert last_result is not None
+    return last_result
