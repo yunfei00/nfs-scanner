@@ -6,7 +6,7 @@ import math
 from abc import ABC, abstractmethod
 from enum import Enum
 
-from PySide6.QtCore import QPointF
+from PySide6.QtCore import QPointF, Qt
 from PySide6.QtGui import QImage, QPolygonF
 from PySide6.QtWidgets import QGraphicsItem, QGraphicsPixmapItem, QGraphicsScene
 
@@ -366,9 +366,55 @@ class MarkerLayer(BaseLayer):
 
 
 class AnnotationLayer(BaseLayer):
-    """Annotation layer placeholder."""
+    """ROI rectangle with resize handles for scan region preview."""
 
     kind = LayerKind.ANNOTATION
 
     def build_mock(self) -> None:
-        return
+        from .mock_assets import board_content_rect
+
+        board_x, board_y, board_w, board_h = board_content_rect()
+        self.set_roi_rect(
+            board_x + board_w * 0.16,
+            board_y + board_h * 0.18,
+            board_w * 0.58,
+            board_h * 0.54,
+        )
+
+    def set_roi_rect(self, x: float, y: float, width: float, height: float) -> None:
+        """Draw one ROI frame with corner and edge control handles."""
+
+        from PySide6.QtCore import QRectF
+        from PySide6.QtGui import QBrush, QColor, QPen
+        from PySide6.QtWidgets import QGraphicsEllipseItem, QGraphicsRectItem
+
+        self.clear()
+        rect_item = QGraphicsRectItem(QRectF(x, y, width, height))
+        rect_item.setPen(QPen(QColor("#0EA5FF"), 1.6, Qt.PenStyle.DashLine))
+        rect_item.setBrush(QBrush(QColor(14, 165, 255, 18)))
+        self._register_item(rect_item)
+
+        handle_radius = 4.0
+        handle_pen = QPen(QColor("#E8EEF8"), 1.0)
+        handle_brush = QBrush(QColor("#0EA5FF"))
+        anchors = (
+            (x, y),
+            (x + width / 2, y),
+            (x + width, y),
+            (x + width, y + height / 2),
+            (x + width, y + height),
+            (x + width / 2, y + height),
+            (x, y + height),
+            (x, y + height / 2),
+        )
+        for anchor_x, anchor_y in anchors:
+            handle = QGraphicsEllipseItem(
+                anchor_x - handle_radius,
+                anchor_y - handle_radius,
+                handle_radius * 2,
+                handle_radius * 2,
+            )
+            handle.setPen(handle_pen)
+            handle.setBrush(handle_brush)
+            self._register_item(handle)
+

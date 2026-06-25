@@ -4,15 +4,16 @@ from __future__ import annotations
 
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QMouseEvent
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QToolButton, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QToolButton, QVBoxLayout, QWidget
 
-from nfs_scanner.version import APP_NAME, APP_VERSION
+from nfs_scanner.core.integration_safety import REAL_DEVICE_ENABLED
+from nfs_scanner.version import APP_VERSION
 
 
 class CommercialTitleBar(QFrame):
-    """Dark custom title bar with drag and window controls."""
+    """Dark custom title bar with brand block, status badges, and window controls."""
 
-    TITLE_HEIGHT = 34
+    TITLE_HEIGHT = 40
 
     def __init__(self, window: QWidget, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -26,24 +27,44 @@ class CommercialTitleBar(QFrame):
 
     def _setup_ui(self) -> None:
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(10, 0, 4, 0)
-        layout.setSpacing(8)
+        layout.setContentsMargins(8, 0, 4, 0)
+        layout.setSpacing(10)
 
-        icon = QFrame(self)
-        icon.setObjectName("commercialTitleBarIcon")
-        icon.setFixedSize(14, 14)
+        logo = QFrame(self)
+        logo.setObjectName("commercialTitleBarLogo")
+        logo.setFixedSize(32, 32)
+        logo_layout = QVBoxLayout(logo)
+        logo_layout.setContentsMargins(0, 0, 0, 0)
+        logo_text = QLabel("NFS", logo)
+        logo_text.setObjectName("commercialTitleBarLogoText")
+        logo_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        logo_layout.addWidget(logo_text)
 
-        title = QLabel(f"{APP_NAME} v{APP_VERSION}  ·  近场扫描系统", self)
+        brand = QWidget(self)
+        brand_layout = QVBoxLayout(brand)
+        brand_layout.setContentsMargins(0, 0, 0, 0)
+        brand_layout.setSpacing(0)
+        title = QLabel("近场扫描系统", brand)
         title.setObjectName("commercialTitleBarTitle")
+        subtitle = QLabel(f"Near Field Scanner  ·  v{APP_VERSION}", brand)
+        subtitle.setObjectName("commercialTitleBarSubtitle")
+        brand_layout.addWidget(title)
+        brand_layout.addWidget(subtitle)
 
-        layout.addWidget(icon)
-        layout.addWidget(title)
+        layout.addWidget(logo)
+        layout.addWidget(brand)
         layout.addStretch(1)
 
-        demo_label = QLabel("DEMO MODE", self)
-        demo_label.setObjectName("commercialTitleBarDemo")
-        layout.addWidget(demo_label)
-        layout.addStretch(1)
+        badge_row = QWidget(self)
+        badge_row.setObjectName("commercialTitleBarBadges")
+        badge_layout = QHBoxLayout(badge_row)
+        badge_layout.setContentsMargins(0, 0, 0, 0)
+        badge_layout.setSpacing(4)
+        for text in ("MOCK", "DRY RUN", "NO HW", "REAL OFF" if not REAL_DEVICE_ENABLED else "REAL ON"):
+            badge = QLabel(text, badge_row)
+            badge.setObjectName("commercialTitleBarBadge")
+            badge_layout.addWidget(badge)
+        layout.addWidget(badge_row)
 
         self._minimize_button = self._make_control_button("—", "最小化", self._on_minimize)
         self._maximize_button = self._make_control_button("□", "最大化", self._on_maximize)

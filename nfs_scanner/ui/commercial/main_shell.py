@@ -41,7 +41,7 @@ class CommercialMainShell(QMainWindow):
     RIGHT_PANEL_WIDTH = 320
     RIGHT_PANEL_MIN_WIDTH = 300
     RIGHT_PANEL_MAX_WIDTH = 360
-    BOTTOM_DOCK_MIN_HEIGHT = 200
+    BOTTOM_DOCK_MIN_HEIGHT = 220
     BOTTOM_DOCK_RATIO = 0.24
     BOTTOM_DOCK_MAXIMIZED_RATIO = 0.20
     DEFAULT_WINDOW_WIDTH = 1600
@@ -149,6 +149,7 @@ class CommercialMainShell(QMainWindow):
         self.toolbar.scan_pause_toggle_requested.connect(self._toggle_mock_scan_pause)
         self.toolbar.export_data_requested.connect(self._on_export_data)
         self.toolbar.report_center_requested.connect(self._on_report_center)
+        self.toolbar.device_center_requested.connect(self._on_connect_device)
 
     def _connect_workflow_navigation(self) -> None:
         self.workflow_panel.step_selected.connect(self._on_workflow_step_selected)
@@ -463,7 +464,7 @@ class CommercialMainShell(QMainWindow):
         upper_splitter.setStretchFactor(0, 1)
         upper_splitter.setStretchFactor(1, 0)
 
-        self.bottom_dock.setMinimumHeight(195)
+        self.bottom_dock.setMinimumHeight(220)
         self.bottom_dock.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         center_splitter.addWidget(upper_splitter)
@@ -554,7 +555,7 @@ class CommercialMainShell(QMainWindow):
 
         if self._center_splitter is not None:
             compact = height <= 768
-            dock_min = 195 if compact else self.BOTTOM_DOCK_MIN_HEIGHT
+            dock_min = 200 if compact else self.BOTTOM_DOCK_MIN_HEIGHT
             self.bottom_dock.setMinimumHeight(dock_min)
 
             chrome_height = (

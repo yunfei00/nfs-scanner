@@ -5,13 +5,15 @@ from __future__ import annotations
 import math
 
 from PySide6.QtCore import QEvent, QTimer, Qt
+from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QCheckBox, QHBoxLayout, QVBoxLayout, QWidget
 
 from nfs_scanner.core.runtime_service import RuntimeSnapshot
 from nfs_scanner.core.path_planner import generate_preview_points
 from nfs_scanner.core.scan_config import ScanPathConfig, ScanRegion
 
-from ..graphics import ColorBar, LayerKind, LayerManager, MiniMap, RealtimeCanvas
+from ..graphics import ColorBar, LayerKind, LayerManager, MiniMapPanel, RealtimeCanvas
+from ..graphics.canvas_hud import CanvasAxisLegend, CanvasCursorHud
 from ..scan_scene_mapper import map_points_to_scene
 from ..widgets import NFSSecondaryButton
 
@@ -29,7 +31,9 @@ class RealtimeView(QWidget):
         self.canvas.setMinimumHeight(260)
         self.layer_manager = LayerManager(self.canvas.graphics_scene)
         self.color_bar = ColorBar(self)
-        self.mini_map = MiniMap(self.canvas, self.canvas)
+        self.mini_map = MiniMapPanel(self.canvas, self.canvas)
+        self.axis_legend = CanvasAxisLegend(self.canvas.viewport())
+        self.cursor_hud = CanvasCursorHud(self.canvas.viewport())
         self._current_region = ScanRegion()
         self._current_path_config = ScanPathConfig()
         self._has_preview_region = False
@@ -40,12 +44,12 @@ class RealtimeView(QWidget):
     def _setup_ui(self) -> None:
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(0, 0, 0, 0)
-        root_layout.setSpacing(8)
+        root_layout.setSpacing(6)
 
         toolbar = QWidget(self)
         toolbar_layout = QHBoxLayout(toolbar)
         toolbar_layout.setContentsMargins(0, 0, 0, 0)
-        toolbar_layout.setSpacing(8)
+        toolbar_layout.setSpacing(6)
 
         fit_button = NFSSecondaryButton("适应视图", toolbar)
         reset_button = NFSSecondaryButton("重置视图", toolbar)
@@ -70,8 +74,11 @@ class RealtimeView(QWidget):
         canvas_container_layout.addWidget(self.canvas, 1)
 
         self.mini_map.setParent(self.canvas.viewport())
-        self.mini_map.raise_()
-        self.mini_map.show()
+        self.axis_legend.setParent(self.canvas.viewport())
+        self.cursor_hud.setParent(self.canvas.viewport())
+        for overlay in (self.mini_map, self.axis_legend, self.cursor_hud):
+            overlay.raise_()
+            overlay.show()
         self.canvas.viewport().installEventFilter(self)
 
         canvas_row_layout.addWidget(canvas_container, 1)
@@ -81,20 +88,37 @@ class RealtimeView(QWidget):
         root_layout.addWidget(canvas_row, 1)
 
     def eventFilter(self, watched, event) -> bool:
-        if watched is self.canvas.viewport() and event.type() == QEvent.Type.Resize:
-            self._position_mini_map()
+        if watched is self.canvas.viewport():
+            if event.type() == QEvent.Type.Resize:
+                self._position_overlays()
+            elif event.type() == QEvent.Type.MouseMove and isinstance(event, QMouseEvent):
+                scene_point = self.canvas.mapToScene(event.position().toPoint())
+                self.cursor_hud.update_readout(
+                    x=scene_point.x(),
+                    y=scene_point.y(),
+                    z=self._current_region.z_height,
+                    freq="1.50 GHz",
+                    amp="-41.2 dBm",
+                )
         return super().eventFilter(watched, event)
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
-        self._position_mini_map()
+        self._position_overlays()
 
-    def _position_mini_map(self) -> None:
-        margin = 10
-        map_width = self.mini_map.width()
-        map_height = self.mini_map.height()
+    def _position_overlays(self) -> None:
+        margin = 8
         viewport = self.canvas.viewport()
         scrollbar_reserve = 14 if self.canvas.verticalScrollBar().isVisible() else 0
+
+        self.axis_legend.adjustSize()
+        self.axis_legend.move(margin, max(viewport.height() - self.axis_legend.height() - margin, margin))
+
+        self.cursor_hud.adjustSize()
+        self.cursor_hud.move(margin, margin)
+
+        map_width = self.mini_map.width()
+        map_height = self.mini_map.height()
         self.mini_map.move(
             max(viewport.width() - map_width - margin - scrollbar_reserve, margin),
             max(viewport.height() - map_height - margin, margin),
@@ -107,6 +131,9 @@ class RealtimeView(QWidget):
         heatmap_layer = self.layer_manager.ensure_layer(LayerKind.HEATMAP)
         heatmap_layer.build_mock()
         self.color_bar.set_lut_name(heatmap_layer.lut_name)
+
+        annotation_layer = self.layer_manager.ensure_layer(LayerKind.ANNOTATION)
+        annotation_layer.build_mock()
 
         marker_layer = self.layer_manager.ensure_layer(LayerKind.MARKER)
         marker_layer.build_mock()
@@ -127,7 +154,7 @@ class RealtimeView(QWidget):
             return
         self.canvas.fit_view()
         self.mini_map.bind_canvas(self.canvas)
-        self._position_mini_map()
+        self._position_overlays()
 
     def update_path_preview(
         self,

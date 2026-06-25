@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QEvent, QRectF, Qt
 from PySide6.QtGui import QBrush, QColor, QPainter, QPen
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QWidget
 
 from .realtime_canvas import RealtimeCanvas
 
@@ -12,8 +12,8 @@ from .realtime_canvas import RealtimeCanvas
 class MiniMap(QWidget):
     """Small overview map with a viewport frame placeholder."""
 
-    MAP_WIDTH = 128
-    MAP_HEIGHT = 96
+    MAP_WIDTH = 104
+    MAP_HEIGHT = 72
 
     def __init__(self, canvas: RealtimeCanvas | None = None, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -50,7 +50,7 @@ class MiniMap(QWidget):
             super().paintEvent(event)
             return
 
-        map_rect = self.rect().adjusted(6, 6, -6, -6)
+        map_rect = self.rect().adjusted(4, 4, -4, -4)
         painter.setPen(QPen(QColor(42, 58, 82, 120)))
         painter.drawRect(map_rect)
 
@@ -68,7 +68,7 @@ class MiniMap(QWidget):
             int(origin_y),
             int(content_width),
             int(content_height),
-            QColor("#172235"),
+            QColor("#1A3D2E"),
         )
 
         viewport_rect = self._viewport_rect(scene_rect, origin_x, origin_y, scale)
@@ -103,3 +103,27 @@ class MiniMap(QWidget):
         width = max(visible.width() * scale, 12.0)
         height = max(visible.height() * scale, 12.0)
         return QRectF(x, y, width, height)
+
+
+class MiniMapPanel(QFrame):
+    """Compact minimap container with title label."""
+
+    def __init__(self, canvas: RealtimeCanvas, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("nfsMiniMapPanel")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(6, 4, 6, 4)
+        layout.setSpacing(2)
+        title = QLabel("全局视图", self)
+        title.setObjectName("commercialMiniMapTitle")
+        title.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.map = MiniMap(canvas, self)
+        layout.addWidget(title)
+        layout.addWidget(self.map, 0, Qt.AlignmentFlag.AlignHCenter)
+
+    def bind_canvas(self, canvas: RealtimeCanvas) -> None:
+        self.map.bind_canvas(canvas)
+
+    def update(self) -> None:
+        self.map.update()
+        super().update()

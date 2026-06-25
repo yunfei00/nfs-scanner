@@ -1,13 +1,11 @@
-"""Left workflow panel for the commercial UI shell."""
+"""Left workflow timeline panel for the commercial UI shell."""
 
 from __future__ import annotations
 
 from typing import Literal
 
-from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QFrame, QLabel, QSizePolicy, QVBoxLayout, QWidget
-
-from .widgets import NFSCollapsiblePanel
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget
 
 StepState = Literal["pending", "active", "completed"]
 
@@ -22,24 +20,60 @@ WORKFLOW_STEPS = (
 )
 
 
-class _WorkflowStepFrame(QFrame):
+class _TimelineStepRow(QFrame):
     clicked = Signal(int)
 
-    def __init__(self, index: int, number: str, title: str, description: str, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        index: int,
+        number: str,
+        title: str,
+        description: str,
+        *,
+        show_connector: bool,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self._index = index
-        self.setObjectName("nfsWorkflowStep")
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 6, 8, 6)
-        layout.setSpacing(1)
+        self.setObjectName("nfsWorkflowTimelineStep")
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
 
-        header = QLabel(f"{number}. {title}", self)
-        header.setObjectName("nfsSectionTitle")
-        detail = QLabel(description, self)
+        root = QHBoxLayout(self)
+        root.setContentsMargins(4, 2, 4, 2)
+        root.setSpacing(8)
+
+        rail = QWidget(self)
+        rail.setFixedWidth(24)
+        rail_layout = QVBoxLayout(rail)
+        rail_layout.setContentsMargins(0, 0, 0, 0)
+        rail_layout.setSpacing(0)
+        self._circle = QLabel(number, rail)
+        self._circle.setObjectName("nfsWorkflowTimelineCircle")
+        self._circle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._circle.setFixedSize(22, 22)
+        rail_layout.addWidget(self._circle, 0, Qt.AlignmentFlag.AlignHCenter)
+        if show_connector:
+            connector = QFrame(rail)
+            connector.setObjectName("nfsWorkflowTimelineConnector")
+            connector.setFixedWidth(2)
+            connector.setMinimumHeight(18)
+            rail_layout.addWidget(connector, 0, Qt.AlignmentFlag.AlignHCenter)
+        rail_layout.addStretch(1)
+
+        body = QWidget(self)
+        body_layout = QVBoxLayout(body)
+        body_layout.setContentsMargins(0, 0, 0, 0)
+        body_layout.setSpacing(1)
+        header = QLabel(title, body)
+        header.setObjectName("nfsWorkflowTimelineTitle")
+        detail = QLabel(description, body)
         detail.setObjectName("nfsMutedLabel")
         detail.setWordWrap(True)
-        layout.addWidget(header)
-        layout.addWidget(detail)
+        body_layout.addWidget(header)
+        body_layout.addWidget(detail)
+
+        root.addWidget(rail, 0)
+        root.addWidget(body, 1)
 
     def mousePressEvent(self, event) -> None:
         self.clicked.emit(self._index)
@@ -47,7 +81,7 @@ class _WorkflowStepFrame(QFrame):
 
 
 class CommercialWorkflowPanel(QWidget):
-    """Workflow step list with pending / active / completed highlighting."""
+    """Vertical workflow timeline with pending / active / completed states."""
 
     step_selected = Signal(int)
 
@@ -57,25 +91,30 @@ class CommercialWorkflowPanel(QWidget):
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
         self._step_states: list[StepState] = ["pending"] * len(WORKFLOW_STEPS)
         self._step_states[0] = "active"
-        self._step_frames: list[_WorkflowStepFrame] = []
+        self._step_rows: list[_TimelineStepRow] = []
         self._setup_ui()
 
     def _setup_ui(self) -> None:
-        body = QWidget(self)
-        body_layout = QVBoxLayout(body)
-        body_layout.setContentsMargins(0, 0, 0, 0)
-        body_layout.setSpacing(4)
-
-        for index, (number, title, description) in enumerate(WORKFLOW_STEPS):
-            frame = _WorkflowStepFrame(index, number, title, description, body)
-            frame.clicked.connect(self.set_current_step)
-            self._step_frames.append(frame)
-            body_layout.addWidget(frame)
-
-        panel = NFSCollapsiblePanel("工作流程", body, parent=self)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(panel)
+        layout.setContentsMargins(8, 8, 8, 4)
+        layout.setSpacing(2)
+
+        title = QLabel("扫描流程", self)
+        title.setObjectName("nfsSectionTitle")
+        layout.addWidget(title)
+
+        for index, (number, step_title, description) in enumerate(WORKFLOW_STEPS):
+            row = _TimelineStepRow(
+                index,
+                number,
+                step_title,
+                description,
+                show_connector=index < len(WORKFLOW_STEPS) - 1,
+                parent=self,
+            )
+            row.clicked.connect(self.set_current_step)
+            self._step_rows.append(row)
+            layout.addWidget(row)
         self._refresh_step_styles()
 
     def set_current_step(self, index: int) -> None:
@@ -94,8 +133,6 @@ class CommercialWorkflowPanel(QWidget):
             self._refresh_step_styles()
 
     def mark_completed_through(self, index: int) -> None:
-        """Mark steps 0..index as completed and index+1 as active when possible."""
-
         for step_index in range(len(self._step_states)):
             if step_index <= index:
                 self._step_states[step_index] = "completed"
@@ -107,9 +144,13 @@ class CommercialWorkflowPanel(QWidget):
         self._refresh_step_styles()
 
     def _refresh_step_styles(self) -> None:
-        for index, frame in enumerate(self._step_frames):
+        for index, row in enumerate(self._step_rows):
             state = self._step_states[index]
-            frame.setProperty("active", state == "active")
-            frame.setProperty("completed", state == "completed")
-            frame.style().unpolish(frame)
-            frame.style().polish(frame)
+            row.setProperty("active", state == "active")
+            row.setProperty("completed", state == "completed")
+            row._circle.setProperty("active", state == "active")
+            row._circle.setProperty("completed", state == "completed")
+            row.style().unpolish(row)
+            row.style().polish(row)
+            row._circle.style().unpolish(row._circle)
+            row._circle.style().polish(row._circle)

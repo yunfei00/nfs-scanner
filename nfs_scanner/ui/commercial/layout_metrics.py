@@ -117,9 +117,11 @@ def collect_layout_metrics(shell: QMainWindow) -> CommercialLayoutMetrics:
     shell.bottom_dock.switch_to_logs_tab()
     QApplication.processEvents()
 
-    metrics.checks = _build_checks(metrics)
-
     from nfs_scanner.ui.commercial.scroll_metrics import collect_scroll_usability_metrics
+    from nfs_scanner.ui.commercial.target_alignment_metrics import collect_target_alignment_checks
+
+    metrics.checks = _build_checks(metrics)
+    metrics.checks.extend(collect_target_alignment_checks(shell))
 
     scroll_metrics = collect_scroll_usability_metrics(shell)
     for scroll_check in scroll_metrics.checks:
@@ -137,7 +139,7 @@ def collect_layout_metrics(shell: QMainWindow) -> CommercialLayoutMetrics:
 
 def _build_checks(metrics: CommercialLayoutMetrics) -> list[LayoutMetricCheck]:
     compact_screen = metrics.screen_available_height <= 768 or metrics.window_height <= 768
-    dock_min_required = 195 if compact_screen else 200
+    dock_min_required = 200 if compact_screen else 220
     log_min_required = 100 if compact_screen else 120
     stats_min_required = 100 if compact_screen else 120
     canvas_min_height = 240 if compact_screen else (360 if metrics.is_maximized else 280)

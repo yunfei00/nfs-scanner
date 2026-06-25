@@ -18,6 +18,9 @@ def _find_demo_indicator(shell: QMainWindow) -> tuple[bool, str]:
     banner = shell.findChild(QWidget, "demoModeBanner")
     if banner is not None and banner.isVisible():
         return True, "demoModeBanner visible"
+    badges = shell.findChild(QWidget, "commercialTitleBarBadges")
+    if badges is not None and badges.isVisible():
+        return True, "title bar status badges visible"
     demo_label = shell.findChild(QLabel, "commercialTitleBarDemo")
     if demo_label is not None and demo_label.isVisible() and demo_label.text().strip():
         return True, f"title bar demo label: {demo_label.text()}"
@@ -39,7 +42,7 @@ def build_qa_visual_checks(metrics: CommercialLayoutMetrics, *, shell: QMainWind
     """Build QA-specific visual checks (stricter than visual_check on large screens)."""
 
     compact = metrics.screen_available_height <= 768 or metrics.window_height <= 768
-    dock_min = 195 if compact else 200
+    dock_min = 200 if compact else 220
     log_min = 100 if compact else 140
     stats_min = 100 if compact else 140
 

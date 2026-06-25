@@ -12,7 +12,7 @@ class CommercialLayoutMetricsTestCase(unittest.TestCase):
         metrics = CommercialLayoutMetrics(
             uses_custom_title_bar=True,
             title_bar_height=34,
-            bottom_dock_height=200,
+            bottom_dock_height=220,
             log_view_height=120,
             statistics_panel_height=130,
             left_panel_width=240,
@@ -39,7 +39,7 @@ class CommercialLayoutMetricsTestCase(unittest.TestCase):
         metrics = CommercialLayoutMetrics(
             uses_custom_title_bar=True,
             title_bar_height=34,
-            bottom_dock_height=200,
+            bottom_dock_height=220,
             log_view_height=80,
             statistics_panel_height=130,
             canvas_width=560,
@@ -66,7 +66,7 @@ class CommercialLayoutMetricsTestCase(unittest.TestCase):
         metrics = CommercialLayoutMetrics(
             uses_custom_title_bar=True,
             title_bar_height=34,
-            bottom_dock_height=200,
+            bottom_dock_height=220,
             log_view_height=110,
             statistics_panel_height=130,
             left_panel_width=240,
