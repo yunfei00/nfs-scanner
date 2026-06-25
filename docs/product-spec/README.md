@@ -13,7 +13,11 @@
 - `04_feature_specs.md`：核心功能规格：扫描、相机对齐、热力图、Marker、仪表、数据存储。
 - `05_implementation_roadmap.md`：分阶段实现路线。
 - `06_codex_tasks.md`：可直接交给 Codex 连续执行的任务清单。
+- `07_acceptance_checklist.md`：功能合并前的验收清单。
 - `../../.ai/codex.md`：AI 开发规则与执行方式。
+- `../../.ai/backlog/`：可逐项执行的 Agent 任务队列。
+- `../../.ai/prompts/`：远程控制 Codex 时可直接复制的提示词。
+- `../../.ai/reviews/`：代码审查与验收模板。
 
 ## 总体原则
 
@@ -22,3 +26,12 @@
 3. 每个工作模式只解决一类任务：实时扫描、离线分析、三维展示、数据表格、报告生成、设备管理。
 4. UI 必须同时适配笔记本和台式机：1366×768 可用，1920×1080 舒服，2K/4K 更佳。
 5. 所有新功能必须有验收标准，不允许只实现“看起来像”。
+
+## AI 开发流程
+
+1. 先读 `.ai/codex.md`。
+2. 再读本目录下的产品规范。
+3. 从 `.ai/backlog/` 选择第一个未完成任务。
+4. 每次只实现一个任务。
+5. 用 `07_acceptance_checklist.md` 和 `.ai/reviews/review-template.md` 做验收。
+6. 提交后再进入下一个任务。
