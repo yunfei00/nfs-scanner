@@ -109,6 +109,32 @@ class MockDeviceService(DeviceServiceProtocol):
             )
         return self.list_devices()
 
+    def update_motion_connection_state(
+        self,
+        device_id: str,
+        *,
+        connection_status: DeviceConnectionStatus,
+        status_label: str,
+        badge_status: str,
+        summary: str,
+        last_message: str,
+    ) -> DeviceSummary:
+        """Update motion device summary after a real connection test (no motion commands)."""
+
+        device = self._require_device(device_id)
+        if device.kind != "motion":
+            raise ValueError(f"Device {device_id} is not a motion device.")
+        updated = replace(
+            device,
+            connection_status=connection_status,
+            status_label=status_label,
+            badge_status=badge_status,
+            summary=summary,
+            last_message=last_message,
+        )
+        self._devices[device_id] = updated
+        return updated
+
     def _require_device(self, device_id: str) -> DeviceSummary:
         device = self._devices.get(device_id)
         if device is None:
