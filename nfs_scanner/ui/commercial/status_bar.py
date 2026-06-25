@@ -7,6 +7,10 @@ from datetime import datetime
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QWidget
 
+from nfs_scanner.core.mock_scan_runtime import MockScanRuntimeSnapshot
+
+from .runtime_display import format_runtime_status
+
 
 class CommercialStatusBar(QFrame):
     """Bottom status bar with mock system information."""
@@ -57,3 +61,16 @@ class CommercialStatusBar(QFrame):
 
     def _refresh_clock(self) -> None:
         self.time_label.setText(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+
+    def update_runtime_snapshot(self, snapshot: MockScanRuntimeSnapshot) -> None:
+        """Refresh status labels from mock scan runtime state."""
+
+        self.system_label.setText(f"系统状态: {format_runtime_status(snapshot.status)}")
+        if snapshot.status == "idle":
+            self.task_label.setText("当前任务: 未开始")
+        else:
+            self.task_label.setText(
+                f"当前任务: Mock 扫描 ({snapshot.completed_points}/{snapshot.total_points})"
+            )
+        percent = int(snapshot.progress * 100)
+        self.progress_label.setText(f"扫描进度: {percent}%")

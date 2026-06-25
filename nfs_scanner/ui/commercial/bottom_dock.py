@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QFormLayout, QHBoxLayout, QLabel, QPlainTextEdit, QSizePolicy, QVBoxLayout, QWidget
 
+from nfs_scanner.core.mock_scan_runtime import MockScanRuntimeSnapshot
 from nfs_scanner.core.scan_config import ScanPreviewStats
 
 from .preview_stats_display import update_density_badge, update_mode_badge, update_preview_stat_labels
+from .runtime_display import format_duration_seconds
 from .widgets import NFSCard, NFSDockPanel, NFSStatusBadge
 
 
@@ -21,6 +23,8 @@ class CommercialBottomDock(QWidget):
         self._preview_stat_labels: dict[str, QLabel] = {}
         self._mode_badge: NFSStatusBadge | None = None
         self._density_badge: NFSStatusBadge | None = None
+        self._runtime_stat_labels: dict[str, QLabel] = {}
+        self._log_view: QPlainTextEdit | None = None
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -39,6 +43,34 @@ class CommercialBottomDock(QWidget):
         update_mode_badge(self._mode_badge, stats)
         update_density_badge(self._density_badge, stats)
         update_preview_stat_labels(self._preview_stat_labels, stats)
+
+    def update_runtime_stats(self, snapshot: MockScanRuntimeSnapshot) -> None:
+        """Refresh runtime progress fields in the statistics tab."""
+
+        status_label = {
+            "idle": "空闲",
+            "running": "运行中",
+            "paused": "已暂停",
+            "completed": "已完成",
+            "stopped": "已停止",
+        }.get(snapshot.status, snapshot.status)
+        values = {
+            "runtime_status": status_label,
+            "completed_points": str(snapshot.completed_points),
+            "total_points": str(snapshot.total_points),
+            "elapsed": format_duration_seconds(snapshot.elapsed_seconds),
+            "remaining": format_duration_seconds(snapshot.estimated_remaining_seconds),
+        }
+
+        for key, label in self._runtime_stat_labels.items():
+            label.setText(values.get(key, "--"))
+
+    def append_log_line(self, message: str, *, level: str = "INFO") -> None:
+        """Append one runtime log line to the logs tab."""
+
+        if self._log_view is None or not message.strip():
+            return
+        self._log_view.appendPlainText(f"[{level}] {message.strip()}")
 
     def _build_spectrum_tab(self) -> QWidget:
         page = QWidget(self)
@@ -90,7 +122,28 @@ class CommercialBottomDock(QWidget):
             self._preview_stat_labels[key] = value_label
 
         card.body_layout.addLayout(stats_form)
+
+        runtime_card = NFSCard("运行时统计", page)
+        runtime_form = QFormLayout()
+        runtime_form.setContentsMargins(0, 0, 0, 0)
+        runtime_form.setVerticalSpacing(8)
+        for key, label in (
+            ("runtime_status", "运行状态"),
+            ("completed_points", "已完成点数"),
+            ("total_points", "总点数"),
+            ("elapsed", "已用时间"),
+            ("remaining", "预计剩余"),
+        ):
+            label_widget = QLabel(label, runtime_card.body)
+            label_widget.setObjectName("nfsMutedLabel")
+            value_label = QLabel("--", runtime_card.body)
+            value_label.setObjectName("nfsPreviewStatValue")
+            runtime_form.addRow(label_widget, value_label)
+            self._runtime_stat_labels[key] = value_label
+        runtime_card.body_layout.addLayout(runtime_form)
+
         layout.addWidget(card, 1)
+        layout.addWidget(runtime_card, 0)
         return page
 
     def _build_logs_tab(self) -> QWidget:
@@ -107,6 +160,7 @@ class CommercialBottomDock(QWidget):
             "[DEVICE] Motion platform mock connected\n"
             "[SCAN] Waiting for scan task"
         )
+        self._log_view = log_view
         card.body_layout.addWidget(log_view, 1)
         layout.addWidget(card, 1)
         return page
