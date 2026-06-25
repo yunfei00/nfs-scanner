@@ -55,7 +55,11 @@ class CommercialWorkspace(QWidget):
         self.tab_widget.setDocumentMode(True)
         for title, view_type in WORKSPACE_TABS:
             if view_type is DeviceCenterView:
-                view = DeviceCenterView(self._services.devices, self.tab_widget)
+                view = DeviceCenterView(
+                    self._services.devices,
+                    self._services.device_config,
+                    self.tab_widget,
+                )
                 self._device_center_view = view
             else:
                 view = view_type(self.tab_widget)
