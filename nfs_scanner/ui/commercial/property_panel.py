@@ -40,6 +40,8 @@ class CommercialPropertyPanel(QScrollArea):
 
     scan_config_changed = Signal(ScanRegion, ScanPathConfig)
     scan_preview_updated = Signal(ScanPreviewStats)
+    scan_start_requested = Signal()
+    scan_stop_requested = Signal()
 
     _DEBOUNCE_MS = 250
 
@@ -57,6 +59,8 @@ class CommercialPropertyPanel(QScrollArea):
         self._preview_stat_labels: dict[str, QLabel] = {}
         self._mode_badge: NFSStatusBadge | None = None
         self._density_badge: NFSStatusBadge | None = None
+        self._start_scan_button: NFSPrimaryButton | None = None
+        self._stop_scan_button: NFSDangerButton | None = None
         self._setup_ui()
         QTimer.singleShot(0, self._emit_scan_config)
 
@@ -167,8 +171,12 @@ class CommercialPropertyPanel(QScrollArea):
         button_row = QWidget(page)
         button_layout = QVBoxLayout(button_row)
         button_layout.setContentsMargins(0, 0, 0, 0)
-        button_layout.addWidget(NFSPrimaryButton("开始扫描", button_row))
-        button_layout.addWidget(NFSDangerButton("停止扫描", button_row))
+        self._start_scan_button = NFSPrimaryButton("开始扫描", button_row)
+        self._stop_scan_button = NFSDangerButton("停止扫描", button_row)
+        self._start_scan_button.clicked.connect(self.scan_start_requested.emit)
+        self._stop_scan_button.clicked.connect(self.scan_stop_requested.emit)
+        button_layout.addWidget(self._start_scan_button)
+        button_layout.addWidget(self._stop_scan_button)
         layout.addWidget(button_row)
         layout.addStretch(1)
         return page
@@ -275,6 +283,14 @@ class CommercialPropertyPanel(QScrollArea):
         update_mode_badge(self._mode_badge, stats)
         update_density_badge(self._density_badge, stats)
         update_preview_stat_labels(self._preview_stat_labels, stats)
+
+    def set_scan_controls_enabled(self, *, start_enabled: bool, stop_enabled: bool) -> None:
+        """Enable or disable mock scan action buttons from runtime state."""
+
+        if self._start_scan_button is not None:
+            self._start_scan_button.setEnabled(start_enabled)
+        if self._stop_scan_button is not None:
+            self._stop_scan_button.setEnabled(stop_enabled)
 
     def _build_display_tab(self, parent: QWidget) -> QWidget:
         page = QWidget(parent)

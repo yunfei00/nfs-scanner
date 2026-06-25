@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QFrame, QMainWindow, QScrollArea, QSizePolicy, QSp
 from .bottom_dock import CommercialBottomDock
 from .device_status_panel import CommercialDeviceStatusPanel
 from .property_panel import CommercialPropertyPanel
+from .runtime import MockScanController
 from .status_bar import CommercialStatusBar
 from .toolbar import CommercialToolbar
 from .workspace import CommercialWorkspace
@@ -34,16 +35,43 @@ class CommercialMainShell(QMainWindow):
         self.property_panel = CommercialPropertyPanel(self)
         self.bottom_dock = CommercialBottomDock(self)
         self.status_bar_widget = CommercialStatusBar(self)
+        self.mock_scan = MockScanController(self)
         self._body_splitter: QSplitter | None = None
         self._center_splitter: QSplitter | None = None
         self._upper_splitter: QSplitter | None = None
         self._setup_ui()
         self._apply_initial_window_size()
         self._connect_scan_preview()
+        self._connect_mock_scan()
 
     def _connect_scan_preview(self) -> None:
         self.property_panel.scan_config_changed.connect(self._on_scan_config_changed)
         self.property_panel.scan_preview_updated.connect(self.bottom_dock.update_preview_stats)
+
+    def _connect_mock_scan(self) -> None:
+        for source in (self.property_panel, self.toolbar):
+            source.scan_start_requested.connect(self._start_mock_scan)
+            source.scan_stop_requested.connect(self._stop_mock_scan)
+        self.mock_scan.snapshot_changed.connect(self._on_mock_scan_snapshot)
+        self._update_scan_controls(self.mock_scan.snapshot())
+
+    def _start_mock_scan(self) -> None:
+        region = self.property_panel.current_scan_region()
+        path_config = self.property_panel.current_scan_path_config()
+        self.mock_scan.start(region, path_config)
+
+    def _stop_mock_scan(self) -> None:
+        self.mock_scan.stop()
+
+    def _on_mock_scan_snapshot(self, snapshot) -> None:
+        self.workspace.realtime_view().update_scan_progress(snapshot)
+        self._update_scan_controls(snapshot)
+
+    def _update_scan_controls(self, snapshot) -> None:
+        running = snapshot.status in ("running", "paused")
+        controls = dict(start_enabled=not running, stop_enabled=running)
+        self.property_panel.set_scan_controls_enabled(**controls)
+        self.toolbar.set_scan_controls_enabled(**controls)
 
     def _setup_ui(self) -> None:
         root = QWidget(self)
