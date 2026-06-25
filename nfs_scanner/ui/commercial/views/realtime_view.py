@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import math
+
 from PySide6.QtCore import QEvent, QTimer, Qt
-from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QCheckBox, QHBoxLayout, QVBoxLayout, QWidget
 
 from nfs_scanner.core.path_planner import generate_preview_points
 from nfs_scanner.core.scan_config import ScanPathConfig, ScanRegion
@@ -11,6 +13,9 @@ from nfs_scanner.core.scan_config import ScanPathConfig, ScanRegion
 from ..graphics import ColorBar, LayerKind, LayerManager, MiniMap, RealtimeCanvas
 from ..scan_scene_mapper import map_points_to_scene
 from ..widgets import NFSSecondaryButton
+
+_REGION_CHANGE_AREA_RATIO = 0.35
+_REGION_CHANGE_CENTER_RATIO = 0.35
 
 
 class RealtimeView(QWidget):
@@ -25,6 +30,8 @@ class RealtimeView(QWidget):
         self.mini_map = MiniMap(self.canvas, self.canvas)
         self._current_region = ScanRegion()
         self._current_path_config = ScanPathConfig()
+        self._has_preview_region = False
+        self._auto_fit_checkbox: QCheckBox | None = None
         self._setup_ui()
         self._load_mock_layers()
 
@@ -44,6 +51,10 @@ class RealtimeView(QWidget):
         reset_button.clicked.connect(self.canvas.reset_view)
         toolbar_layout.addWidget(fit_button)
         toolbar_layout.addWidget(reset_button)
+
+        self._auto_fit_checkbox = QCheckBox("自动适应路径", toolbar)
+        self._auto_fit_checkbox.setChecked(False)
+        toolbar_layout.addWidget(self._auto_fit_checkbox)
         toolbar_layout.addStretch(1)
 
         canvas_row = QWidget(self)
@@ -95,15 +106,12 @@ class RealtimeView(QWidget):
         heatmap_layer.build_mock()
         self.color_bar.set_lut_name(heatmap_layer.lut_name)
 
-        path_layer = self.layer_manager.ensure_layer(LayerKind.PATH)
-        path_layer.build_mock()
-
         marker_layer = self.layer_manager.ensure_layer(LayerKind.MARKER)
         marker_layer.build_mock()
 
         self._current_region = ScanRegion()
         self._current_path_config = ScanPathConfig()
-        self.update_path_preview(self._current_region, self._current_path_config)
+        self.update_path_preview(self._current_region, self._current_path_config, initial=True)
 
         self.canvas.set_scene_rect(0, 0, photo_layer.canvas_width, photo_layer.canvas_height)
         QTimer.singleShot(0, self._finalize_canvas_layout)
@@ -119,11 +127,21 @@ class RealtimeView(QWidget):
         self.mini_map.bind_canvas(self.canvas)
         self._position_mini_map()
 
-    def update_path_preview(self, region: ScanRegion, path_config: ScanPathConfig) -> None:
+    def update_path_preview(
+        self,
+        region: ScanRegion,
+        path_config: ScanPathConfig,
+        *,
+        initial: bool = False,
+    ) -> None:
         """Regenerate ScanPathLayer from scan configuration without touching other layers."""
 
+        previous_region = self._current_region
         safe_region = region.clamped() if not region.is_valid else region
         safe_config = path_config.clamped() if not path_config.is_valid else path_config
+        region_changed = self._region_changed_significantly(previous_region, safe_region)
+        auto_fit = self._auto_fit_checkbox.isChecked() if self._auto_fit_checkbox is not None else False
+
         self._current_region = safe_region
         self._current_path_config = safe_config
 
@@ -139,3 +157,40 @@ class RealtimeView(QWidget):
         path_layer = self.layer_manager.ensure_layer(LayerKind.PATH)
         path_layer.set_path_points(scene_points)
         self.mini_map.update()
+
+        if initial or auto_fit or region_changed or not self._has_preview_region:
+            self.canvas.fit_view()
+        self._has_preview_region = True
+
+    @staticmethod
+    def _region_changed_significantly(previous: ScanRegion, current: ScanRegion) -> bool:
+        previous_width = abs(previous.x_stop - previous.x_start)
+        previous_height = abs(previous.y_stop - previous.y_start)
+        current_width = abs(current.x_stop - current.x_start)
+        current_height = abs(current.y_stop - current.y_start)
+        previous_area = previous_width * previous_height
+        current_area = current_width * current_height
+
+        if previous_area <= 1e-6 or current_area <= 1e-6:
+            return True
+
+        area_ratio = current_area / previous_area
+        if area_ratio > (1.0 + _REGION_CHANGE_AREA_RATIO) or area_ratio < (1.0 - _REGION_CHANGE_AREA_RATIO):
+            return True
+
+        previous_center = (
+            (previous.x_start + previous.x_stop) / 2.0,
+            (previous.y_start + previous.y_stop) / 2.0,
+        )
+        current_center = (
+            (current.x_start + current.x_stop) / 2.0,
+            (current.y_start + current.y_stop) / 2.0,
+        )
+        center_shift = math.hypot(
+            current_center[0] - previous_center[0],
+            current_center[1] - previous_center[1],
+        )
+        previous_diag = math.hypot(previous_width, previous_height)
+        if previous_diag > 1e-6 and center_shift > previous_diag * _REGION_CHANGE_CENTER_RATIO:
+            return True
+        return False

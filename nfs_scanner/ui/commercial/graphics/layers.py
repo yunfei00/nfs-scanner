@@ -254,6 +254,12 @@ class ScanPathLayer(BaseLayer):
         self._current_index = max(0, current_index)
         self._completed_count = max(0, completed_count)
 
+    @property
+    def point_count(self) -> int:
+        """Number of points in the current path (full planner list, not display subset)."""
+
+        return len(self._points)
+
 
 class MarkerLayer(BaseLayer):
     """Display mock markers with tooltip metadata."""
