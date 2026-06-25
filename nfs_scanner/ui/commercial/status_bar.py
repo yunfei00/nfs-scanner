@@ -66,7 +66,7 @@ class CommercialStatusBar(QFrame):
         """Refresh status labels from mock scan runtime state."""
 
         self.system_label.setText(f"系统状态: {format_runtime_status(snapshot.status)}")
-        if snapshot.status == "idle":
+        if snapshot.status in ("idle", "configured"):
             self.task_label.setText("当前任务: 未开始")
         else:
             self.task_label.setText(

@@ -49,10 +49,12 @@ class CommercialBottomDock(QWidget):
 
         status_label = {
             "idle": "空闲",
+            "configured": "已配置",
             "running": "运行中",
             "paused": "已暂停",
             "completed": "已完成",
             "stopped": "已停止",
+            "error": "错误",
         }.get(snapshot.status, snapshot.status)
         values = {
             "runtime_status": status_label,

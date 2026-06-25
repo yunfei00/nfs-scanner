@@ -21,9 +21,11 @@ def format_runtime_status(status: str) -> str:
 
     labels = {
         "idle": "就绪",
+        "configured": "已配置",
         "running": "扫描中",
         "paused": "已暂停",
         "completed": "已完成",
         "stopped": "已停止",
+        "error": "错误",
     }
     return labels.get(status, status)

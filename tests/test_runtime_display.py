@@ -15,7 +15,7 @@ class RuntimeDisplayTestCase(unittest.TestCase):
         self.assertEqual(format_duration_seconds(3665), "1h 1m 5s")
 
     def test_format_runtime_status(self) -> None:
-        self.assertEqual(format_runtime_status("running"), "扫描中")
+        self.assertEqual(format_runtime_status("configured"), "已配置")
         self.assertEqual(format_runtime_status("unknown"), "unknown")
 
 

@@ -50,6 +50,10 @@ class MockScanRuntimeTestCase(unittest.TestCase):
         stopped = self.service.stop()
         self.assertEqual(stopped.status, "stopped")
 
+    def test_configure_before_start(self) -> None:
+        configured = self.service.snapshot()
+        self.assertEqual(configured.status, "configured")
+
 
 if __name__ == "__main__":
     unittest.main()

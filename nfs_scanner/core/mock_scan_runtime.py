@@ -5,36 +5,18 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Literal
 
 from .path_planner import ScanPoint3D, generate_preview_points
+from .runtime_service import RuntimeSnapshot, ScanRuntimeServiceProtocol
 from .scan_config import ScanPathConfig, ScanRegion
 
-MockScanRuntimeStatus = Literal["idle", "running", "paused", "completed", "stopped"]
-
-
-@dataclass(slots=True, frozen=True)
-class MockScanRuntimeSnapshot:
-    """Immutable mock runtime state for commercial UI binding."""
-
-    status: MockScanRuntimeStatus = "idle"
-    total_points: int = 0
-    completed_points: int = 0
-    current_index: int = 0
-    elapsed_seconds: float = 0.0
-    estimated_remaining_seconds: float = 0.0
-    last_message: str = ""
-
-    @property
-    def progress(self) -> float:
-        if self.total_points <= 0:
-            return 0.0
-        return max(0.0, min(1.0, self.completed_points / self.total_points))
+# Backward-compatible alias for existing imports.
+MockScanRuntimeSnapshot = RuntimeSnapshot
 
 
 @dataclass(slots=True)
 class _MockScanRuntimeState:
-    status: MockScanRuntimeStatus = "idle"
+    status: str = "idle"
     region: ScanRegion = field(default_factory=ScanRegion)
     path_config: ScanPathConfig = field(default_factory=ScanPathConfig)
     path_points: list[ScanPoint3D] = field(default_factory=list)
@@ -46,16 +28,16 @@ class _MockScanRuntimeState:
     last_message: str = ""
 
 
-class MockScanRuntimeService:
+class MockScanRuntimeService(ScanRuntimeServiceProtocol):
     """In-memory mock scan orchestrator driven by timer ticks from the UI layer."""
 
     def __init__(self, *, monotonic_provider: Callable[[], float] | None = None) -> None:
         self._monotonic = monotonic_provider or time.monotonic
         self._state = _MockScanRuntimeState()
 
-    def snapshot(self) -> MockScanRuntimeSnapshot:
-        return MockScanRuntimeSnapshot(
-            status=self._state.status,
+    def snapshot(self) -> RuntimeSnapshot:
+        return RuntimeSnapshot(
+            status=self._state.status,  # type: ignore[arg-type]
             total_points=len(self._state.path_points),
             completed_points=self._state.completed_points,
             current_index=self._state.current_index,
@@ -76,9 +58,10 @@ class MockScanRuntimeService:
         self._state.region = safe_region
         self._state.path_config = safe_config
         self._state.path_points = generate_preview_points(safe_region, safe_config)
+        self._state.status = "configured"
         self._state.last_message = f"Configured mock scan ({len(self._state.path_points)} points)"
 
-    def start(self) -> MockScanRuntimeSnapshot:
+    def start(self) -> RuntimeSnapshot:
         if not self._state.path_points:
             self._state.path_points = generate_preview_points(self._state.region, self._state.path_config)
         if not self._state.path_points:
@@ -92,7 +75,7 @@ class MockScanRuntimeService:
         self._state.last_message = "Mock scan started"
         return self.snapshot()
 
-    def pause(self) -> MockScanRuntimeSnapshot:
+    def pause(self) -> RuntimeSnapshot:
         if self._state.status != "running":
             raise RuntimeError("No running mock scan to pause.")
         self._state.pause_started_monotonic = self._monotonic()
@@ -100,7 +83,7 @@ class MockScanRuntimeService:
         self._state.last_message = "Mock scan paused"
         return self.snapshot()
 
-    def resume(self) -> MockScanRuntimeSnapshot:
+    def resume(self) -> RuntimeSnapshot:
         if self._state.status != "paused":
             raise RuntimeError("No paused mock scan to resume.")
         if self._state.pause_started_monotonic is not None:
@@ -113,7 +96,7 @@ class MockScanRuntimeService:
         self._state.last_message = "Mock scan resumed"
         return self.snapshot()
 
-    def stop(self) -> MockScanRuntimeSnapshot:
+    def stop(self) -> RuntimeSnapshot:
         if self._state.status == "paused":
             if self._state.pause_started_monotonic is not None:
                 self._state.paused_seconds += max(
@@ -129,8 +112,8 @@ class MockScanRuntimeService:
         self._state.last_message = "Mock scan stopped by user"
         return self.snapshot()
 
-    def tick(self) -> MockScanRuntimeSnapshot:
-        """Advance one scan point when running; no-op otherwise."""
+    def tick(self) -> RuntimeSnapshot:
+        """Advance one scan point when running; mock-only helper not on the protocol."""
 
         if self._state.status != "running":
             return self.snapshot()
@@ -150,12 +133,14 @@ class MockScanRuntimeService:
             )
         return self.snapshot()
 
-    def reset(self) -> MockScanRuntimeSnapshot:
+    def reset(self) -> RuntimeSnapshot:
         self._state = _MockScanRuntimeState(
             region=self._state.region,
             path_config=self._state.path_config,
             path_points=list(self._state.path_points),
         )
+        if self._state.path_points:
+            self._state.status = "configured"
         self._state.last_message = "Mock runtime reset"
         return self.snapshot()
 
