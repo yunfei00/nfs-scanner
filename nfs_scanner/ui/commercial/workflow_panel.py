@@ -35,28 +35,29 @@ class _TimelineStepRow(QFrame):
     ) -> None:
         super().__init__(parent)
         self._index = index
+        self._number = number
         self.setObjectName("nfsWorkflowTimelineStep")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         root = QHBoxLayout(self)
-        root.setContentsMargins(4, 2, 4, 2)
+        root.setContentsMargins(6, 4, 6, 4)
         root.setSpacing(8)
 
         rail = QWidget(self)
-        rail.setFixedWidth(24)
+        rail.setFixedWidth(26)
         rail_layout = QVBoxLayout(rail)
         rail_layout.setContentsMargins(0, 0, 0, 0)
         rail_layout.setSpacing(0)
         self._circle = QLabel(number, rail)
         self._circle.setObjectName("nfsWorkflowTimelineCircle")
         self._circle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._circle.setFixedSize(22, 22)
+        self._circle.setFixedSize(24, 24)
         rail_layout.addWidget(self._circle, 0, Qt.AlignmentFlag.AlignHCenter)
         if show_connector:
             connector = QFrame(rail)
             connector.setObjectName("nfsWorkflowTimelineConnector")
             connector.setFixedWidth(2)
-            connector.setMinimumHeight(18)
+            connector.setMinimumHeight(16)
             rail_layout.addWidget(connector, 0, Qt.AlignmentFlag.AlignHCenter)
         rail_layout.addStretch(1)
 
@@ -64,12 +65,21 @@ class _TimelineStepRow(QFrame):
         body_layout = QVBoxLayout(body)
         body_layout.setContentsMargins(0, 0, 0, 0)
         body_layout.setSpacing(1)
-        header = QLabel(title, body)
-        header.setObjectName("nfsWorkflowTimelineTitle")
+        header_row = QHBoxLayout()
+        header_row.setContentsMargins(0, 0, 0, 0)
+        header_row.setSpacing(6)
+        self._header = QLabel(title, body)
+        self._header.setObjectName("nfsWorkflowTimelineTitle")
+        self._progress = QLabel("", body)
+        self._progress.setObjectName("nfsWorkflowTimelineProgress")
+        self._progress.setVisible(False)
+        header_row.addWidget(self._header)
+        header_row.addStretch(1)
+        header_row.addWidget(self._progress)
         detail = QLabel(description, body)
         detail.setObjectName("nfsMutedLabel")
         detail.setWordWrap(True)
-        body_layout.addWidget(header)
+        body_layout.addLayout(header_row)
         body_layout.addWidget(detail)
 
         root.addWidget(rail, 0)
@@ -78,6 +88,10 @@ class _TimelineStepRow(QFrame):
     def mousePressEvent(self, event) -> None:
         self.clicked.emit(self._index)
         super().mousePressEvent(event)
+
+    def set_progress_text(self, text: str) -> None:
+        self._progress.setText(text)
+        self._progress.setVisible(bool(text))
 
 
 class CommercialWorkflowPanel(QWidget):
@@ -88,6 +102,7 @@ class CommercialWorkflowPanel(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("commercialWorkflowPanel")
+        self.setProperty("targetStyleMode", "true")
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
         self._step_states: list[StepState] = ["pending"] * len(WORKFLOW_STEPS)
         self._step_states[0] = "active"
@@ -117,6 +132,22 @@ class CommercialWorkflowPanel(QWidget):
             layout.addWidget(row)
         self._refresh_step_styles()
 
+    def apply_target_demo_state(self, *, active_index: int = 4, progress_percent: float = 65.2) -> None:
+        """Seed workflow to match the target screenshot demo state."""
+
+        for index in range(len(self._step_states)):
+            if index < active_index:
+                self._step_states[index] = "completed"
+            elif index == active_index:
+                self._step_states[index] = "active"
+            else:
+                self._step_states[index] = "pending"
+        for index, row in enumerate(self._step_rows):
+            row.set_progress_text("")
+            if index == active_index:
+                row.set_progress_text(f"进行中… {progress_percent:.1f}%")
+        self._refresh_step_styles()
+
     def set_current_step(self, index: int) -> None:
         if index < 0 or index >= len(WORKFLOW_STEPS):
             return
@@ -124,6 +155,8 @@ class CommercialWorkflowPanel(QWidget):
             if state == "active":
                 self._step_states[step_index] = "completed" if step_index < index else "pending"
         self._step_states[index] = "active"
+        for row in self._step_rows:
+            row.set_progress_text("")
         self._refresh_step_styles()
         self.step_selected.emit(index)
 
@@ -141,6 +174,8 @@ class CommercialWorkflowPanel(QWidget):
             else:
                 if self._step_states[step_index] != "completed":
                     self._step_states[step_index] = "pending"
+        for row in self._step_rows:
+            row.set_progress_text("")
         self._refresh_step_styles()
 
     def _refresh_step_styles(self) -> None:
@@ -148,6 +183,10 @@ class CommercialWorkflowPanel(QWidget):
             state = self._step_states[index]
             row.setProperty("active", state == "active")
             row.setProperty("completed", state == "completed")
+            if state == "completed":
+                row._circle.setText("✓")
+            else:
+                row._circle.setText(row._number)
             row._circle.setProperty("active", state == "active")
             row._circle.setProperty("completed", state == "completed")
             row.style().unpolish(row)
