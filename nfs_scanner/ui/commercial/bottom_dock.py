@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QFormLayout, QLabel, QPlainTextEdit, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFormLayout, QLabel, QPlainTextEdit, QSizePolicy, QVBoxLayout, QWidget
 
 from .widgets import NFSCard, NFSDockPanel
 
@@ -13,6 +13,7 @@ class CommercialBottomDock(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("commercialBottomDock")
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self._dock = NFSDockPanel(self)
         self._setup_ui()
 
@@ -34,7 +35,7 @@ class CommercialBottomDock(QWidget):
         card = NFSCard("频谱视图", page)
         placeholder = QLabel("频谱曲线占位区（Mock Trace）", card.body)
         placeholder.setObjectName("nfsMutedLabel")
-        placeholder.setMinimumHeight(120)
+        placeholder.setMinimumHeight(72)
         card.body_layout.addWidget(placeholder, 1)
         layout.addWidget(card, 1)
         return page
