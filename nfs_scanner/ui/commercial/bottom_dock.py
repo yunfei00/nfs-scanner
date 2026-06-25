@@ -20,30 +20,27 @@ from PySide6.QtWidgets import (
 from nfs_scanner.core.runtime_service import RuntimeSnapshot
 from nfs_scanner.core.scan_config import ScanPreviewStats
 
-from .preview_stats_display import update_density_badge, update_mode_badge, update_preview_stat_labels
+from .preview_stats_display import update_preview_stat_labels
 from .runtime_display import format_duration_seconds
 from .scroll_helpers import configure_abstract_scroll_area
-from .widgets import NFSStatusBadge
 from .widgets.mock_chart_widgets import MockSpectrumWidget
 
 _LOG_SEED_LINES = (
-    "[INFO] Commercial UI shell initialized",
-    "[DEVICE] Motion platform mock connected",
-    "[SCAN] Waiting for scan task",
-    "[PROJECT] Demo project ready",
-    "[INFO] Bottom dock tri-panel layout active",
-    "[INFO] Use this panel to monitor scan lifecycle",
-    "[DRY RUN] Command layer idle",
-    "[INFO] Log auto-scroll enabled",
-    "[SCAN] Preview path updated",
-    "[DEVICE] Spectrum mock ready",
-    "[WARN] High density preview sampled",
-    "[DATA] Mock task registry ready",
-    "[INFO] QA seed line 13",
-    "[INFO] QA seed line 14",
-    "[INFO] QA seed line 15",
-    "[INFO] QA seed line 16",
+    "[INFO] 2026-06-26 09:00:01 系统初始化完成",
+    "[DEVICE] 2026-06-26 09:00:03 运动平台已连接",
+    "[SCAN] 2026-06-26 09:00:05 扫描任务已配置",
+    "[INFO] 2026-06-26 09:00:06 热力图实时显示已启用",
+    "[SCAN] 2026-06-26 09:00:08 扫描执行中…",
+    "[DATA] 2026-06-26 09:00:12 采集点 #4212 已写入缓存",
+    "[WARN] 2026-06-26 09:00:15 高密度预览已抽样显示",
+    "[INFO] 2026-06-26 09:00:18 频谱视图已更新",
+    "[SCAN] 2026-06-26 09:00:22 当前频率 2.450 GHz",
+    "[DATA] 2026-06-26 09:00:25 幅度 -23.45 dBm",
+    "[ERROR] 2026-06-26 09:00:28 Mock 错误占位（可忽略）",
+    "[INFO] 2026-06-26 09:00:30 日志自动滚动已启用",
 )
+
+_LOG_TAGS = ("INFO", "WARN", "ERROR", "SCAN", "DATA")
 
 
 class CommercialBottomDock(QWidget):
@@ -54,10 +51,9 @@ class CommercialBottomDock(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("commercialBottomDock")
+        self.setProperty("targetStyleMode", "true")
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._preview_stat_labels: dict[str, QLabel] = {}
-        self._mode_badge: NFSStatusBadge | None = None
-        self._density_badge: NFSStatusBadge | None = None
         self._runtime_stat_labels: dict[str, QLabel] = {}
         self._log_view: QPlainTextEdit | None = None
         self._spectrum_widget: MockSpectrumWidget | None = None
@@ -85,6 +81,26 @@ class CommercialBottomDock(QWidget):
         tri_layout.addWidget(log_panel, 3)
         layout.addWidget(tri_panel, 1)
 
+    def seed_target_demo_stats(self) -> None:
+        """Populate scan statistics with target-screenshot-like demo values."""
+
+        values = {
+            "completed_points": "4212 / 6461",
+            "current_xyz": "X:45.2  Y:32.8  Z:5.0",
+            "current_freq": "2.450 GHz",
+            "current_amp": "-23.45 dBm",
+            "started_at": "2026-06-26 09:00:00",
+            "elapsed": "00:21:05",
+            "remaining": "00:11:13",
+            "runtime_status": "运行中",
+        }
+        for key, label in self._runtime_stat_labels.items():
+            if key in values:
+                label.setText(values[key])
+        if self._progress_bar is not None:
+            self._progress_bar.setValue(65)
+            self._progress_bar.setFormat("65.2%")
+
     def log_view_widget(self) -> QPlainTextEdit | None:
         return self._log_view
 
@@ -100,8 +116,6 @@ class CommercialBottomDock(QWidget):
         return self._stats_panel.height()
 
     def update_preview_stats(self, stats: ScanPreviewStats) -> None:
-        update_mode_badge(self._mode_badge, stats)
-        update_density_badge(self._density_badge, stats)
         update_preview_stat_labels(self._preview_stat_labels, stats)
 
     def update_runtime_stats(self, snapshot: RuntimeSnapshot) -> None:
@@ -119,9 +133,9 @@ class CommercialBottomDock(QWidget):
             "runtime_status": status_label,
             "progress_percent": f"{percent}%",
             "completed_points": f"{snapshot.completed_points} / {snapshot.total_points}",
-            "current_xyz": f"({snapshot.current_index}, mock, 5.00)",
-            "current_freq": "1.50 GHz",
-            "current_amp": "-41.2 dBm",
+            "current_xyz": f"X:{snapshot.current_index:.1f}  Y:mock  Z:5.0",
+            "current_freq": "2.450 GHz",
+            "current_amp": "-23.45 dBm",
             "started_at": "2026-06-26 09:00:00",
             "elapsed": format_duration_seconds(snapshot.elapsed_seconds),
             "remaining": format_duration_seconds(snapshot.estimated_remaining_seconds),
@@ -130,8 +144,9 @@ class CommercialBottomDock(QWidget):
             label.setText(values.get(key, "--"))
         if self._progress_bar is not None:
             self._progress_bar.setValue(percent)
+            self._progress_bar.setFormat(f"{percent}%")
         if self._spectrum_widget is not None and snapshot.status in ("running", "paused", "completed"):
-            self._spectrum_widget.set_view_mode("trace")
+            self._spectrum_widget.set_view_mode("frequency")
             self._spectrum_widget.update()
 
     def append_log_line(self, message: str, *, level: str = "INFO") -> None:
@@ -156,7 +171,7 @@ class CommercialBottomDock(QWidget):
         title.setObjectName("dockStatTitle")
         layout.addWidget(title)
         self._spectrum_widget = MockSpectrumWidget(panel)
-        self._spectrum_widget.setMinimumHeight(96)
+        self._spectrum_widget.setMinimumHeight(110)
         layout.addWidget(self._spectrum_widget, 1)
         return panel
 
@@ -174,7 +189,8 @@ class CommercialBottomDock(QWidget):
         self._progress_bar = QProgressBar(panel)
         self._progress_bar.setObjectName("commercialScanProgressBar")
         self._progress_bar.setRange(0, 100)
-        self._progress_bar.setValue(0)
+        self._progress_bar.setValue(65)
+        self._progress_bar.setFormat("65.2%")
         self._progress_bar.setTextVisible(True)
         layout.addWidget(self._progress_bar)
 
@@ -182,10 +198,10 @@ class CommercialBottomDock(QWidget):
         grid = QGridLayout(grid_host)
         grid.setContentsMargins(0, 0, 0, 0)
         grid.setHorizontalSpacing(8)
-        grid.setVerticalSpacing(4)
+        grid.setVerticalSpacing(3)
 
         fields = (
-            ("completed_points", "进度"),
+            ("completed_points", "已扫描点数"),
             ("current_xyz", "当前坐标"),
             ("current_freq", "当前频率"),
             ("current_amp", "当前幅度"),
@@ -204,29 +220,6 @@ class CommercialBottomDock(QWidget):
             self._runtime_stat_labels[key] = value_label
 
         layout.addWidget(grid_host, 1)
-
-        preview_host = QFrame(panel)
-        preview_host.setObjectName("dockStatPanel")
-        preview_layout = QGridLayout(preview_host)
-        preview_layout.setContentsMargins(6, 4, 6, 4)
-        preview_layout.setHorizontalSpacing(6)
-        preview_layout.setVerticalSpacing(4)
-        for index, (key, caption) in enumerate(
-            (
-                ("point_count", "点数"),
-                ("area_mm2", "面积"),
-                ("path_length_mm", "路径"),
-                ("estimated_seconds", "预计"),
-            )
-        ):
-            name = QLabel(caption, preview_host)
-            name.setObjectName("nfsMutedLabel")
-            value = QLabel("--", preview_host)
-            value.setObjectName("dockStatValue")
-            preview_layout.addWidget(name, index // 2, (index % 2) * 2)
-            preview_layout.addWidget(value, index // 2, (index % 2) * 2 + 1)
-            self._preview_stat_labels[key] = value
-        layout.addWidget(preview_host, 0)
         return panel
 
     def _build_log_panel(self, parent: QWidget) -> QWidget:
@@ -242,6 +235,19 @@ class CommercialBottomDock(QWidget):
         hint = QLabel("运行日志", panel)
         hint.setObjectName("dockStatTitle")
         toolbar_layout.addWidget(hint)
+        tag_row = QWidget(toolbar)
+        tag_layout = QHBoxLayout(tag_row)
+        tag_layout.setContentsMargins(0, 0, 0, 0)
+        tag_layout.setSpacing(4)
+        tag_row.setObjectName("commercialLogCategoryTags")
+        for tag in _LOG_TAGS:
+            chip = QLabel(tag, tag_row)
+            chip.setObjectName("commercialLogCategoryTag")
+            chip.setProperty("logLevel", tag)
+            chip.style().unpolish(chip)
+            chip.style().polish(chip)
+            tag_layout.addWidget(chip)
+        toolbar_layout.addWidget(tag_row)
         toolbar_layout.addStretch(1)
         clear_button = QPushButton("清空", toolbar)
         clear_button.setObjectName("ghostButton")
@@ -261,3 +267,6 @@ class CommercialBottomDock(QWidget):
         self._log_view = log_view
         layout.addWidget(log_view, 1)
         return panel
+
+    def has_log_category_tags(self) -> bool:
+        return self.findChild(QWidget, "commercialLogCategoryTags") is not None

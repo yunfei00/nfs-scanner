@@ -6,20 +6,22 @@ import math
 import random
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPen
+from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
 
 class MockSpectrumWidget(QWidget):
-    """Simple mock spectrum curve for bottom dock and data view."""
+    """Target-style yellow spectrum curve with grid, marker, and axis labels."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("mockSpectrumWidget")
+        self.setProperty("yellowCurveMode", "true")
         self.setMinimumHeight(72)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._view_mode = "trace"
         self._seed = random.randint(0, 9999)
+        self._marker_freq = 2.45
 
     def set_view_mode(self, mode: str) -> None:
         self._view_mode = mode if mode in ("trace", "frequency") else "trace"
@@ -28,39 +30,56 @@ class MockSpectrumWidget(QWidget):
     def paintEvent(self, _event) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        rect = self.rect().adjusted(8, 8, -8, -8)
-        painter.fillRect(rect, QColor("#0B1220"))
+        rect = self.rect().adjusted(6, 6, -6, -6)
+        painter.fillRect(rect, QColor("#050A12"))
 
-        grid_pen = QPen(QColor("#2A3A52"), 1, Qt.PenStyle.DotLine)
+        grid_pen = QPen(QColor("#243247"), 1, Qt.PenStyle.SolidLine)
         painter.setPen(grid_pen)
-        for ratio in (0.25, 0.5, 0.75):
+        for ratio in (0.2, 0.4, 0.6, 0.8):
             y_value = rect.top() + rect.height() * ratio
             painter.drawLine(rect.left(), int(y_value), rect.right(), int(y_value))
+        for ratio in (0.25, 0.5, 0.75):
+            x_value = rect.left() + rect.width() * ratio
+            painter.drawLine(int(x_value), rect.top(), int(x_value), rect.bottom())
 
         points: list[tuple[float, float]] = []
-        count = 48
+        count = 64
+        peak_x = 0.58
         for index in range(count):
             x_ratio = index / max(count - 1, 1)
-            phase = self._seed * 0.01
-            if self._view_mode == "frequency":
-                wave = math.sin(x_ratio * math.pi * 4 + phase) * 0.35
-                peak = math.exp(-((x_ratio - 0.62) ** 2) / 0.004) * 0.55
-                value = 0.35 + wave + peak
-            else:
-                wave = math.sin(x_ratio * math.pi * 6 + phase) * 0.25
-                value = 0.45 + wave + math.sin(x_ratio * 18) * 0.08
+            noise = math.sin(x_ratio * math.pi * 8 + self._seed * 0.02) * 0.04
+            baseline = 0.22 + math.sin(x_ratio * math.pi * 2) * 0.05
+            peak = math.exp(-((x_ratio - peak_x) ** 2) / 0.0035) * 0.72
+            shoulder = math.exp(-((x_ratio - 0.35) ** 2) / 0.02) * 0.18
+            value = min(max(baseline + peak + shoulder + noise, 0.08), 0.95)
             points.append((rect.left() + x_ratio * rect.width(), rect.bottom() - value * rect.height()))
 
-        curve_pen = QPen(QColor("#06D6E8"), 2)
+        curve_pen = QPen(QColor("#FACC15"), 2)
         painter.setPen(curve_pen)
         for index in range(1, len(points)):
             x1, y1 = points[index - 1]
             x2, y2 = points[index]
             painter.drawLine(int(x1), int(y1), int(x2), int(y2))
 
-        painter.setPen(QPen(QColor("#AAB7C8")))
-        label = "Mock Trace" if self._view_mode == "trace" else "Mock Frequency"
-        painter.drawText(rect.adjusted(4, 4, 0, 0), Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft, label)
+        marker_x = rect.left() + peak_x * rect.width()
+        marker_y = rect.bottom() - 0.72 * rect.height()
+        painter.setPen(QPen(QColor("#22C55E"), 1, Qt.PenStyle.DashLine))
+        painter.drawLine(int(marker_x), rect.top(), int(marker_x), rect.bottom())
+        painter.setPen(QPen(QColor("#22C55E")))
+        painter.setBrush(QColor("#22C55E"))
+        painter.drawEllipse(int(marker_x - 4), int(marker_y - 4), 8, 8)
+        painter.setPen(QPen(QColor("#E8EEF8")))
+        font = QFont(painter.font())
+        font.setPointSize(8)
+        painter.setFont(font)
+        painter.drawText(int(marker_x + 6), int(marker_y + 4), "M1")
+
+        painter.setPen(QPen(QColor("#69788D")))
+        painter.drawText(rect.left(), rect.bottom() + 14, "1.000 GHz")
+        painter.drawText(int(rect.center().x() - 24), rect.bottom() + 14, "2.450 GHz")
+        painter.drawText(rect.right() - 56, rect.bottom() + 14, "6.000 GHz")
+        painter.drawText(rect.left() - 2, rect.top() + 10, "0 dB")
+        painter.drawText(rect.left() - 2, rect.bottom() - 4, "-100 dB")
         painter.end()
 
 
