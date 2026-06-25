@@ -144,6 +144,24 @@ class CommercialUiSmokeTestCase(unittest.TestCase):
         finally:
             shell.close()
 
+    def test_mock_scan_emits_dry_run_commands(self) -> None:
+        from nfs_scanner.ui.commercial.services import create_commercial_services
+
+        services = create_commercial_services()
+        shell = create_commercial_shell(services=services)
+        try:
+            shell._start_mock_scan()
+            self.assertGreaterEqual(len(services.dry_run.log.entries()), 2)
+            runtime = shell.mock_scan.service
+            if hasattr(runtime, "tick"):
+                snapshot = runtime.tick()
+                shell._on_mock_scan_snapshot(snapshot)
+            self.assertGreaterEqual(len(services.dry_run.log.entries()), 4)
+            line = services.dry_run.log.entries()[-1].format_line()
+            self.assertIn("DRY RUN", line)
+        finally:
+            shell.close()
+
     def test_high_density_preview_samples_path_markers(self) -> None:
         view = RealtimeView()
         try:
