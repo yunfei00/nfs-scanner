@@ -97,12 +97,48 @@ class PhotoLayer(BaseLayer):
 
 
 class HeatmapLayer(BaseLayer):
-    """Heatmap layer. Expanded in Task 05."""
+    """Display one heatmap image overlay aligned to the photo layer."""
 
     kind = LayerKind.HEATMAP
 
+    def __init__(self, scene: QGraphicsScene) -> None:
+        super().__init__(scene)
+        self._pixmap_item: QGraphicsPixmapItem | None = None
+        self._opacity = 0.65
+        self._lut_name = "viridis"
+
     def build_mock(self) -> None:
-        return
+        from .mock_assets import create_mock_heatmap_qimage
+
+        self.set_heatmap_image(create_mock_heatmap_qimage())
+
+    def set_heatmap_image(self, image: QImage) -> None:
+        """Load one heatmap image as a single pixmap layer."""
+
+        from PySide6.QtGui import QPixmap
+
+        self.clear()
+        pixmap = QPixmap.fromImage(image)
+        item = QGraphicsPixmapItem(pixmap)
+        item.setPos(0, 0)
+        item.setOpacity(self._opacity)
+        self._pixmap_item = self._register_item(item)
+
+    def set_opacity(self, opacity: float) -> None:
+        """Update heatmap overlay opacity (0.0 to 1.0)."""
+
+        self._opacity = max(0.0, min(float(opacity), 1.0))
+        if self._pixmap_item is not None:
+            self._pixmap_item.setOpacity(self._opacity)
+
+    def set_lut_name(self, lut_name: str) -> None:
+        """Placeholder LUT selector for future visualization settings."""
+
+        self._lut_name = lut_name.strip() or "viridis"
+
+    @property
+    def lut_name(self) -> str:
+        return self._lut_name
 
 
 class ScanPathLayer(BaseLayer):

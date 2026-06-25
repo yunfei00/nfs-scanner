@@ -24,7 +24,14 @@ Needs Review: yes/no
 - Impact: Cursor/Codex 可以在低风险细节上继续推进，并把非重大决策记录下来。
 - Needs Review: no
 
-### 2026-06-25 - Sprint 002 Task 04 Mock Board Size
+### 2026-06-25 - Sprint 002 Task 05 Heatmap Rendering
+
+- Date: 2026-06-25
+- Task: sprint-002-task-05-heatmap-layer
+- Decision: 热力图以单张 RGBA QImage 转 QPixmap 叠加，默认 opacity 0.65。
+- Reason: 满足 ui-spec「禁止 cell 绘制」与对齐要求。
+- Impact: LUT 切换可在后续任务重生成整张 image，无需改图层结构。
+- Needs Review: no
 
 - Date: 2026-06-25
 - Task: sprint-002-task-04-photo-layer
