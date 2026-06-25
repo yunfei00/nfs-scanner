@@ -9,7 +9,6 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QScrollArea,
     QTabWidget,
     QVBoxLayout,
@@ -33,7 +32,7 @@ from nfs_scanner.core.scan_config import (
 )
 
 from .preview_stats_display import update_density_badge, update_mode_badge, update_preview_stat_labels
-from .widgets import NFSCard, NFSDangerButton, NFSParameterGroup, NFSPrimaryButton, NFSStatusBadge
+from .widgets import NFSCard, NFSDangerButton, NFSNumericField, NFSParameterGroup, NFSPrimaryButton, NFSStatusBadge
 
 
 class CommercialPropertyPanel(QScrollArea):
@@ -52,7 +51,7 @@ class CommercialPropertyPanel(QScrollArea):
         self._debounce_timer = QTimer(self)
         self._debounce_timer.setSingleShot(True)
         self._debounce_timer.timeout.connect(self._emit_scan_config)
-        self._field_map: dict[str, QLineEdit] = {}
+        self._field_map: dict[str, NFSNumericField] = {}
         self._mode_combo: QComboBox | None = None
         self._validation_label: QLabel | None = None
         self._preview_stat_labels: dict[str, QLabel] = {}
@@ -122,13 +121,13 @@ class CommercialPropertyPanel(QScrollArea):
 
         area_card = NFSCard("扫描区域", page)
         area_form = NFSParameterGroup(parent=area_card.body)
-        self._register_field(area_form, "x_start", "起始 X", f"{DEFAULT_X_START:g}")
-        self._register_field(area_form, "x_stop", "终止 X", f"{DEFAULT_X_STOP:g}")
-        self._register_field(area_form, "y_start", "起始 Y", f"{DEFAULT_Y_START:g}")
-        self._register_field(area_form, "y_stop", "终止 Y", f"{DEFAULT_Y_STOP:g}")
-        self._register_field(area_form, "z_height", "Z 高度", f"{DEFAULT_Z_HEIGHT:g}")
-        self._register_field(area_form, "x_step", "步长 X", f"{DEFAULT_X_STEP:g}")
-        self._register_field(area_form, "y_step", "步长 Y", f"{DEFAULT_Y_STEP:g}")
+        self._register_numeric_field(area_form, "x_start", "起始 X", f"{DEFAULT_X_START:g}", "mm")
+        self._register_numeric_field(area_form, "x_stop", "终止 X", f"{DEFAULT_X_STOP:g}", "mm")
+        self._register_numeric_field(area_form, "y_start", "起始 Y", f"{DEFAULT_Y_START:g}", "mm")
+        self._register_numeric_field(area_form, "y_stop", "终止 Y", f"{DEFAULT_Y_STOP:g}", "mm")
+        self._register_numeric_field(area_form, "z_height", "Z 高度", f"{DEFAULT_Z_HEIGHT:g}", "mm")
+        self._register_numeric_field(area_form, "x_step", "步长 X", f"{DEFAULT_X_STEP:g}", "mm")
+        self._register_numeric_field(area_form, "y_step", "步长 Y", f"{DEFAULT_Y_STEP:g}", "mm")
         area_card.body_layout.addWidget(area_form)
         layout.addWidget(area_card)
 
@@ -139,20 +138,20 @@ class CommercialPropertyPanel(QScrollArea):
 
         self._mode_combo = QComboBox(path_card.body)
         self._mode_combo.addItems(["snake", "raster"])
-        self._mode_combo.currentTextChanged.connect(self._schedule_emit_scan_config)
+        self._mode_combo.currentTextChanged.connect(self._on_scan_mode_changed)
         path_form.addRow(QLabel("扫描模式", path_card.body), self._mode_combo)
 
-        dwell_field = QLineEdit(path_card.body)
+        dwell_field = NFSNumericField("ms", path_card.body)
         dwell_field.setText(str(DEFAULT_DWELL_MS))
-        dwell_field.textChanged.connect(self._schedule_emit_scan_config)
+        dwell_field.valueChanged.connect(self._schedule_emit_scan_config)
         self._field_map["dwell_ms"] = dwell_field
-        path_form.addRow(QLabel("驻留 (ms)", path_card.body), dwell_field)
+        path_form.addRow(QLabel("驻留时间", path_card.body), dwell_field)
 
-        speed_field = QLineEdit(path_card.body)
+        speed_field = NFSNumericField("mm/min", path_card.body)
         speed_field.setText(f"{DEFAULT_SPEED_MM_MIN:g}")
-        speed_field.textChanged.connect(self._schedule_emit_scan_config)
+        speed_field.valueChanged.connect(self._schedule_emit_scan_config)
         self._field_map["speed_mm_min"] = speed_field
-        path_form.addRow(QLabel("速度 (mm/min)", path_card.body), speed_field)
+        path_form.addRow(QLabel("移动速度", path_card.body), speed_field)
 
         path_card.body_layout.addLayout(path_form)
         layout.addWidget(path_card)
@@ -174,26 +173,44 @@ class CommercialPropertyPanel(QScrollArea):
         layout.addStretch(1)
         return page
 
-    def _register_field(self, form: NFSParameterGroup, key: str, label: str, value: str) -> None:
-        field = form.add_row(label, value)
-        field.textChanged.connect(self._schedule_emit_scan_config)
+    def _register_numeric_field(
+        self,
+        form: NFSParameterGroup,
+        key: str,
+        label: str,
+        value: str,
+        unit: str,
+    ) -> None:
+        field = form.add_numeric_row(label, value, unit=unit)
+        field.valueChanged.connect(self._schedule_emit_scan_config)
         self._field_map[key] = field
+
+    def _on_scan_mode_changed(self) -> None:
+        self._emit_scan_config()
 
     def _schedule_emit_scan_config(self) -> None:
         self._debounce_timer.start(self._DEBOUNCE_MS)
 
     def _parse_float(self, key: str, default: float) -> float:
-        text = self._field_map[key].text().strip()
+        field = self._field_map[key]
+        text = field.text().strip()
         try:
-            return float(text)
+            value = float(text)
+            field.set_valid(True)
+            return value
         except ValueError:
+            field.set_valid(False)
             return default
 
     def _parse_int(self, key: str, default: int) -> int:
-        text = self._field_map[key].text().strip()
+        field = self._field_map[key]
+        text = field.text().strip()
         try:
-            return int(float(text))
+            value = int(float(text))
+            field.set_valid(True)
+            return value
         except ValueError:
+            field.set_valid(False)
             return default
 
     def current_scan_region(self) -> ScanRegion:
@@ -218,7 +235,8 @@ class CommercialPropertyPanel(QScrollArea):
     def _emit_scan_config(self) -> None:
         region = self.current_scan_region()
         path_config = self.current_scan_path_config()
-        errors = region.validate() + path_config.validate()
+        parse_errors = self._collect_parse_errors()
+        errors = parse_errors + region.validate() + path_config.validate()
 
         if errors:
             if self._validation_label is not None:
@@ -233,6 +251,25 @@ class CommercialPropertyPanel(QScrollArea):
         self._update_preview_stats_display(stats)
         self.scan_config_changed.emit(region, path_config)
         self.scan_preview_updated.emit(stats)
+
+    def _collect_parse_errors(self) -> list[str]:
+        errors: list[str] = []
+        for key, field in self._field_map.items():
+            text = field.text().strip()
+            if not text:
+                field.set_valid(False)
+                errors.append(f"{key} 不能为空")
+                continue
+            try:
+                if key == "dwell_ms":
+                    int(float(text))
+                else:
+                    float(text)
+                field.set_valid(True)
+            except ValueError:
+                field.set_valid(False)
+                errors.append(f"{key} 格式无效")
+        return errors
 
     def _update_preview_stats_display(self, stats: ScanPreviewStats) -> None:
         update_mode_badge(self._mode_badge, stats)

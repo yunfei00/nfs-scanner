@@ -6,6 +6,7 @@ from .nfs_buttons import NFSDangerButton, NFSPrimaryButton, NFSSecondaryButton, 
 from .nfs_card import NFSCard
 from .nfs_collapsible_panel import NFSCollapsiblePanel
 from .nfs_dock_panel import NFSDockPanel
+from .nfs_numeric_field import NFSNumericField
 from .nfs_panel import NFSPanel
 from .nfs_parameter_group import NFSParameterGroup
 from .nfs_status_badge import NFSStatusBadge
@@ -23,6 +24,7 @@ __all__ = [
     "NFSCollapsiblePanel",
     "NFSDangerButton",
     "NFSDockPanel",
+    "NFSNumericField",
     "NFSPanel",
     "NFSParameterGroup",
     "NFSPrimaryButton",

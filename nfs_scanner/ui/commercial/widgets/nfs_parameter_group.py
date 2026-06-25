@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QFormLayout, QLabel, QLineEdit, QVBoxLayout, QWidget
 
+from .nfs_numeric_field import NFSNumericField
+
 
 class NFSParameterGroup(QWidget):
     """Form container with optional title and description."""
@@ -45,6 +47,25 @@ class NFSParameterGroup(QWidget):
         field.setText(value)
         if placeholder:
             field.setPlaceholderText(placeholder)
+        label_widget = QLabel(label, self)
+        label_widget.setObjectName("nfsMutedLabel")
+        self.form_layout.addRow(label_widget, field)
+        return field
+
+    def add_numeric_row(
+        self,
+        label: str,
+        value: str = "",
+        *,
+        unit: str = "",
+        placeholder: str = "",
+    ) -> NFSNumericField:
+        """Add a labeled numeric field with unit suffix."""
+
+        field = NFSNumericField(unit, self)
+        field.setText(value)
+        if placeholder:
+            field.line_edit().setPlaceholderText(placeholder)
         label_widget = QLabel(label, self)
         label_widget.setObjectName("nfsMutedLabel")
         self.form_layout.addRow(label_widget, field)
