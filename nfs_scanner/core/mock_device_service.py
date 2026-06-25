@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from .device_service import DeviceConnectionStatus, DeviceServiceProtocol, DeviceKind, DeviceSummary
+from .device_service import DeviceConnectionStatus, DeviceServiceProtocol, DeviceSummary
 
 
 def _badge_for_status(status: DeviceConnectionStatus) -> tuple[str, str]:
@@ -32,6 +32,7 @@ class MockDeviceService(DeviceServiceProtocol):
                 status_label="已连接",
                 badge_status="connected",
                 summary="X=0.00 Y=0.00 Z=5.00",
+                last_message="Mock motion platform ready",
             ),
             "spectrum-001": DeviceSummary(
                 device_id="spectrum-001",
@@ -43,6 +44,7 @@ class MockDeviceService(DeviceServiceProtocol):
                 status_label="未连接",
                 badge_status="disconnected",
                 summary="100 MHz - 3 GHz / RBW 100 kHz",
+                last_message="Waiting for mock connect",
             ),
             "camera-001": DeviceSummary(
                 device_id="camera-001",
@@ -54,6 +56,7 @@ class MockDeviceService(DeviceServiceProtocol):
                 status_label="未连接",
                 badge_status="disconnected",
                 summary="1920x1080 / 30 fps",
+                last_message="Waiting for mock connect",
             ),
         }
 
@@ -64,18 +67,23 @@ class MockDeviceService(DeviceServiceProtocol):
         device = self._require_device(device_id)
         label, badge = _badge_for_status("connected")
         summary = device.summary
+        message = f"Mock connected: {device.display_name}"
         if device.kind == "motion":
             summary = "X=0.00 Y=0.00 Z=5.00"
+            message = "Mock motion platform connected (no serial I/O)"
         elif device.kind == "spectrum":
             summary = "100 MHz - 3 GHz / RBW 100 kHz"
+            message = "Mock spectrum session opened (no VISA)"
         elif device.kind == "camera":
             summary = "1920x1080 / 30 fps"
+            message = "Mock camera stream started (no USB capture)"
         updated = replace(
             device,
             connection_status="connected",
             status_label=label,
             badge_status=badge,
             summary=summary,
+            last_message=message,
         )
         self._devices[device_id] = updated
         return updated
@@ -88,11 +96,17 @@ class MockDeviceService(DeviceServiceProtocol):
             connection_status="disconnected",
             status_label=label,
             badge_status=badge,
+            last_message=f"Mock disconnected: {device.display_name}",
         )
         self._devices[device_id] = updated
         return updated
 
     def refresh_status(self) -> list[DeviceSummary]:
+        for device_id, device in list(self._devices.items()):
+            self._devices[device_id] = replace(
+                device,
+                last_message=f"Mock status refreshed at {device.display_name}",
+            )
         return self.list_devices()
 
     def _require_device(self, device_id: str) -> DeviceSummary:

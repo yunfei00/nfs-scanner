@@ -23,6 +23,7 @@ class DeviceSummary:
     status_label: str
     badge_status: str
     summary: str
+    last_message: str = ""
 
 
 @runtime_checkable
