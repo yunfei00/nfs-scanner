@@ -7,6 +7,7 @@ import math
 from PySide6.QtCore import QEvent, QTimer, Qt
 from PySide6.QtWidgets import QCheckBox, QHBoxLayout, QVBoxLayout, QWidget
 
+from nfs_scanner.core.mock_scan_runtime import MockScanRuntimeSnapshot
 from nfs_scanner.core.path_planner import generate_preview_points
 from nfs_scanner.core.scan_config import ScanPathConfig, ScanRegion
 
@@ -161,6 +162,18 @@ class RealtimeView(QWidget):
         if initial or auto_fit or region_changed or not self._has_preview_region:
             self.canvas.fit_view()
         self._has_preview_region = True
+
+    def update_scan_progress(self, snapshot: MockScanRuntimeSnapshot) -> None:
+        """Refresh path layer markers from mock runtime snapshot."""
+
+        path_layer = self.layer_manager.ensure_layer(LayerKind.PATH)
+        active = snapshot.status in ("running", "paused")
+        path_layer.set_progress(
+            current_index=snapshot.current_index,
+            completed_count=snapshot.completed_points,
+            active=active,
+        )
+        self.mini_map.update()
 
     @staticmethod
     def _region_changed_significantly(previous: ScanRegion, current: ScanRegion) -> bool:

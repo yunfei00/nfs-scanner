@@ -189,6 +189,10 @@ class ScanPathLayer(BaseLayer):
         self._points: list[tuple[float, float]] = []
         self._current_index = 0
         self._completed_count = 0
+        self._progress_active = False
+        self._dot_items_by_index: dict[int, QGraphicsItem] = {}
+        self._current_marker: QGraphicsItem | None = None
+        self._completed_path_item: QGraphicsItem | None = None
 
     def build_mock(self) -> None:
         from .mock_assets import generate_snake_path_points
@@ -210,6 +214,9 @@ class ScanPathLayer(BaseLayer):
 
         self.clear()
         self._points = list(points)
+        self._dot_items_by_index.clear()
+        self._current_marker = None
+        self._completed_path_item = None
         if len(self._points) < 2:
             return
 
@@ -247,12 +254,79 @@ class ScanPathLayer(BaseLayer):
             dot.setBrush(QBrush(QColor("#E8EEF8")))
             dot.setPen(QPen(QColor("#2A3A52")))
             self._register_item(dot)
+            self._dot_items_by_index[index] = dot
 
-    def set_progress(self, *, current_index: int, completed_count: int) -> None:
-        """Reserve scan progress state for future runtime integration."""
+        marker_radius = 7.0
+        self._current_marker = QGraphicsEllipseItem(-marker_radius, -marker_radius, marker_radius * 2, marker_radius * 2)
+        self._current_marker.setBrush(QBrush(QColor(251, 191, 36, 80)))
+        self._current_marker.setPen(QPen(QColor("#FBBF24"), 2.0))
+        self._current_marker.setVisible(False)
+        self._register_item(self._current_marker)
+        self._apply_progress_visual()
+
+    def set_progress(
+        self,
+        *,
+        current_index: int,
+        completed_count: int,
+        active: bool = False,
+    ) -> None:
+        """Update scan progress markers on the existing path layer."""
 
         self._current_index = max(0, current_index)
         self._completed_count = max(0, completed_count)
+        self._progress_active = active
+        self._apply_progress_visual()
+
+    def _apply_progress_visual(self) -> None:
+        from PySide6.QtCore import QPointF
+        from PySide6.QtGui import QBrush, QColor, QPainterPath, QPen
+        from PySide6.QtWidgets import QGraphicsPathItem
+
+        if not self._points:
+            return
+
+        completed = min(self._completed_count, len(self._points))
+        current = min(self._current_index, len(self._points) - 1)
+
+        for index, dot in self._dot_items_by_index.items():
+            if index < completed:
+                dot.setBrush(QBrush(QColor("#4ADE80")))
+                dot.setPen(QPen(QColor("#166534")))
+            elif self._progress_active and index == current:
+                dot.setBrush(QBrush(QColor("#FBBF24")))
+                dot.setPen(QPen(QColor("#92400E")))
+            else:
+                dot.setBrush(QBrush(QColor("#E8EEF8")))
+                dot.setPen(QPen(QColor("#2A3A52")))
+
+        if self._current_marker is not None:
+            if self._progress_active and completed < len(self._points):
+                x_value, y_value = self._points[current]
+                marker_radius = 7.0
+                self._current_marker.setRect(
+                    x_value - marker_radius,
+                    y_value - marker_radius,
+                    marker_radius * 2,
+                    marker_radius * 2,
+                )
+                self._current_marker.setVisible(True)
+            else:
+                self._current_marker.setVisible(False)
+
+        if self._completed_path_item is not None:
+            self._scene.removeItem(self._completed_path_item)
+            if self._completed_path_item in self._items:
+                self._items.remove(self._completed_path_item)
+            self._completed_path_item = None
+
+        if completed >= 2:
+            path = QPainterPath(QPointF(*self._points[0]))
+            for x_value, y_value in self._points[1:completed]:
+                path.lineTo(x_value, y_value)
+            completed_item = QGraphicsPathItem(path)
+            completed_item.setPen(QPen(QColor("#4ADE80"), 2.4))
+            self._completed_path_item = self._register_item(completed_item)
 
     @property
     def point_count(self) -> int:
