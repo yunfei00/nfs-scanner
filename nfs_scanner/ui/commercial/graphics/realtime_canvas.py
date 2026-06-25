@@ -23,7 +23,7 @@ class RealtimeCanvas(QGraphicsView):
         self._setup_view()
 
     @property
-    def scene(self) -> QGraphicsScene:
+    def graphics_scene(self) -> QGraphicsScene:
         """Return the owned graphics scene."""
 
         return self._scene

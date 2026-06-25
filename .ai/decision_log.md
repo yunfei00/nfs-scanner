@@ -24,7 +24,14 @@ Needs Review: yes/no
 - Impact: Cursor/Codex 可以在低风险细节上继续推进，并把非重大决策记录下来。
 - Needs Review: no
 
-### 2026-06-25 - Sprint 002 Task 01 Graphics Package Layout
+### 2026-06-25 - Sprint 002 Task 02 Canvas Interaction
+
+- Date: 2026-06-25
+- Task: sprint-002-task-02-realtime-canvas
+- Decision: 使用中键拖拽平移、滚轮缩放；场景矩形默认 800x600 作为空状态占位。
+- Reason: 与 ui-spec 交互规则一致，且不引入额外工具栏依赖。
+- Impact: 后续图层共享同一 scene rect，fit/reset 行为稳定。
+- Needs Review: no
 
 - Date: 2026-06-25
 - Task: sprint-002-task-01-graphics-package
