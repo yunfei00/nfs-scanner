@@ -1,27 +1,44 @@
-"""Central workspace placeholder for the commercial UI."""
+"""Central workspace with mode tabs."""
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QTabWidget, QVBoxLayout, QWidget
 
-from .widgets import CommercialCard
+from .views import (
+    DataTableView,
+    DataView,
+    DeviceCenterView,
+    RealtimeView,
+    ReportView,
+    ThreeDView,
+)
+
+WORKSPACE_TABS = (
+    ("实时视图", RealtimeView),
+    ("数据视图", DataView),
+    ("3D 视图", ThreeDView),
+    ("数据表格", DataTableView),
+    ("报告中心", ReportView),
+    ("设备中心", DeviceCenterView),
+)
 
 
 class CommercialWorkspace(QWidget):
-    """Placeholder workspace region. Expanded in Sprint 001 Task 05."""
+    """Central workspace tabs hosting placeholder work modes."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("commercialWorkspace")
+        self.tab_widget = QTabWidget(self)
         self._setup_ui()
 
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(8)
+        layout.setSpacing(0)
 
-        card = CommercialCard("中央工作区", self)
-        placeholder = QLabel("Workspace placeholder — tabs arrive in Task 05", card.body)
-        placeholder.setObjectName("commercialMutedLabel")
-        card.body_layout.addWidget(placeholder, 1)
-        layout.addWidget(card, 1)
+        self.tab_widget.setObjectName("commercialWorkspaceTabs")
+        self.tab_widget.setDocumentMode(True)
+        for title, view_type in WORKSPACE_TABS:
+            self.tab_widget.addTab(view_type(self.tab_widget), title)
+        layout.addWidget(self.tab_widget, 1)

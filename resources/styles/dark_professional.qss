@@ -215,6 +215,12 @@ QHeaderView::section {
     font-weight: 600;
 }
 
+QFrame#realtimeCanvasPlaceholder {
+    background-color: #172235;
+    border: 1px dashed #2A3A52;
+    border-radius: 8px;
+}
+
 QPlainTextEdit#commercialLogView {
     font-family: "Cascadia Mono", "Consolas", monospace;
     font-size: 12px;

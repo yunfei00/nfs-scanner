@@ -12,10 +12,11 @@ Sprint 001 - Commercial UI Shell (in progress)
 - [x] Sprint 001 Task 02 - Theme system
 - [x] Sprint 001 Task 03 - Main shell layout
 - [x] Sprint 001 Task 04 - Workflow and device panels
+- [x] Sprint 001 Task 05 - Workspace tabs
 
 ## In Progress
 
-- [ ] Sprint 001 Task 05 - Workspace tabs
+- [ ] Sprint 001 Task 06 - Property panel and bottom dock
 
 ## Notes
 
