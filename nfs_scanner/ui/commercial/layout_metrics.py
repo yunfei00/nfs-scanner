@@ -139,7 +139,7 @@ def collect_layout_metrics(shell: QMainWindow) -> CommercialLayoutMetrics:
 
 def _build_checks(metrics: CommercialLayoutMetrics) -> list[LayoutMetricCheck]:
     compact_screen = metrics.screen_available_height <= 768 or metrics.window_height <= 768
-    dock_min_required = 200 if compact_screen else 220
+    dock_min_required = 200 if compact_screen else 240
     log_min_required = 100 if compact_screen else 120
     stats_min_required = 100 if compact_screen else 120
     canvas_min_height = 240 if compact_screen else (360 if metrics.is_maximized else 280)
@@ -189,9 +189,9 @@ def _build_checks(metrics: CommercialLayoutMetrics) -> list[LayoutMetricCheck]:
         ),
         LayoutMetricCheck(
             name="right_panel_width",
-            expected="300–380 px",
+            expected="340–380 px",
             actual=f"{metrics.right_panel_width}px",
-            passed=_between(metrics.right_panel_width, 300, 380),
+            passed=_between(metrics.right_panel_width, 340, 380),
         ),
         LayoutMetricCheck(
             name="left_panel_width",

@@ -4,16 +4,17 @@ Last updated: 2026-06-26
 
 ## Current Mode
 
-**COMPLETE — Commercial Scrollbar / Slider UX Alignment**
+**COMPLETE — Target Screenshot Layout Replication**
 
-商业 UI 滚动条/滑块统一加粗（14px）、handle 最小 48px、hover/pressed 清晰；QA 含 scrollbar 可用性检查。
+商业 UI 已按目标图结构重构：顶部工具栏、左侧 timeline、中央 PCB+heatmap、右侧紧凑参数 Tab、底部三栏 dock。
 
 ## Recent (2026-06-26)
 
-- 全局 QScrollBar/QSlider/QProgressBar QSS 重写
-- `scroll_helpers.py` + 各区域 scroll 配置
-- `scroll_metrics.py` + QA interaction 检查
-- 720p visual + QA **PASS**
+- 目标图对齐：title bar + 13 项工具栏 + 授权区
+- 画布：PCB mock 满幅、白路径、ROI、MiniMap 绿框
+- 参数面板 350px 三 Tab + XYZ 网格
+- 底部频谱/统计/日志三栏 + QA 15+ 检查项
+- visual check + QA pipeline **PASS**
 
 ## Application Entry Points
 
@@ -27,9 +28,8 @@ Last updated: 2026-06-26
 | Sprint | Status |
 |--------|--------|
 | 001–022 | done — Demo 闭环 v0.1 |
-| 023–026 | done — Custom title bar + visual self-check |
 | Commercial Target Alignment | **done** |
-| Commercial Demo QA Pipeline | **done** |
+| Target Screenshot Replication | **done** |
 | Real Motion Control | **blocked** |
 
 ## Constraints (unchanged)

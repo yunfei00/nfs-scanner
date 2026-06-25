@@ -1,19 +1,19 @@
 {
-  "generated_at": "2026-06-26T07:31:18",
+  "generated_at": "2026-06-26T07:41:24",
   "default": {
     "uses_custom_title_bar": true,
-    "title_bar_height": 40,
+    "title_bar_height": 36,
     "bottom_dock_height": 200,
     "log_view_height": 140,
     "statistics_panel_height": 192,
     "left_panel_width": 240,
-    "right_panel_width": 320,
-    "workspace_width": 696,
-    "canvas_width": 636,
-    "canvas_height": 290,
-    "canvas_to_right_ratio": 1.9875,
-    "canvas_to_left_ratio": 2.65,
-    "canvas_view_area_ratio": 0.8053445113963846,
+    "right_panel_width": 350,
+    "workspace_width": 666,
+    "canvas_width": 606,
+    "canvas_height": 317,
+    "canvas_to_right_ratio": 1.7314285714285715,
+    "canvas_to_left_ratio": 2.525,
+    "canvas_view_area_ratio": 0.8103928318315278,
     "colorbar_gap_px": 2,
     "toolbar_overflow": false,
     "status_bar_visible": true,
@@ -23,7 +23,7 @@
     "screen_available_height": 720,
     "is_maximized": false,
     "scroll_usability": {
-      "left_scrollbar_width": 0,
+      "left_scrollbar_width": 14,
       "device_scrollbar_width": 14,
       "property_scrollbar_width": 14,
       "log_scrollbar_width": 14,
@@ -50,7 +50,7 @@
         {
           "name": "left_scrollbar_width",
           "expected": ">= 12px when visible",
-          "actual": "0px",
+          "actual": "14px",
           "passed": true
         },
         {
@@ -68,13 +68,13 @@
         {
           "name": "log_area_scrollable",
           "expected": "log content scrollable",
-          "actual": "range=9",
+          "actual": "range=5",
           "passed": true
         },
         {
           "name": "property_area_scrollable",
           "expected": "property panel scrollable",
-          "actual": "range=679",
+          "actual": "range=569",
           "passed": true
         },
         {
@@ -102,13 +102,13 @@
       {
         "name": "custom_title_bar",
         "expected": "frameless + title bar visible",
-        "actual": "custom=True, height=40px",
+        "actual": "custom=True, height=36px",
         "passed": true
       },
       {
         "name": "title_bar_height",
         "expected": "28–44 px",
-        "actual": "40px",
+        "actual": "36px",
         "passed": true
       },
       {
@@ -132,7 +132,7 @@
       {
         "name": "canvas_size",
         "expected": "height >= 240px",
-        "actual": "636x290px",
+        "actual": "606x317px",
         "passed": true
       },
       {
@@ -143,8 +143,8 @@
       },
       {
         "name": "right_panel_width",
-        "expected": "300–380 px",
-        "actual": "320px",
+        "expected": "340–380 px",
+        "actual": "350px",
         "passed": true
       },
       {
@@ -156,13 +156,13 @@
       {
         "name": "center_canvas_priority",
         "expected": "canvas >= 1.6x right, >= 2.0x left, area >= 50%",
-        "actual": "right=1.99x, left=2.65x, area=81%",
+        "actual": "right=1.73x, left=2.52x, area=81%",
         "passed": true
       },
       {
         "name": "workspace_wider_than_right_panel",
         "expected": "workspace > right panel",
-        "actual": "696px > 320px",
+        "actual": "666px > 350px",
         "passed": true
       },
       {
@@ -184,15 +184,33 @@
         "passed": true
       },
       {
+        "name": "target_style_mode",
+        "expected": "targetStyleMode enabled",
+        "actual": "true",
+        "passed": true
+      },
+      {
         "name": "logo_area_exists",
         "expected": "NFS logo block visible",
         "actual": "visible=True",
         "passed": true
       },
       {
+        "name": "top_toolbar_icon_mode",
+        "expected": ">= 12 toolbar actions",
+        "actual": "13",
+        "passed": true
+      },
+      {
         "name": "workflow_timeline_mode",
         "expected": ">= 7 timeline steps",
         "actual": "7",
+        "passed": true
+      },
+      {
+        "name": "right_compact_grid_form",
+        "expected": "property tabs + xyz grid rows",
+        "actual": "tabs=True, rows=3",
         "passed": true
       },
       {
@@ -208,21 +226,33 @@
         "passed": true
       },
       {
+        "name": "spectrum_yellow_curve_mode",
+        "expected": "yellow curve spectrum widget",
+        "actual": "true",
+        "passed": true
+      },
+      {
         "name": "scan_stats_panel_visible",
         "expected": "scan stats panel visible",
         "actual": "visible=True",
         "passed": true
       },
       {
-        "name": "log_panel_visible",
-        "expected": "log panel visible with >= 6 lines",
-        "actual": "lines=16",
+        "name": "scan_stats_demo_values",
+        "expected": "seeded runtime stat values",
+        "actual": "2.450 GHz",
         "passed": true
       },
       {
-        "name": "toolbar_item_count",
-        "expected": ">= 8 toolbar actions",
-        "actual": "10",
+        "name": "log_panel_visible",
+        "expected": "log panel visible with >= 6 lines",
+        "actual": "lines=12",
+        "passed": true
+      },
+      {
+        "name": "log_category_tags",
+        "expected": "INFO/WARN/ERROR/SCAN/DATA tags",
+        "actual": "True",
         "passed": true
       },
       {
@@ -234,7 +264,7 @@
       {
         "name": "heatmap_smooth_mode",
         "expected": "heatmap overlay enabled",
-        "actual": "heatmap_layer_ready",
+        "actual": "1",
         "passed": true
       },
       {
@@ -244,8 +274,8 @@
         "passed": true
       },
       {
-        "name": "right_panel_compact_mode",
-        "expected": "compact property panel enabled",
+        "name": "right_panel_no_horizontal_clip",
+        "expected": "property panel fits viewport width",
         "actual": "True",
         "passed": true
       },
@@ -288,7 +318,7 @@
       {
         "name": "left_scrollbar_width",
         "expected": ">= 12px when visible",
-        "actual": "0px",
+        "actual": "14px",
         "passed": true
       },
       {
@@ -306,13 +336,13 @@
       {
         "name": "log_area_scrollable",
         "expected": "log content scrollable",
-        "actual": "range=9",
+        "actual": "range=5",
         "passed": true
       },
       {
         "name": "property_area_scrollable",
         "expected": "property panel scrollable",
-        "actual": "range=679",
+        "actual": "range=569",
         "passed": true
       },
       {
@@ -338,18 +368,18 @@
   },
   "maximized": {
     "uses_custom_title_bar": true,
-    "title_bar_height": 40,
+    "title_bar_height": 36,
     "bottom_dock_height": 200,
     "log_view_height": 140,
     "statistics_panel_height": 192,
     "left_panel_width": 240,
-    "right_panel_width": 320,
-    "workspace_width": 696,
-    "canvas_width": 636,
-    "canvas_height": 290,
-    "canvas_to_right_ratio": 1.9875,
-    "canvas_to_left_ratio": 2.65,
-    "canvas_view_area_ratio": 0.8053445113963846,
+    "right_panel_width": 350,
+    "workspace_width": 666,
+    "canvas_width": 606,
+    "canvas_height": 317,
+    "canvas_to_right_ratio": 1.7314285714285715,
+    "canvas_to_left_ratio": 2.525,
+    "canvas_view_area_ratio": 0.8103928318315278,
     "colorbar_gap_px": 2,
     "toolbar_overflow": false,
     "status_bar_visible": true,
@@ -359,7 +389,7 @@
     "screen_available_height": 720,
     "is_maximized": true,
     "scroll_usability": {
-      "left_scrollbar_width": 0,
+      "left_scrollbar_width": 14,
       "device_scrollbar_width": 14,
       "property_scrollbar_width": 14,
       "log_scrollbar_width": 14,
@@ -386,7 +416,7 @@
         {
           "name": "left_scrollbar_width",
           "expected": ">= 12px when visible",
-          "actual": "0px",
+          "actual": "14px",
           "passed": true
         },
         {
@@ -404,13 +434,13 @@
         {
           "name": "log_area_scrollable",
           "expected": "log content scrollable",
-          "actual": "range=9",
+          "actual": "range=5",
           "passed": true
         },
         {
           "name": "property_area_scrollable",
           "expected": "property panel scrollable",
-          "actual": "range=679",
+          "actual": "range=569",
           "passed": true
         },
         {
@@ -438,13 +468,13 @@
       {
         "name": "custom_title_bar",
         "expected": "frameless + title bar visible",
-        "actual": "custom=True, height=40px",
+        "actual": "custom=True, height=36px",
         "passed": true
       },
       {
         "name": "title_bar_height",
         "expected": "28–44 px",
-        "actual": "40px",
+        "actual": "36px",
         "passed": true
       },
       {
@@ -468,7 +498,7 @@
       {
         "name": "canvas_size",
         "expected": "height >= 240px",
-        "actual": "636x290px",
+        "actual": "606x317px",
         "passed": true
       },
       {
@@ -479,8 +509,8 @@
       },
       {
         "name": "right_panel_width",
-        "expected": "300–380 px",
-        "actual": "320px",
+        "expected": "340–380 px",
+        "actual": "350px",
         "passed": true
       },
       {
@@ -492,13 +522,13 @@
       {
         "name": "center_canvas_priority",
         "expected": "canvas >= 1.6x right, >= 2.0x left, area >= 50%",
-        "actual": "right=1.99x, left=2.65x, area=81%",
+        "actual": "right=1.73x, left=2.52x, area=81%",
         "passed": true
       },
       {
         "name": "workspace_wider_than_right_panel",
         "expected": "workspace > right panel",
-        "actual": "696px > 320px",
+        "actual": "666px > 350px",
         "passed": true
       },
       {
@@ -520,15 +550,33 @@
         "passed": true
       },
       {
+        "name": "target_style_mode",
+        "expected": "targetStyleMode enabled",
+        "actual": "true",
+        "passed": true
+      },
+      {
         "name": "logo_area_exists",
         "expected": "NFS logo block visible",
         "actual": "visible=True",
         "passed": true
       },
       {
+        "name": "top_toolbar_icon_mode",
+        "expected": ">= 12 toolbar actions",
+        "actual": "13",
+        "passed": true
+      },
+      {
         "name": "workflow_timeline_mode",
         "expected": ">= 7 timeline steps",
         "actual": "7",
+        "passed": true
+      },
+      {
+        "name": "right_compact_grid_form",
+        "expected": "property tabs + xyz grid rows",
+        "actual": "tabs=True, rows=3",
         "passed": true
       },
       {
@@ -544,21 +592,33 @@
         "passed": true
       },
       {
+        "name": "spectrum_yellow_curve_mode",
+        "expected": "yellow curve spectrum widget",
+        "actual": "true",
+        "passed": true
+      },
+      {
         "name": "scan_stats_panel_visible",
         "expected": "scan stats panel visible",
         "actual": "visible=True",
         "passed": true
       },
       {
-        "name": "log_panel_visible",
-        "expected": "log panel visible with >= 6 lines",
-        "actual": "lines=16",
+        "name": "scan_stats_demo_values",
+        "expected": "seeded runtime stat values",
+        "actual": "2.450 GHz",
         "passed": true
       },
       {
-        "name": "toolbar_item_count",
-        "expected": ">= 8 toolbar actions",
-        "actual": "10",
+        "name": "log_panel_visible",
+        "expected": "log panel visible with >= 6 lines",
+        "actual": "lines=12",
+        "passed": true
+      },
+      {
+        "name": "log_category_tags",
+        "expected": "INFO/WARN/ERROR/SCAN/DATA tags",
+        "actual": "True",
         "passed": true
       },
       {
@@ -570,7 +630,7 @@
       {
         "name": "heatmap_smooth_mode",
         "expected": "heatmap overlay enabled",
-        "actual": "heatmap_layer_ready",
+        "actual": "1",
         "passed": true
       },
       {
@@ -580,8 +640,8 @@
         "passed": true
       },
       {
-        "name": "right_panel_compact_mode",
-        "expected": "compact property panel enabled",
+        "name": "right_panel_no_horizontal_clip",
+        "expected": "property panel fits viewport width",
         "actual": "True",
         "passed": true
       },
@@ -624,7 +684,7 @@
       {
         "name": "left_scrollbar_width",
         "expected": ">= 12px when visible",
-        "actual": "0px",
+        "actual": "14px",
         "passed": true
       },
       {
@@ -642,13 +702,13 @@
       {
         "name": "log_area_scrollable",
         "expected": "log content scrollable",
-        "actual": "range=9",
+        "actual": "range=5",
         "passed": true
       },
       {
         "name": "property_area_scrollable",
         "expected": "property panel scrollable",
-        "actual": "range=679",
+        "actual": "range=569",
         "passed": true
       },
       {

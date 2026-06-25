@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QFrame, QLabel, QProgressBar, QWidget
+from PySide6.QtWidgets import QFrame, QLabel, QProgressBar, QTabWidget, QWidget
 
 from nfs_scanner.ui.commercial.graphics.layers import LayerKind
 from nfs_scanner.ui.commercial.layout_metrics import LayoutMetricCheck
 from nfs_scanner.ui.commercial.main_shell import CommercialMainShell
+from nfs_scanner.ui.commercial.widgets.mock_chart_widgets import MockSpectrumWidget
 
 
 def collect_target_alignment_checks(shell: CommercialMainShell) -> list[LayoutMetricCheck]:
-    """Build target-page alignment assertions for visual QA."""
+    """Build target-screenshot alignment assertions for visual QA."""
 
     logo = shell.findChild(QFrame, "commercialTitleBarLogo")
     timeline_steps = shell.findChildren(QFrame, "nfsWorkflowTimelineStep")
@@ -22,13 +23,23 @@ def collect_target_alignment_checks(shell: CommercialMainShell) -> list[LayoutMe
     realtime = shell.workspace.realtime_view()
     roi_items = realtime.layer_manager.ensure_layer(LayerKind.ANNOTATION).items()
     toolbar_count = shell.toolbar.tool_button_count()
-    property_compact = shell.property_panel.property("compactMode") == "true"
+    property_tabs = shell.property_panel.findChild(QTabWidget, "commercialPropertyTabs")
+    grid_rows = shell.property_panel.findChildren(QWidget, "commercialPropertyGridRow")
+    spectrum_widget = shell.findChild(MockSpectrumWidget, "mockSpectrumWidget")
+    log_tags = shell.bottom_dock.has_log_category_tags()
 
     log_lines = 0
     if log_view is not None:
         log_lines = len(log_view.toPlainText().splitlines())
 
+    target_style = shell.property("targetStyleMode") == "true"
     checks = [
+        LayoutMetricCheck(
+            name="target_style_mode",
+            expected="targetStyleMode enabled",
+            actual=str(shell.property("targetStyleMode")),
+            passed=target_style,
+        ),
         LayoutMetricCheck(
             name="logo_area_exists",
             expected="NFS logo block visible",
@@ -36,10 +47,22 @@ def collect_target_alignment_checks(shell: CommercialMainShell) -> list[LayoutMe
             passed=logo is not None and logo.isVisible(),
         ),
         LayoutMetricCheck(
+            name="top_toolbar_icon_mode",
+            expected=">= 12 toolbar actions",
+            actual=str(toolbar_count),
+            passed=toolbar_count >= 12,
+        ),
+        LayoutMetricCheck(
             name="workflow_timeline_mode",
             expected=">= 7 timeline steps",
             actual=str(len(timeline_steps)),
             passed=len(timeline_steps) >= 7,
+        ),
+        LayoutMetricCheck(
+            name="right_compact_grid_form",
+            expected="property tabs + xyz grid rows",
+            actual=f"tabs={property_tabs is not None}, rows={len(grid_rows)}",
+            passed=property_tabs is not None and len(grid_rows) >= 3,
         ),
         LayoutMetricCheck(
             name="bottom_dock_three_panel_mode",
@@ -54,10 +77,22 @@ def collect_target_alignment_checks(shell: CommercialMainShell) -> list[LayoutMe
             passed=spectrum is not None and spectrum.isVisible(),
         ),
         LayoutMetricCheck(
+            name="spectrum_yellow_curve_mode",
+            expected="yellow curve spectrum widget",
+            actual=str(spectrum_widget.property("yellowCurveMode") if spectrum_widget else None),
+            passed=spectrum_widget is not None and spectrum_widget.property("yellowCurveMode") == "true",
+        ),
+        LayoutMetricCheck(
             name="scan_stats_panel_visible",
             expected="scan stats panel visible",
             actual=f"visible={stats.isVisible() if stats else False}",
             passed=stats is not None and stats.isVisible(),
+        ),
+        LayoutMetricCheck(
+            name="scan_stats_demo_values",
+            expected="seeded runtime stat values",
+            actual=shell.bottom_dock._runtime_stat_labels.get("current_freq", QLabel()).text(),
+            passed=shell.bottom_dock._runtime_stat_labels.get("current_freq", QLabel()).text() == "2.450 GHz",
         ),
         LayoutMetricCheck(
             name="log_panel_visible",
@@ -66,10 +101,10 @@ def collect_target_alignment_checks(shell: CommercialMainShell) -> list[LayoutMe
             passed=log_panel is not None and log_panel.isVisible() and log_lines >= 6,
         ),
         LayoutMetricCheck(
-            name="toolbar_item_count",
-            expected=">= 8 toolbar actions",
-            actual=str(toolbar_count),
-            passed=toolbar_count >= 8,
+            name="log_category_tags",
+            expected="INFO/WARN/ERROR/SCAN/DATA tags",
+            actual=str(log_tags),
+            passed=log_tags,
         ),
         LayoutMetricCheck(
             name="pcb_like_mock_board",
@@ -80,7 +115,7 @@ def collect_target_alignment_checks(shell: CommercialMainShell) -> list[LayoutMe
         LayoutMetricCheck(
             name="heatmap_smooth_mode",
             expected="heatmap overlay enabled",
-            actual="heatmap_layer_ready",
+            actual=str(len(realtime.layer_manager.ensure_layer(LayerKind.HEATMAP).items())),
             passed=len(realtime.layer_manager.ensure_layer(LayerKind.HEATMAP).items()) > 0,
         ),
         LayoutMetricCheck(
@@ -90,10 +125,10 @@ def collect_target_alignment_checks(shell: CommercialMainShell) -> list[LayoutMe
             passed=len(roi_items) >= 5,
         ),
         LayoutMetricCheck(
-            name="right_panel_compact_mode",
-            expected="compact property panel enabled",
-            actual=str(property_compact),
-            passed=bool(property_compact),
+            name="right_panel_no_horizontal_clip",
+            expected="property panel fits viewport width",
+            actual=str(not shell.property_panel.has_horizontal_clipping()),
+            passed=not shell.property_panel.has_horizontal_clipping(),
         ),
     ]
 

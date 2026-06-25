@@ -474,3 +474,12 @@ Needs Review: yes/no
 - Impact: visual + QA PASS；145 tests。
 - Needs Review: no
 
+### 2026-06-26 - Target Screenshot Layout Replication
+
+- Date: 2026-06-26
+- Task: target-screenshot-layout-replication
+- Decision: 按目标图重构商业 UI 五区：title bar 授权区 + 13 项 Qt 标准图标工具栏；PCB 满幅 mock + 白路径 + ROI；350px 三 Tab 参数面板；底部频谱/统计/日志三栏；`targetStyleMode` QA 检查。
+- Reason: 用户要求第一眼接近目标仪器软件，而非 Demo 壳。
+- Impact: visual + QA PASS；145 tests；不接真实设备。
+- Needs Review: no
+

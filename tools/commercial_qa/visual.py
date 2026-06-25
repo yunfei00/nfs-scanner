@@ -18,13 +18,17 @@ def _find_demo_indicator(shell: QMainWindow) -> tuple[bool, str]:
     banner = shell.findChild(QWidget, "demoModeBanner")
     if banner is not None and banner.isVisible():
         return True, "demoModeBanner visible"
-    badges = shell.findChild(QWidget, "commercialTitleBarBadges")
-    if badges is not None and badges.isVisible():
-        return True, "title bar status badges visible"
+    auth = shell.findChild(QWidget, "commercialTitleBarAuth")
+    if auth is not None and auth.isVisible():
+        return True, "title bar auth area visible"
+    if hasattr(shell, "status_bar_widget"):
+        demo_chip = shell.status_bar_widget.demo_label
+        if demo_chip.isVisible() and demo_chip.text().strip():
+            return True, f"status bar: {demo_chip.text()}"
     demo_label = shell.findChild(QLabel, "commercialTitleBarDemo")
     if demo_label is not None and demo_label.isVisible() and demo_label.text().strip():
         return True, f"title bar demo label: {demo_label.text()}"
-    return False, "no demo banner or title bar demo label"
+    return False, "no demo banner or status indicator"
 
 
 def _estimate_log_visible_lines(log_view, min_lines: int = 6) -> tuple[int, bool]:
@@ -42,7 +46,7 @@ def build_qa_visual_checks(metrics: CommercialLayoutMetrics, *, shell: QMainWind
     """Build QA-specific visual checks (stricter than visual_check on large screens)."""
 
     compact = metrics.screen_available_height <= 768 or metrics.window_height <= 768
-    dock_min = 200 if compact else 220
+    dock_min = 200 if compact else 240
     log_min = 100 if compact else 140
     stats_min = 100 if compact else 140
 
@@ -107,9 +111,9 @@ def build_qa_visual_checks(metrics: CommercialLayoutMetrics, *, shell: QMainWind
         QACheck(
             name="right_panel_width",
             category="visual",
-            expected="300–380 px",
+            expected="340–380 px",
             actual=f"{metrics.right_panel_width}px",
-            passed=_between(metrics.right_panel_width, 300, 380),
+            passed=_between(metrics.right_panel_width, 340, 380),
             auto_fixable=True,
         ),
         QACheck(
