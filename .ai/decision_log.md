@@ -248,3 +248,21 @@ Needs Review: yes/no
 - Reason: 高密度 mock 扫描会产生数百条重复日志，淹没有用信息。
 - Impact: `MockScanController._on_tick` 过滤 `Mock point` 前缀消息。
 - Needs Review: no
+
+### 2026-06-25 - Sprint 009 In-Memory Analysis
+
+- Date: 2026-06-25
+- Task: sprint-009-task-01
+- Decision: `MockAnalysisService` 仅维护内存任务列表，不读写 CSV 或项目文件。
+- Reason: Major Review Gate 前禁止数据格式与存储层变更。
+- Impact: 数据视图展示 demo 任务 + mock 扫描完成后自动追加条目。
+- Needs Review: no
+
+### 2026-06-25 - Sprint 010 Major Review Stop
+
+- Date: 2026-06-25
+- Task: sprint-010-major-review
+- Decision: Autopilot 在 Sprint 010 Major Review Gate 停止，不进入真实设备/ScanManager 集成。
+- Reason: `.ai/review_gate.md` 强制要求在真实设备接入前人工批准。
+- Impact: 007–009 mock 能力已 push；后续需人工 review 后再规划 M4/M5。
+- Needs Review: yes
