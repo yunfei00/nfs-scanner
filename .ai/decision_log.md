@@ -266,3 +266,21 @@ Needs Review: yes/no
 - Reason: `.ai/review_gate.md` 强制要求在真实设备接入前人工批准。
 - Impact: 007–009 mock 能力已 push；后续需人工 review 后再规划 M4/M5。
 - Needs Review: yes
+
+### 2026-06-25 - Sprint 010 Runtime Protocol
+
+- Date: 2026-06-25
+- Task: sprint-010-task-01
+- Decision: 使用 `typing.Protocol` 定义 `ScanRuntimeServiceProtocol` 与 `RuntimeSnapshot`，不依赖 PySide6。
+- Reason: 符合 `docs/architecture/10_service_architecture.md` 服务层边界。
+- Impact: Mock 与未来真实 runtime 可互换注入商业 UI。
+- Needs Review: no
+
+### 2026-06-25 - Sprint 010 Real Device Safety Default
+
+- Date: 2026-06-25
+- Task: sprint-010-task-06
+- Decision: `REAL_DEVICE_ENABLED=false`；仅当 `NFS_SCANNER_REAL_DEVICES=1` 且 Major Review 批准后才允许真实设备控制。
+- Reason: 用户批准集成准备但未批准真实设备控制；需独立 Major Review。
+- Impact: 工具栏「连接设备」默认禁用；`require_real_device_control()` 供未来真实 adapter 入口使用。
+- Needs Review: yes
