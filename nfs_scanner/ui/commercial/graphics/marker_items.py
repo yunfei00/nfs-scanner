@@ -35,7 +35,6 @@ class MarkerItem(QGraphicsEllipseItem):
         self.setFlag(QGraphicsEllipseItem.GraphicsItemFlag.ItemIsSelectable, True)
         self.setAcceptHoverEvents(True)
         self.setToolTip(self._format_tooltip(data))
-        self.setZValue(10.0)
 
     @property
     def data(self) -> MarkerData:

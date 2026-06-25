@@ -33,6 +33,24 @@ Needs Review: yes/no
 - Impact: 后续工作需人工 review 后再规划。
 - Needs Review: yes
 
+### 2026-06-25 - Sprint 002 Review Fix Layer Z-Order
+
+- Date: 2026-06-25
+- Task: Sprint 002 Review Fix
+- Decision: zValue 在 BaseLayer._register_item() 时应用；LayerManager 仅负责给 layer 分配 z_value。
+- Reason: build_mock() 在 ensure_layer() 之后创建 items，原先 _apply_z_order 时机过早。
+- Impact: 所有后续 layer item 自动获得稳定层级；Marker 不再覆盖为 10.0。
+- Needs Review: no
+
+### 2026-06-25 - Sprint 002 Review Fix Path Arrows
+
+- Date: 2026-06-25
+- Task: Sprint 002 Review Fix
+- Decision: ScanPathLayer 箭头使用路径段方向向量计算三角形，替代固定向左箭头。
+- Reason: 改动小、可读性更好，蛇形路径各段方向正确。
+- Impact: 仅 mock 路径显示改善，无业务逻辑变化。
+- Needs Review: no
+
 - Date: 2026-06-25
 - Task: sprint-002-task-09-integrate-realtime-view
 - Decision: RealtimeView 启动时自动 build_mock 全部图层并 fit_view。

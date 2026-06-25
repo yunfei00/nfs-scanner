@@ -2,13 +2,36 @@
 
 from __future__ import annotations
 
+import math
 from abc import ABC, abstractmethod
 from enum import Enum
 
-from PySide6.QtGui import QImage
+from PySide6.QtCore import QPointF
+from PySide6.QtGui import QImage, QPolygonF
 from PySide6.QtWidgets import QGraphicsItem, QGraphicsPixmapItem, QGraphicsScene
 
 from .mock_assets import CANVAS_HEIGHT, CANVAS_WIDTH, create_mock_board_qimage
+
+
+def _direction_arrow_polygon(tip: QPointF, direction: QPointF, *, size: float = 8.0) -> QPolygonF:
+    """Build a small arrow head aligned with one path segment direction."""
+
+    length = math.hypot(direction.x(), direction.y())
+    if length == 0:
+        return QPolygonF()
+
+    unit_x = direction.x() / length
+    unit_y = direction.y() / length
+    base = QPointF(tip.x() - unit_x * size, tip.y() - unit_y * size)
+    offset_x = -unit_y * size * 0.5
+    offset_y = unit_x * size * 0.5
+    return QPolygonF(
+        [
+            tip,
+            QPointF(base.x() + offset_x, base.y() + offset_y),
+            QPointF(base.x() - offset_x, base.y() - offset_y),
+        ]
+    )
 
 
 class LayerKind(str, Enum):
@@ -29,6 +52,20 @@ class BaseLayer(ABC):
     def __init__(self, scene: QGraphicsScene) -> None:
         self._scene = scene
         self._items: list[QGraphicsItem] = []
+        self._z_value = 0.0
+
+    @property
+    def z_value(self) -> float:
+        """Stable scene z-order assigned by LayerManager."""
+
+        return self._z_value
+
+    def set_z_value(self, z_value: float) -> None:
+        """Assign layer z-order and apply it to existing items."""
+
+        self._z_value = float(z_value)
+        for item in self._items:
+            item.setZValue(self._z_value)
 
     def items(self) -> list[QGraphicsItem]:
         """Return graphics items owned by this layer."""
@@ -50,6 +87,7 @@ class BaseLayer(ABC):
 
     def _register_item(self, item: QGraphicsItem) -> QGraphicsItem:
         self._scene.addItem(item)
+        item.setZValue(self._z_value)
         self._items.append(item)
         return item
 
@@ -179,16 +217,9 @@ class ScanPathLayer(BaseLayer):
         for index in range(len(self._points) - 1):
             start = QPointF(*self._points[index])
             end = QPointF(*self._points[index + 1])
-            direction = end - start
-            if direction.manhattanLength() == 0:
+            arrow = _direction_arrow_polygon(end, end - start)
+            if arrow.isEmpty():
                 continue
-            arrow = QPolygonF(
-                [
-                    end,
-                    end + QPointF(-8, -4),
-                    end + QPointF(-8, 4),
-                ]
-            )
             arrow_item = QGraphicsPolygonItem(arrow)
             arrow_item.setBrush(QBrush(QColor("#0EA5FF")))
             arrow_item.setPen(QPen(Qt.PenStyle.NoPen))

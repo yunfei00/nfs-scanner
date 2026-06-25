@@ -22,6 +22,14 @@ _LAYER_TYPES: dict[LayerKind, type[BaseLayer]] = {
     LayerKind.ANNOTATION: AnnotationLayer,
 }
 
+_LAYER_Z_VALUES: dict[LayerKind, float] = {
+    LayerKind.PHOTO: 0.0,
+    LayerKind.HEATMAP: 1.0,
+    LayerKind.PATH: 2.0,
+    LayerKind.MARKER: 3.0,
+    LayerKind.ANNOTATION: 4.0,
+}
+
 
 class LayerManager:
     """Manage layer creation, visibility, ordering, and cleanup."""
@@ -39,8 +47,8 @@ class LayerManager:
 
         layer_type = _LAYER_TYPES[kind]
         layer = layer_type(self._scene)
+        layer.set_z_value(_LAYER_Z_VALUES[kind])
         self._layers[kind] = layer
-        self._apply_z_order()
         return layer
 
     def get_layer(self, kind: LayerKind) -> BaseLayer | None:
@@ -73,10 +81,15 @@ class LayerManager:
 
         return tuple(kind for kind in _LAYER_ORDER if kind in self._layers)
 
-    def _apply_z_order(self) -> None:
-        for index, kind in enumerate(_LAYER_ORDER):
-            layer = self._layers.get(kind)
-            if layer is None:
-                continue
+    def verify_layer_z_values(self) -> bool:
+        """Return True when every registered item uses the expected layer z-order."""
+
+        for kind in self.layer_kinds():
+            expected = _LAYER_Z_VALUES[kind]
+            layer = self._layers[kind]
+            if layer.z_value != expected:
+                return False
             for item in layer.items():
-                item.setZValue(float(index))
+                if item.zValue() != expected:
+                    return False
+        return True
