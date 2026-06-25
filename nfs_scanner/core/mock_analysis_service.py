@@ -71,6 +71,11 @@ class MockAnalysisService:
     def list_tasks(self) -> list[MockScanTaskRecord]:
         return list(self._tasks)
 
+    def reset_to_defaults(self) -> None:
+        """Restore built-in demo tasks (mock-only, no CSV)."""
+
+        self._tasks = _default_tasks()
+
     def get_task(self, task_id: str) -> MockScanTaskRecord | None:
         for task in self._tasks:
             if task.task_id == task_id:
