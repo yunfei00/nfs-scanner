@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 from nfs_scanner.core.mock_analysis_service import MockAnalysisService, MockScanTaskRecord
 
 from ..widgets import NFSCard
+from ..widgets.mock_chart_widgets import MockHeatmapWidget, MockSpectrumWidget
 
 
 class DataView(QWidget):
@@ -29,7 +30,8 @@ class DataView(QWidget):
         self._task_list: QListWidget | None = None
         self._view_mode_combo: QComboBox | None = None
         self._summary_labels: dict[str, QLabel] = {}
-        self._heatmap_label: QLabel | None = None
+        self._heatmap_widget: MockHeatmapWidget | None = None
+        self._spectrum_widget: MockSpectrumWidget | None = None
         self._setup_ui()
         self.refresh_tasks()
 
@@ -44,11 +46,26 @@ class DataView(QWidget):
             return
         self._task_list.clear()
         for task in self._analysis_service.list_tasks():
-            item = QListWidgetItem(f"{task.name} ({task.point_count} pts)")
+            item = QListWidgetItem(self._format_task_item(task))
             item.setData(Qt.ItemDataRole.UserRole, task.task_id)
             self._task_list.addItem(item)
         if self._task_list.count() > 0:
             self._task_list.setCurrentRow(0)
+
+    def select_task(self, task_id: str) -> None:
+        if self._task_list is None:
+            return
+        for row in range(self._task_list.count()):
+            item = self._task_list.item(row)
+            if item is not None and item.data(Qt.ItemDataRole.UserRole) == task_id:
+                self._task_list.setCurrentRow(row)
+                return
+
+    def _format_task_item(self, task: MockScanTaskRecord) -> str:
+        return (
+            f"{task.name}\n"
+            f"{task.completed_at} | {task.point_count} pts | {task.scan_mode}"
+        )
 
     def _setup_ui(self) -> None:
         root_layout = QHBoxLayout(self)
@@ -57,7 +74,7 @@ class DataView(QWidget):
 
         list_card = NFSCard("历史任务", self)
         list_card.setMinimumWidth(240)
-        list_card.setMaximumWidth(280)
+        list_card.setMaximumWidth(300)
         self._task_list = QListWidget(list_card.body)
         self._task_list.setObjectName("nfsDataTaskList")
         self._task_list.currentItemChanged.connect(self._on_task_selected)
@@ -82,7 +99,7 @@ class DataView(QWidget):
         summary_card = NFSCard("分析摘要", analysis_column)
         summary_form = QFormLayout()
         summary_form.setContentsMargins(0, 0, 0, 0)
-        summary_form.setVerticalSpacing(8)
+        summary_form.setVerticalSpacing(6)
         for key, label in (
             ("point_count", "点数"),
             ("peak_frequency", "峰值频率"),
@@ -98,16 +115,25 @@ class DataView(QWidget):
             self._summary_labels[key] = value_label
         summary_card.body_layout.addLayout(summary_form)
 
-        heatmap_card = NFSCard("离线热力图", analysis_column)
-        self._heatmap_label = QLabel("选择任务以查看 mock 热力图占位区", heatmap_card.body)
-        self._heatmap_label.setObjectName("nfsMutedLabel")
-        self._heatmap_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._heatmap_label.setMinimumHeight(160)
-        heatmap_card.body_layout.addWidget(self._heatmap_label, 1)
+        charts_row = QWidget(analysis_column)
+        charts_layout = QHBoxLayout(charts_row)
+        charts_layout.setContentsMargins(0, 0, 0, 0)
+        charts_layout.setSpacing(8)
+
+        heatmap_card = NFSCard("离线热力图", charts_row)
+        self._heatmap_widget = MockHeatmapWidget(heatmap_card.body)
+        heatmap_card.body_layout.addWidget(self._heatmap_widget, 1)
+
+        spectrum_card = NFSCard("频谱曲线", charts_row)
+        self._spectrum_widget = MockSpectrumWidget(spectrum_card.body)
+        spectrum_card.body_layout.addWidget(self._spectrum_widget, 1)
+
+        charts_layout.addWidget(heatmap_card, 1)
+        charts_layout.addWidget(spectrum_card, 1)
 
         analysis_layout.addWidget(toolbar)
         analysis_layout.addWidget(summary_card)
-        analysis_layout.addWidget(heatmap_card, 1)
+        analysis_layout.addWidget(charts_row, 1)
 
         root_layout.addWidget(list_card)
         root_layout.addWidget(analysis_column, 1)
@@ -140,9 +166,11 @@ class DataView(QWidget):
         for key, label in self._summary_labels.items():
             label.setText(values.get(key, "--"))
 
-        if self._heatmap_label is not None:
-            self._heatmap_label.setText(
-                f"[{summary.view_mode.upper()}] {task.name}\n"
-                f"Mock heatmap placeholder — {summary.heatmap_grid}\n"
-                f"Peak {summary.peak_frequency} @ {summary.peak_amplitude}"
+        if self._heatmap_widget is not None:
+            self._heatmap_widget.set_task_context(
+                title=f"{task.name} [{view_mode}]",
+                point_count=task.point_count,
+                view_mode=view_mode,
             )
+        if self._spectrum_widget is not None:
+            self._spectrum_widget.set_view_mode(view_mode)

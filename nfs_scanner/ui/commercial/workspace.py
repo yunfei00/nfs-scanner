@@ -31,6 +31,7 @@ class CommercialWorkspace(QWidget):
 
     REALTIME_TAB_INDEX = 0
     DATA_VIEW_TAB_INDEX = 1
+    REPORT_VIEW_TAB_INDEX = 4
     DEVICE_CENTER_TAB_INDEX = 5
 
     def __init__(
@@ -44,6 +45,8 @@ class CommercialWorkspace(QWidget):
         self._services = services or create_commercial_services()
         self.tab_widget = QTabWidget(self)
         self._device_center_view: DeviceCenterView | None = None
+        self._data_view: DataView | None = None
+        self._report_view: ReportView | None = None
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -62,10 +65,23 @@ class CommercialWorkspace(QWidget):
                     self.tab_widget,
                 )
                 self._device_center_view = view
+            elif view_type is DataView:
+                view = DataView(self.tab_widget)
+                self._data_view = view
+            elif view_type is ReportView:
+                view = ReportView(
+                    self.tab_widget,
+                    project=self._services.project,
+                )
+                self._report_view = view
             else:
                 view = view_type(self.tab_widget)
             self.tab_widget.addTab(view, title)
         layout.addWidget(self.tab_widget, 1)
+
+    def switch_to_tab(self, index: int) -> None:
+        if 0 <= index < self.tab_widget.count():
+            self.tab_widget.setCurrentIndex(index)
 
     def realtime_view(self) -> RealtimeView:
         """Return the live realtime workspace tab."""
@@ -78,9 +94,19 @@ class CommercialWorkspace(QWidget):
     def data_view(self) -> DataView:
         """Return the offline data analysis workspace tab."""
 
+        if self._data_view is not None:
+            return self._data_view
         widget = self.tab_widget.widget(self.DATA_VIEW_TAB_INDEX)
         if not isinstance(widget, DataView):
             raise RuntimeError("Data tab is not a DataView instance")
+        return widget
+
+    def report_view(self) -> ReportView:
+        if self._report_view is not None:
+            return self._report_view
+        widget = self.tab_widget.widget(self.REPORT_VIEW_TAB_INDEX)
+        if not isinstance(widget, ReportView):
+            raise RuntimeError("Report tab is not a ReportView instance")
         return widget
 
     def device_center_view(self) -> DeviceCenterView:
@@ -92,3 +118,6 @@ class CommercialWorkspace(QWidget):
         if not isinstance(widget, DeviceCenterView):
             raise RuntimeError("Device center tab is not a DeviceCenterView instance")
         return widget
+
+    def bind_report_analysis(self, analysis) -> None:
+        self.report_view().bind_services(analysis, self._services.project)
