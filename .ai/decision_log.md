@@ -24,7 +24,14 @@ Needs Review: yes/no
 - Impact: Cursor/Codex 可以在低风险细节上继续推进，并把非重大决策记录下来。
 - Needs Review: no
 
-### 2026-06-25 - Sprint 002 Task 09 Realtime Integration
+### 2026-06-25 - Sprint 002 Review Gate Stop
+
+- Date: 2026-06-25
+- Task: sprint-002-task-10-sprint-review
+- Decision: Sprint 002 在 Review Gate 停止，不自动进入 Phase 3 或 Sprint 003。
+- Reason: 符合 constitution 与 review_gate 对 sprint 结束的强制 review 要求。
+- Impact: 后续工作需人工 review 后再规划。
+- Needs Review: yes
 
 - Date: 2026-06-25
 - Task: sprint-002-task-09-integrate-realtime-view
