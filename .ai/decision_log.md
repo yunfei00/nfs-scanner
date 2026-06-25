@@ -320,3 +320,21 @@ Needs Review: yes/no
 - Reason: 用户明确不批准真实设备控制；dry-run 层已完成预演。
 - Impact: 011–013 已 push；下一步需人工批准 Real Device Control Sprint。
 - Needs Review: yes
+
+### 2026-06-25 - Sprint 015 Connection Test Only
+
+- Date: 2026-06-25
+- Task: sprint-015
+- Decision: `MotionConnectionAdapter` 仅 open/close 串口；禁止 home/jog/move/write；不引入 pyserial 依赖到 requirements。
+- Reason: 用户批准真实连接测试但未批准运动控制；无 pyserial 时 discovery 返回空列表。
+- Impact: `real_connection_test` 模式需 `NFS_SCANNER_REAL_DEVICES=1`；默认 `connection_mode=mock`。
+- Needs Review: no
+
+### 2026-06-25 - Sprint 016 Major Review Stop
+
+- Date: 2026-06-25
+- Task: sprint-016-major-review
+- Decision: Sprint 016 Major Review Gate 停止；真实运动控制（jog/home/move）需单独 Major Review。
+- Reason: 连接测试与运动控制必须分阶段批准。
+- Impact: 015 已 push；不得自动进入 motion control Sprint。
+- Needs Review: yes
