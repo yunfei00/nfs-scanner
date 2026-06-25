@@ -1,16 +1,16 @@
-"""Mock device status panel backed by DeviceServiceProtocol."""
+"""Compact device status summary for the left sidebar."""
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QFormLayout, QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget
 
 from nfs_scanner.core.device_service import DeviceServiceProtocol, DeviceSummary
 
-from .widgets import NFSCard, NFSCollapsiblePanel, NFSSecondaryButton, NFSStatusBadge
+from .widgets import NFSCard, NFSCollapsiblePanel, NFSStatusBadge
 
 
 class CommercialDeviceStatusPanel(QWidget):
-    """Device cards for motion, spectrum and camera from a device service."""
+    """Sidebar summary cards; full controls live in Device Center."""
 
     def __init__(
         self,
@@ -27,7 +27,7 @@ class CommercialDeviceStatusPanel(QWidget):
         self.refresh_devices()
 
     def refresh_devices(self) -> None:
-        """Rebuild device cards from the current service state."""
+        """Rebuild summary cards from the current service state."""
 
         if self._cards_layout is None:
             return
@@ -37,58 +37,41 @@ class CommercialDeviceStatusPanel(QWidget):
             if widget is not None:
                 widget.deleteLater()
         for device in self._device_service.list_devices():
-            self._cards_layout.addWidget(self._create_device_card(device))
+            self._cards_layout.addWidget(self._create_summary_card(device))
+        hint = QLabel("详细连接与配置请前往「设备中心」", self)
+        hint.setObjectName("nfsMutedLabel")
+        hint.setWordWrap(True)
+        self._cards_layout.addWidget(hint)
 
     def _setup_ui(self) -> None:
         body = QWidget(self)
         self._cards_layout = QVBoxLayout(body)
         self._cards_layout.setContentsMargins(0, 0, 0, 0)
-        self._cards_layout.setSpacing(8)
+        self._cards_layout.setSpacing(6)
 
         panel = NFSCollapsiblePanel("设备状态", body, parent=self)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(panel)
 
-    def _create_device_card(self, device: DeviceSummary) -> NFSCard:
+    def _create_summary_card(self, device: DeviceSummary) -> NFSCard:
         card = NFSCard(device.display_name, self)
+        card.setProperty("cardRole", "deviceSummary")
 
-        header = QWidget(card.body)
-        header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(0, 0, 0, 0)
-        header_layout.addStretch(1)
-        header_layout.addWidget(NFSStatusBadge(device.status_label, device.badge_status, header))
-        card.body_layout.addWidget(header)
-
-        layout = QFormLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setHorizontalSpacing(8)
-        layout.setVerticalSpacing(6)
-        layout.addRow("型号/协议", QLabel(device.model, card.body))
-        layout.addRow("连接地址", QLabel(device.address, card.body))
-        summary = QLabel(device.summary, card.body)
+        row = QWidget(card.body)
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(6)
+        summary = QLabel(device.summary, row)
         summary.setObjectName("nfsValueLabel")
-        layout.addRow("参数摘要", summary)
-        card.body_layout.addLayout(layout)
+        summary.setWordWrap(True)
+        row_layout.addWidget(summary, 1)
+        row_layout.addWidget(NFSStatusBadge(device.status_label, device.badge_status, row))
+        card.body_layout.addWidget(row)
 
-        actions = QWidget(card.body)
-        actions_layout = QHBoxLayout(actions)
-        actions_layout.setContentsMargins(0, 0, 0, 0)
-        actions_layout.setSpacing(6)
-        connect_button = NFSSecondaryButton("连接", actions)
-        disconnect_button = NFSSecondaryButton("断开", actions)
-        connect_button.clicked.connect(lambda _checked=False, did=device.device_id: self._connect(did))
-        disconnect_button.clicked.connect(lambda _checked=False, did=device.device_id: self._disconnect(did))
-        actions_layout.addWidget(connect_button)
-        actions_layout.addWidget(disconnect_button)
-        actions_layout.addStretch(1)
-        card.body_layout.addWidget(actions)
+        if device.last_message:
+            message = QLabel(device.last_message, card.body)
+            message.setObjectName("nfsMutedLabel")
+            message.setWordWrap(True)
+            card.body_layout.addWidget(message)
         return card
-
-    def _connect(self, device_id: str) -> None:
-        self._device_service.connect_device(device_id)
-        self.refresh_devices()
-
-    def _disconnect(self, device_id: str) -> None:
-        self._device_service.disconnect_device(device_id)
-        self.refresh_devices()

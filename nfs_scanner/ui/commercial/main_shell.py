@@ -38,7 +38,7 @@ class CommercialMainShell(QMainWindow):
         self.toolbar = CommercialToolbar(self)
         self.workflow_panel = CommercialWorkflowPanel(self)
         self.device_status_panel = CommercialDeviceStatusPanel(self._services.devices, parent=self)
-        self.workspace = CommercialWorkspace(self)
+        self.workspace = CommercialWorkspace(self, services=self._services)
         self.property_panel = CommercialPropertyPanel(self)
         self.bottom_dock = CommercialBottomDock(self)
         self.status_bar_widget = CommercialStatusBar(self)
@@ -50,7 +50,13 @@ class CommercialMainShell(QMainWindow):
         self._apply_initial_window_size()
         self._connect_scan_preview()
         self._connect_mock_scan()
+        self._connect_device_sync()
         self.toolbar.apply_integration_safety()
+
+    def _connect_device_sync(self) -> None:
+        """Keep sidebar device summary in sync with device center actions."""
+
+        self.workspace.device_center_view().devices_changed.connect(self.device_status_panel.refresh_devices)
 
     def _connect_scan_preview(self) -> None:
         self.property_panel.scan_config_changed.connect(self._on_scan_config_changed)
