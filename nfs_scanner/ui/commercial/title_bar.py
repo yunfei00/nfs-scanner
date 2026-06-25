@@ -6,14 +6,13 @@ from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QToolButton, QVBoxLayout, QWidget
 
-from nfs_scanner.core.integration_safety import REAL_DEVICE_ENABLED
 from nfs_scanner.version import APP_VERSION
 
 
 class CommercialTitleBar(QFrame):
-    """Dark custom title bar with brand block, status badges, and window controls."""
+    """Dark title bar with brand block, auth/user area, and window controls."""
 
-    TITLE_HEIGHT = 40
+    TITLE_HEIGHT = 36
 
     def __init__(self, window: QWidget, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -27,12 +26,12 @@ class CommercialTitleBar(QFrame):
 
     def _setup_ui(self) -> None:
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 0, 4, 0)
-        layout.setSpacing(10)
+        layout.setContentsMargins(10, 0, 4, 0)
+        layout.setSpacing(8)
 
         logo = QFrame(self)
         logo.setObjectName("commercialTitleBarLogo")
-        logo.setFixedSize(32, 32)
+        logo.setFixedSize(36, 36)
         logo_layout = QVBoxLayout(logo)
         logo_layout.setContentsMargins(0, 0, 0, 0)
         logo_text = QLabel("NFS", logo)
@@ -55,16 +54,21 @@ class CommercialTitleBar(QFrame):
         layout.addWidget(brand)
         layout.addStretch(1)
 
-        badge_row = QWidget(self)
-        badge_row.setObjectName("commercialTitleBarBadges")
-        badge_layout = QHBoxLayout(badge_row)
-        badge_layout.setContentsMargins(0, 0, 0, 0)
-        badge_layout.setSpacing(4)
-        for text in ("MOCK", "DRY RUN", "NO HW", "REAL OFF" if not REAL_DEVICE_ENABLED else "REAL ON"):
-            badge = QLabel(text, badge_row)
-            badge.setObjectName("commercialTitleBarBadge")
-            badge_layout.addWidget(badge)
-        layout.addWidget(badge_row)
+        auth_row = QWidget(self)
+        auth_row.setObjectName("commercialTitleBarAuth")
+        auth_layout = QHBoxLayout(auth_row)
+        auth_layout.setContentsMargins(0, 0, 0, 0)
+        auth_layout.setSpacing(8)
+        auth_dot = QLabel("●", auth_row)
+        auth_dot.setObjectName("commercialTitleBarAuthDot")
+        auth_label = QLabel("授权状态: 正常", auth_row)
+        auth_label.setObjectName("commercialTitleBarAuthLabel")
+        user_label = QLabel("Admin  ▾", auth_row)
+        user_label.setObjectName("commercialTitleBarUser")
+        auth_layout.addWidget(auth_dot)
+        auth_layout.addWidget(auth_label)
+        auth_layout.addWidget(user_label)
+        layout.addWidget(auth_row)
 
         self._minimize_button = self._make_control_button("—", "最小化", self._on_minimize)
         self._maximize_button = self._make_control_button("□", "最大化", self._on_maximize)
@@ -86,7 +90,7 @@ class CommercialTitleBar(QFrame):
         button.setObjectName("commercialTitleBarClose" if danger else "commercialTitleBarControl")
         button.setText(text)
         button.setToolTip(tooltip)
-        button.setFixedSize(36, 28)
+        button.setFixedSize(32, 26)
         button.clicked.connect(slot)
         return button
 
