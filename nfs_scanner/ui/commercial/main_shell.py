@@ -43,6 +43,7 @@ class CommercialMainShell(QMainWindow):
 
     def _connect_scan_preview(self) -> None:
         self.property_panel.scan_config_changed.connect(self._on_scan_config_changed)
+        self.property_panel.scan_preview_updated.connect(self.bottom_dock.update_preview_stats)
 
     def _setup_ui(self) -> None:
         root = QWidget(self)
