@@ -9,9 +9,18 @@ import unittest
 from PySide6.QtWidgets import QApplication
 
 try:
+    from nfs_scanner.core.scan_config import ScanPathConfig, ScanRegion
     from nfs_scanner.ui.commercial.entry import create_commercial_shell
+    from nfs_scanner.ui.commercial.graphics.layers import LayerKind
+    from nfs_scanner.ui.commercial.property_panel import CommercialPropertyPanel
+    from nfs_scanner.ui.commercial.views.realtime_view import RealtimeView
 except ImportError as import_error:  # pragma: no cover - environment dependent
     create_commercial_shell = None  # type: ignore[assignment,misc]
+    CommercialPropertyPanel = None  # type: ignore[assignment,misc]
+    RealtimeView = None  # type: ignore[assignment,misc]
+    ScanRegion = None  # type: ignore[assignment,misc]
+    ScanPathConfig = None  # type: ignore[assignment,misc]
+    LayerKind = None  # type: ignore[assignment,misc]
     _IMPORT_ERROR = import_error
 else:
     _IMPORT_ERROR = None
@@ -46,6 +55,31 @@ class CommercialUiSmokeTestCase(unittest.TestCase):
             self.assertIsNotNone(shell.workspace)
             self.assertIsNotNone(shell.property_panel)
             self.assertIsNotNone(shell.bottom_dock)
+        finally:
+            shell.close()
+
+    def test_property_panel_and_realtime_view_construct(self) -> None:
+        panel = CommercialPropertyPanel()
+        view = RealtimeView()
+        try:
+            self.assertTrue(hasattr(panel, "scan_config_changed"))
+            self.assertTrue(hasattr(view, "update_path_preview"))
+            region = panel.current_scan_region()
+            config = panel.current_scan_path_config()
+            view.update_path_preview(region, config)
+        finally:
+            panel.close()
+            view.close()
+
+    def test_scan_preview_updates_path_layer(self) -> None:
+        shell = create_commercial_shell()
+        try:
+            view = shell.workspace.realtime_view()
+            region = ScanRegion(x_start=0.0, x_stop=50.0, y_start=0.0, y_stop=50.0, x_step=10.0, y_step=10.0)
+            config = ScanPathConfig(scan_mode="raster", dwell_ms=100, speed_mm_min=600.0)
+            view.update_path_preview(region, config)
+            path_layer = view.layer_manager.ensure_layer(LayerKind.PATH)
+            self.assertGreater(len(path_layer.items()), 0)
         finally:
             shell.close()
 

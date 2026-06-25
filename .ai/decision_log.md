@@ -167,3 +167,30 @@ Needs Review: yes/no
 - Reason: 符合 constitution 与 review_gate 要求。
 - Impact: 需人工确认中央画布视觉中心效果。
 - Needs Review: yes
+
+### 2026-06-25 - Sprint 005 Scan Preview Models
+
+- Date: 2026-06-25
+- Task: sprint-005-task-01
+- Decision: 商业预览配置独立于旧 `ScanConfig`，新增 `ScanRegion` / `ScanPathConfig` / `ScanPreviewStats`。
+- Reason: 预览 UI 需要 validation 与统计字段，但不改动现有扫描运行时模型。
+- Impact: 旧 `scan_manager` 与 `ScanConfig` 不受影响。
+- Needs Review: no
+
+### 2026-06-25 - Sprint 005 Scene Coordinate Mapping
+
+- Date: 2026-06-25
+- Task: sprint-005-task-04
+- Decision: 扫描 mm 坐标通过 `board_content_rect` 线性映射到 scene 像素。
+- Reason: 保持 photo/heatmap/path 图层对齐，预览路径始终落在板图可视区域内。
+- Impact: 仅商业 RealtimeView 预览层更新，不接真实运动控制。
+- Needs Review: no
+
+### 2026-06-25 - Sprint 005 Review Gate Stop
+
+- Date: 2026-06-25
+- Task: sprint-005-review
+- Decision: Sprint 005 在 Review Gate 停止，不自动进入 Sprint 006。
+- Reason: 符合 constitution 与 review_gate 要求。
+- Impact: 需人工验证参数变更→路径预览→统计联动。
+- Needs Review: yes
