@@ -52,6 +52,7 @@ class CommercialBottomDock(QWidget):
         self._runtime_stat_labels: dict[str, QLabel] = {}
         self._log_view: QPlainTextEdit | None = None
         self._spectrum_widget: MockSpectrumWidget | None = None
+        self._statistics_tab: QWidget | None = None
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -60,10 +61,36 @@ class CommercialBottomDock(QWidget):
         layout.setSpacing(0)
 
         self._dock.add_tab(self._build_spectrum_tab(), "频谱")
-        self._dock.add_tab(self._build_statistics_tab(), "统计")
+        self._statistics_tab = self._build_statistics_tab()
+        self._dock.add_tab(self._statistics_tab, "统计")
         log_index = self._dock.add_tab(self._build_logs_tab(), "日志")
         self._dock.tab_widget.setCurrentIndex(log_index)
         layout.addWidget(self._dock, 1)
+
+    def log_view_widget(self) -> QPlainTextEdit | None:
+        """Return the log text widget for visual verification."""
+
+        return self._log_view
+
+    def switch_to_logs_tab(self) -> None:
+        self._dock.tab_widget.setCurrentIndex(2)
+
+    def switch_to_statistics_tab(self) -> None:
+        self._dock.tab_widget.setCurrentIndex(1)
+
+    def statistics_content_height(self) -> int:
+        """Return the statistics tab content height."""
+
+        if self._statistics_tab is None:
+            return 0
+        panels = [
+            panel
+            for panel in self._statistics_tab.findChildren(QFrame)
+            if panel.objectName() == "dockStatPanel"
+        ]
+        if panels:
+            return max(panel.height() for panel in panels)
+        return self._statistics_tab.height()
 
     def update_preview_stats(self, stats: ScanPreviewStats) -> None:
         """Refresh bottom statistics tab with preview-only metrics."""
@@ -238,7 +265,7 @@ class CommercialBottomDock(QWidget):
         log_view.setPlainText("\n".join(_LOG_SEED_LINES))
         metrics = QFontMetrics(log_view.font())
         line_height = metrics.lineSpacing()
-        log_view.setMinimumHeight(line_height * self._LOG_VISIBLE_LINES + 12)
+        log_view.setMinimumHeight(max(100, line_height * self._LOG_VISIBLE_LINES + 12))
         self._log_view = log_view
 
         layout.addWidget(toolbar, 0)
