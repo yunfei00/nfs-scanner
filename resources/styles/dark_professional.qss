@@ -454,15 +454,144 @@ QScrollArea {
 }
 
 QScrollBar:vertical {
-    background: #111A2B;
-    width: 10px;
-    margin: 0;
+    background: #172235;
+    width: 14px;
+    margin: 2px;
+    border: none;
 }
 
 QScrollBar::handle:vertical {
-    background: #2A3A52;
+    background: #3A5068;
+    border: 1px solid #4A6580;
+    border-radius: 7px;
+    min-height: 48px;
+    margin: 2px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #4A6580;
+    border-color: #5A7898;
+}
+
+QScrollBar::handle:vertical:pressed {
+    background: #0EA5FF;
+    border-color: #38BDF8;
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    height: 0px;
+    width: 0px;
+    background: transparent;
+    border: none;
+}
+
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical {
+    background: transparent;
+}
+
+QScrollBar:horizontal {
+    background: #172235;
+    height: 14px;
+    margin: 2px;
+    border: none;
+}
+
+QScrollBar::handle:horizontal {
+    background: #3A5068;
+    border: 1px solid #4A6580;
+    border-radius: 7px;
+    min-width: 48px;
+    margin: 2px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background: #4A6580;
+    border-color: #5A7898;
+}
+
+QScrollBar::handle:horizontal:pressed {
+    background: #0EA5FF;
+    border-color: #38BDF8;
+}
+
+QScrollBar::add-line:horizontal,
+QScrollBar::sub-line:horizontal {
+    height: 0px;
+    width: 0px;
+    background: transparent;
+    border: none;
+}
+
+QScrollBar::add-page:horizontal,
+QScrollBar::sub-page:horizontal {
+    background: transparent;
+}
+
+QSlider::groove:horizontal {
+    background: #243247;
+    height: 6px;
+    border-radius: 3px;
+}
+
+QSlider::handle:horizontal {
+    background: #4A6580;
+    border: 1px solid #5A7898;
+    width: 16px;
+    height: 16px;
+    margin: -6px 0;
+    border-radius: 8px;
+}
+
+QSlider::handle:horizontal:hover {
+    background: #5A7898;
+    border-color: #7A98B8;
+}
+
+QSlider::handle:horizontal:pressed {
+    background: #0EA5FF;
+    border-color: #38BDF8;
+}
+
+QSlider::groove:vertical {
+    background: #243247;
+    width: 6px;
+    border-radius: 3px;
+}
+
+QSlider::handle:vertical {
+    background: #4A6580;
+    border: 1px solid #5A7898;
+    width: 16px;
+    height: 16px;
+    margin: 0 -6px;
+    border-radius: 8px;
+}
+
+QSlider::handle:vertical:hover {
+    background: #5A7898;
+    border-color: #7A98B8;
+}
+
+QSlider::handle:vertical:pressed {
+    background: #0EA5FF;
+    border-color: #38BDF8;
+}
+
+QProgressBar {
+    background: #172235;
+    border: 1px solid #2A3A52;
     border-radius: 4px;
-    min-height: 24px;
+    height: 10px;
+    text-align: center;
+    color: #AAB7C8;
+    font-size: 11px;
+}
+
+QProgressBar::chunk {
+    background: #0EA5FF;
+    border-radius: 3px;
 }
 
 QSplitter::handle {
@@ -511,6 +640,13 @@ QPlainTextEdit#nfsLogView {
     border: 1px solid #243247;
     border-radius: 4px;
     padding: 4px 6px;
+}
+
+QListWidget#nfsDataTaskList,
+QTableWidget#nfsDataTable {
+    background-color: #172235;
+    border: 1px solid #2A3A52;
+    border-radius: 6px;
 }
 
 /* --- Realtime workspace assistive widgets --- */
