@@ -24,7 +24,14 @@ Needs Review: yes/no
 - Impact: Cursor/Codex 可以在低风险细节上继续推进，并把非重大决策记录下来。
 - Needs Review: no
 
-### 2026-06-25 - Sprint 002 Task 08 Assistive Widget Placement
+### 2026-06-25 - Sprint 002 Task 09 Realtime Integration
+
+- Date: 2026-06-25
+- Task: sprint-002-task-09-integrate-realtime-view
+- Decision: RealtimeView 启动时自动 build_mock 全部图层并 fit_view。
+- Reason: 商业 UI 打开即可验证 Sprint 002 交付，无需手动触发。
+- Impact: 其它 Workspace Tab 未改动，Sprint 001 shell 保持完整。
+- Needs Review: no
 
 - Date: 2026-06-25
 - Task: sprint-002-task-08-colorbar-minimap
