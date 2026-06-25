@@ -80,6 +80,15 @@ class CommercialMainShell(QMainWindow):
             visible=snapshot.status in ("running", "paused"),
             paused=snapshot.status == "paused",
         )
+        if snapshot.status == "completed" and snapshot.total_points > 0:
+            data_view = self.workspace.data_view()
+            record = data_view.analysis_service.register_completed_mock_scan(
+                snapshot,
+                self.property_panel.current_scan_region(),
+                self.property_panel.current_scan_path_config(),
+            )
+            data_view.refresh_tasks()
+            self.bottom_dock.append_log_line(f"Registered mock task: {record.name}", level="SCAN")
         self._update_scan_controls(snapshot)
 
     def _update_scan_controls(self, snapshot) -> None:

@@ -100,6 +100,19 @@ class CommercialUiSmokeTestCase(unittest.TestCase):
         controller.stop()
         self.assertEqual(snapshots[-1].status, "stopped")
 
+    def test_data_view_lists_mock_tasks(self) -> None:
+        from nfs_scanner.ui.commercial.views.data_view import DataView
+
+        view = DataView()
+        try:
+            self.assertGreaterEqual(view.analysis_service.list_tasks().__len__(), 2)
+            view.refresh_tasks()
+            self.assertIsNotNone(view._task_list)
+            assert view._task_list is not None
+            self.assertGreaterEqual(view._task_list.count(), 2)
+        finally:
+            view.close()
+
     def test_high_density_preview_samples_path_markers(self) -> None:
         view = RealtimeView()
         try:
