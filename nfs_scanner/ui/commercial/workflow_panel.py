@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QFrame, QLabel, QSizePolicy, QVBoxLayout, QWidget
 
 from .widgets import NFSCollapsiblePanel
 
+StepState = Literal["pending", "active", "completed"]
 
 WORKFLOW_STEPS = (
     ("1", "项目管理", "创建或打开扫描项目"),
@@ -44,7 +47,7 @@ class _WorkflowStepFrame(QFrame):
 
 
 class CommercialWorkflowPanel(QWidget):
-    """Workflow step list with current-step highlighting."""
+    """Workflow step list with pending / active / completed highlighting."""
 
     step_selected = Signal(int)
 
@@ -52,7 +55,8 @@ class CommercialWorkflowPanel(QWidget):
         super().__init__(parent)
         self.setObjectName("commercialWorkflowPanel")
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
-        self._current_step_index = 1
+        self._step_states: list[StepState] = ["pending"] * len(WORKFLOW_STEPS)
+        self._step_states[0] = "active"
         self._step_frames: list[_WorkflowStepFrame] = []
         self._setup_ui()
 
@@ -77,12 +81,35 @@ class CommercialWorkflowPanel(QWidget):
     def set_current_step(self, index: int) -> None:
         if index < 0 or index >= len(WORKFLOW_STEPS):
             return
-        self._current_step_index = index
+        for step_index, state in enumerate(self._step_states):
+            if state == "active":
+                self._step_states[step_index] = "completed" if step_index < index else "pending"
+        self._step_states[index] = "active"
         self._refresh_step_styles()
         self.step_selected.emit(index)
 
+    def set_step_state(self, index: int, state: StepState) -> None:
+        if 0 <= index < len(self._step_states):
+            self._step_states[index] = state
+            self._refresh_step_styles()
+
+    def mark_completed_through(self, index: int) -> None:
+        """Mark steps 0..index as completed and index+1 as active when possible."""
+
+        for step_index in range(len(self._step_states)):
+            if step_index <= index:
+                self._step_states[step_index] = "completed"
+            elif step_index == index + 1:
+                self._step_states[step_index] = "active"
+            else:
+                if self._step_states[step_index] != "completed":
+                    self._step_states[step_index] = "pending"
+        self._refresh_step_styles()
+
     def _refresh_step_styles(self) -> None:
         for index, frame in enumerate(self._step_frames):
-            frame.setProperty("active", index == self._current_step_index)
+            state = self._step_states[index]
+            frame.setProperty("active", state == "active")
+            frame.setProperty("completed", state == "completed")
             frame.style().unpolish(frame)
             frame.style().polish(frame)
