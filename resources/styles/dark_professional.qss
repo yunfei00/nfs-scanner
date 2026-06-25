@@ -9,42 +9,58 @@ QMainWindow#commercialMainShell QWidget {
     font-size: 13px;
 }
 
+/* --- Shell regions --- */
+
 QWidget#commercialToolbar,
 QWidget#commercialStatusBar,
 QWidget#commercialBottomDock,
 QWidget#commercialPropertyPanel,
 QWidget#commercialWorkflowPanel,
 QWidget#commercialDeviceStatusPanel,
-QFrame#commercialCard,
-QFrame#commercialLeftArea {
+QFrame#commercialLeftArea,
+QFrame#nfsPanel,
+QWidget#nfsDockPanel {
     background-color: #111A2B;
     border: 1px solid #2A3A52;
     border-radius: 8px;
 }
 
+/* --- Cards & collapsible panels --- */
+
+QFrame#nfsCard,
+QFrame#nfsCollapsiblePanel,
 QFrame#commercialCard {
     background-color: #172235;
+    border: 1px solid #2A3A52;
+    border-radius: 8px;
 }
 
-QFrame#commercialCard:hover {
+QFrame#nfsCard:hover {
     background-color: #1D2B42;
 }
 
+/* --- Typography --- */
+
+QLabel#nfsSectionTitle,
 QLabel#commercialSectionTitle {
     color: #E8EEF8;
     font-size: 14px;
     font-weight: 600;
 }
 
+QLabel#nfsMutedLabel,
 QLabel#commercialMutedLabel,
 QLabel#commercialShellPlaceholder {
     color: #AAB7C8;
 }
 
+QLabel#nfsValueLabel,
 QLabel#commercialValueLabel {
     color: #E8EEF8;
     font-weight: 600;
 }
+
+/* --- Buttons (NFS + legacy aliases) --- */
 
 QPushButton {
     background-color: #172235;
@@ -63,6 +79,13 @@ QPushButton:pressed {
     background-color: #111A2B;
 }
 
+QPushButton:disabled {
+    color: #69788D;
+    background-color: #111A2B;
+    border-color: #2A3A52;
+}
+
+QPushButton#nfsPrimaryButton,
 QPushButton#primaryButton {
     background-color: #0EA5FF;
     border-color: #0EA5FF;
@@ -70,15 +93,18 @@ QPushButton#primaryButton {
     font-weight: 600;
 }
 
+QPushButton#nfsPrimaryButton:hover,
 QPushButton#primaryButton:hover {
     background-color: #38B6FF;
 }
 
+QPushButton#nfsSecondaryButton,
 QPushButton#secondaryButton {
     background-color: #172235;
     border-color: #2A3A52;
 }
 
+QPushButton#nfsDangerButton,
 QPushButton#dangerButton {
     background-color: #EF4444;
     border-color: #EF4444;
@@ -86,25 +112,90 @@ QPushButton#dangerButton {
     font-weight: 600;
 }
 
-QFrame#commercialWorkflowStep[active="true"] {
-    background-color: #172235;
-    border: 1px solid #0EA5FF;
-    border-radius: 8px;
+QPushButton#nfsDangerButton:hover,
+QPushButton#dangerButton:hover {
+    background-color: #F87171;
 }
 
-QFrame#commercialWorkflowStep {
-    background-color: transparent;
-    border: 1px solid transparent;
-    border-radius: 8px;
-}
-
+QToolButton#nfsToolButton,
 QToolButton#ghostButton {
     background-color: transparent;
     border: none;
     color: #AAB7C8;
     min-height: 24px;
     padding: 0 4px;
+    border-radius: 4px;
 }
+
+QToolButton#nfsToolButton:hover,
+QToolButton#ghostButton:hover {
+    color: #E8EEF8;
+    background-color: #1D2B42;
+}
+
+/* --- Workflow steps --- */
+
+QFrame#nfsWorkflowStep[active="true"],
+QFrame#commercialWorkflowStep[active="true"] {
+    background-color: #172235;
+    border: 1px solid #0EA5FF;
+    border-radius: 8px;
+}
+
+QFrame#nfsWorkflowStep,
+QFrame#commercialWorkflowStep {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+}
+
+/* --- Status badges --- */
+
+QLabel#nfsStatusBadge[badgeStatus="connected"],
+QLabel#statusBadgeConnected {
+    color: #22C55E;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background-color: rgba(34, 197, 94, 0.12);
+}
+
+QLabel#nfsStatusBadge[badgeStatus="disconnected"],
+QLabel#statusBadgeDisconnected {
+    color: #69788D;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background-color: rgba(105, 120, 141, 0.12);
+}
+
+QLabel#nfsStatusBadge[badgeStatus="warning"],
+QLabel#statusBadgeScanning {
+    color: #F59E0B;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background-color: rgba(245, 158, 11, 0.12);
+}
+
+QLabel#nfsStatusBadge[badgeStatus="running"] {
+    color: #0EA5FF;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background-color: rgba(14, 165, 255, 0.12);
+}
+
+QLabel#nfsStatusBadge[badgeStatus="error"],
+QLabel#statusBadgeError {
+    color: #EF4444;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background-color: rgba(239, 68, 68, 0.12);
+}
+
+/* --- Inputs --- */
 
 QLineEdit,
 QComboBox,
@@ -121,16 +212,51 @@ QTextEdit {
     selection-background-color: #0EA5FF;
 }
 
+QLineEdit:focus,
+QComboBox:focus,
+QSpinBox:focus,
+QDoubleSpinBox:focus,
+QPlainTextEdit:focus,
+QTextEdit:focus {
+    border-color: #0EA5FF;
+}
+
 QComboBox::drop-down {
     border: none;
     width: 24px;
 }
+
+QCheckBox {
+    spacing: 6px;
+    color: #E8EEF8;
+}
+
+QCheckBox::indicator {
+    width: 16px;
+    height: 16px;
+    border: 1px solid #2A3A52;
+    border-radius: 4px;
+    background-color: #172235;
+}
+
+QCheckBox::indicator:checked {
+    background-color: #0EA5FF;
+    border-color: #0EA5FF;
+}
+
+/* --- Tabs (property panel + dock) --- */
 
 QTabWidget::pane {
     border: 1px solid #2A3A52;
     border-radius: 8px;
     background-color: #111A2B;
     top: -1px;
+}
+
+QTabWidget#nfsDockTabs::pane,
+QTabWidget#commercialBottomDockTabs::pane,
+QTabWidget#commercialPropertyTabs::pane {
+    border-top-left-radius: 0;
 }
 
 QTabBar::tab {
@@ -149,6 +275,13 @@ QTabBar::tab:selected {
     color: #0EA5FF;
     font-weight: 600;
 }
+
+QTabBar::tab:hover:!selected {
+    background-color: #1D2B42;
+    color: #E8EEF8;
+}
+
+/* --- Scroll & split --- */
 
 QScrollArea {
     border: none;
@@ -179,25 +312,7 @@ QSplitter::handle:vertical {
     height: 4px;
 }
 
-QLabel#statusBadgeConnected {
-    color: #22C55E;
-    font-weight: 600;
-}
-
-QLabel#statusBadgeDisconnected {
-    color: #69788D;
-    font-weight: 600;
-}
-
-QLabel#statusBadgeScanning {
-    color: #F59E0B;
-    font-weight: 600;
-}
-
-QLabel#statusBadgeError {
-    color: #EF4444;
-    font-weight: 600;
-}
+/* --- Tables --- */
 
 QTableWidget {
     background-color: #172235;
@@ -215,13 +330,16 @@ QHeaderView::section {
     font-weight: 600;
 }
 
+/* --- Realtime canvas placeholder (legacy) --- */
+
 QFrame#realtimeCanvasPlaceholder {
     background-color: #172235;
     border: 1px dashed #2A3A52;
     border-radius: 8px;
 }
 
-QPlainTextEdit#commercialLogView {
+QPlainTextEdit#commercialLogView,
+QPlainTextEdit#nfsLogView {
     font-family: "Cascadia Mono", "Consolas", monospace;
     font-size: 12px;
 }
