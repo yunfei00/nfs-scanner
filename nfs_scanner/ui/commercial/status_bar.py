@@ -1,16 +1,59 @@
-"""Status bar placeholder for the commercial UI."""
+"""Status bar for the commercial UI shell."""
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from datetime import datetime
+
+from PySide6.QtCore import QTimer, Qt
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QWidget
 
 
-class CommercialStatusBar(QWidget):
-    """Placeholder status bar. Expanded in Sprint 001 Task 03."""
+class CommercialStatusBar(QFrame):
+    """Bottom status bar with mock system information."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("commercialStatusBar")
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 4, 8, 4)
-        layout.addWidget(QLabel("Status Bar (placeholder)", self))
+        self.setMinimumHeight(28)
+        self.setMaximumHeight(28)
+        self._setup_ui()
+        self._start_clock()
+
+    def _setup_ui(self) -> None:
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(12, 4, 12, 4)
+        layout.setSpacing(16)
+
+        self.system_label = self._create_label("系统状态: 就绪")
+        self.project_label = self._create_label("当前项目: Demo Project")
+        self.task_label = self._create_label("当前任务: 未开始")
+        self.progress_label = self._create_label("扫描进度: 0%")
+        self.license_label = self._create_label("授权: Trial (30 天)")
+        self.time_label = self._create_label("")
+
+        for widget in (
+            self.system_label,
+            self.project_label,
+            self.task_label,
+            self.progress_label,
+            self.license_label,
+        ):
+            layout.addWidget(widget)
+
+        layout.addStretch(1)
+        layout.addWidget(self.time_label)
+
+    def _create_label(self, text: str) -> QLabel:
+        label = QLabel(text, self)
+        label.setObjectName("commercialMutedLabel")
+        label.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        return label
+
+    def _start_clock(self) -> None:
+        timer = QTimer(self)
+        timer.timeout.connect(self._refresh_clock)
+        timer.start(1000)
+        self._refresh_clock()
+
+    def _refresh_clock(self) -> None:
+        self.time_label.setText(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))

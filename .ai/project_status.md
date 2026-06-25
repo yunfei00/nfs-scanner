@@ -10,10 +10,11 @@ Sprint 001 - Commercial UI Shell (in progress)
 
 - [x] Sprint 001 Task 01 - Commercial UI package and safe entry point
 - [x] Sprint 001 Task 02 - Theme system
+- [x] Sprint 001 Task 03 - Main shell layout
 
 ## In Progress
 
-- [ ] Sprint 001 Task 03 - Main shell layout
+- [ ] Sprint 001 Task 04 - Workflow and device panels
 
 ## Notes
 

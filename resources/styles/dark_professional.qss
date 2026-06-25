@@ -1,7 +1,8 @@
 /* Dark Professional theme for the commercial UI shell. */
 
-QWidget#commercialMainShell,
-QWidget#commercialMainShell QWidget {
+QMainWindow#commercialMainShell,
+QWidget#commercialRoot,
+QMainWindow#commercialMainShell QWidget {
     background-color: #0B1220;
     color: #E8EEF8;
     font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif;
