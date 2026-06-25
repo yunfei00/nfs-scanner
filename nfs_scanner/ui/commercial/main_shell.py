@@ -43,6 +43,7 @@ class CommercialMainShell(QMainWindow):
         self.bottom_dock = CommercialBottomDock(self)
         self.status_bar_widget = CommercialStatusBar(self)
         self.mock_scan = MockScanController(self._services.runtime, self)
+        self._last_dry_run_point = 0
         self._body_splitter: QSplitter | None = None
         self._center_splitter: QSplitter | None = None
         self._upper_splitter: QSplitter | None = None
@@ -72,6 +73,11 @@ class CommercialMainShell(QMainWindow):
         self._update_scan_controls(self.mock_scan.snapshot())
 
     def _start_mock_scan(self) -> None:
+        self._last_dry_run_point = 0
+        self._services.dry_run.log.clear()
+        self._services.dry_run.motion.home()
+        self._services.dry_run.spectrum.configure_frequency(1.5e9, 2.0e9)
+        self._flush_dry_run_logs()
         region = self.property_panel.current_scan_region()
         path_config = self.property_panel.current_scan_path_config()
         self.mock_scan.start(region, path_config)
@@ -103,7 +109,37 @@ class CommercialMainShell(QMainWindow):
             )
             data_view.refresh_tasks()
             self.bottom_dock.append_log_line(f"Registered mock task: {record.name}", level="SCAN")
+        self._emit_dry_run_if_needed(snapshot)
         self._update_scan_controls(snapshot)
+
+    def _emit_dry_run_if_needed(self, snapshot) -> None:
+        from nfs_scanner.core.mock_scan_runtime import MockScanRuntimeService
+
+        if snapshot.status not in ("running", "completed"):
+            return
+        if snapshot.completed_points <= self._last_dry_run_point:
+            return
+        runtime = self._services.runtime
+        if not isinstance(runtime, MockScanRuntimeService):
+            return
+        points = runtime.path_points
+        index = snapshot.completed_points - 1
+        if 0 <= index < len(points):
+            x_value, y_value, z_value = points[index]
+            self._services.dry_run.motion.move_to(x_value, y_value, z_value)
+            self._services.dry_run.spectrum.query_trace(points=101)
+            if snapshot.completed_points % 5 == 0:
+                self._services.dry_run.camera.capture_frame()
+        self._last_dry_run_point = snapshot.completed_points
+        self._flush_dry_run_logs()
+
+    def _flush_dry_run_logs(self) -> None:
+        lines = self._services.dry_run.log.format_lines()
+        if not lines:
+            return
+        latest = lines[-1]
+        self.bottom_dock.append_log_line(latest, level="DRY RUN")
+        self.workspace.device_center_view().append_dry_run_line(latest)
 
     def _update_scan_controls(self, snapshot) -> None:
         running = snapshot.status in ("running", "paused")

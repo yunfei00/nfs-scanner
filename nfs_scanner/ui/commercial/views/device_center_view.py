@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QPlainTextEdit,
     QScrollArea,
     QSpinBox,
     QVBoxLayout,
@@ -38,7 +39,7 @@ class DeviceCenterView(QWidget):
         self._device_service = device_service
         self._config_service = config_service or MockDeviceConfigService()
         self._cards_layout: QVBoxLayout | None = None
-        self._dry_run_log_view: QPlainTextEdit | None = None  # type: ignore[name-defined]
+        self._dry_run_log_view: QPlainTextEdit | None = None
         self._setup_ui()
         self.refresh_devices()
 
@@ -66,8 +67,6 @@ class DeviceCenterView(QWidget):
         self._cards_layout.addStretch(1)
 
     def _setup_ui(self) -> None:
-        from PySide6.QtWidgets import QPlainTextEdit
-
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(8)
