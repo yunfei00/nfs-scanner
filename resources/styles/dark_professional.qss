@@ -86,10 +86,24 @@ QPushButton#dangerButton {
     font-weight: 600;
 }
 
-QPushButton#ghostButton {
+QFrame#commercialWorkflowStep[active="true"] {
+    background-color: #172235;
+    border: 1px solid #0EA5FF;
+    border-radius: 8px;
+}
+
+QFrame#commercialWorkflowStep {
     background-color: transparent;
-    border-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+}
+
+QToolButton#ghostButton {
+    background-color: transparent;
+    border: none;
     color: #AAB7C8;
+    min-height: 24px;
+    padding: 0 4px;
 }
 
 QLineEdit,
