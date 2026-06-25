@@ -190,6 +190,22 @@ python -m nfs_scanner.main
 
 ---
 
+## AI Development Workflow
+
+本项目使用文档驱动的 AI 开发流程。开始任务前应优先阅读以下入口：
+
+- `.ai/cursor_workflow.md`：Cursor 固定执行流程。
+- `.ai/cursor_night_run.md`：长会话夜间执行指南。
+- `docs/product-spec/`：产品规格与验收口径。
+- `docs/architecture/`：系统架构与模块边界。
+- `docs/design-system/`：商业版 UI 设计系统。
+- `docs/ui-spec/`：商业版 UI 布局与视图规格。
+- `docs/component-library/`：组件库目标与首批 Widget 范围。
+
+每次 AI 任务应保持小步提交，遵守 `.ai/commit_rules.md`，并在 `.ai/review_gate.md` 定义的检查点暂停 review。
+
+---
+
 ## License
 
 For Research and Engineering Use.
