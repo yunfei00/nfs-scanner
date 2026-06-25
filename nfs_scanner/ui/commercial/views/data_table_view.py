@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QHeaderView, QLabel, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
+from ..scroll_helpers import configure_abstract_scroll_area
 from ..widgets import CommercialCard
 
 TABLE_COLUMNS = ("Point ID", "X", "Y", "Z", "Frequency", "Magnitude dB")
@@ -26,6 +27,7 @@ class DataTableView(QWidget):
         card.body_layout.addWidget(hint)
 
         table = QTableWidget(3, len(TABLE_COLUMNS), card.body)
+        table.setObjectName("nfsDataTable")
         table.setHorizontalHeaderLabels(TABLE_COLUMNS)
         table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         table.verticalHeader().setVisible(False)
@@ -40,4 +42,5 @@ class DataTableView(QWidget):
             for column, value in enumerate(values):
                 table.setItem(row, column, QTableWidgetItem(value))
         card.body_layout.addWidget(table, 1)
+        configure_abstract_scroll_area(table)
         layout.addWidget(card, 1)

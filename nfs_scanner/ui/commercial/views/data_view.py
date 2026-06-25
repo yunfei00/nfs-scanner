@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 
 from nfs_scanner.core.mock_analysis_service import MockAnalysisService, MockScanTaskRecord
 
+from ..scroll_helpers import configure_abstract_scroll_area
 from ..widgets import NFSCard
 from ..widgets.mock_chart_widgets import MockHeatmapWidget, MockSpectrumWidget
 
@@ -77,6 +78,7 @@ class DataView(QWidget):
         list_card.setMaximumWidth(300)
         self._task_list = QListWidget(list_card.body)
         self._task_list.setObjectName("nfsDataTaskList")
+        configure_abstract_scroll_area(self._task_list)
         self._task_list.currentItemChanged.connect(self._on_task_selected)
         list_card.body_layout.addWidget(self._task_list, 1)
 

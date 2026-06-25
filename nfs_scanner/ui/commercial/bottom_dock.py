@@ -21,6 +21,7 @@ from nfs_scanner.core.scan_config import ScanPreviewStats
 
 from .preview_stats_display import update_density_badge, update_mode_badge, update_preview_stat_labels
 from .runtime_display import format_duration_seconds
+from .scroll_helpers import configure_abstract_scroll_area
 from .widgets import NFSDockPanel, NFSStatusBadge
 from .widgets.mock_chart_widgets import MockSpectrumWidget
 
@@ -33,6 +34,14 @@ _LOG_SEED_LINES = (
     "[INFO] Use this panel to monitor scan lifecycle",
     "[DRY RUN] Command layer idle",
     "[INFO] Log auto-scroll enabled",
+    "[INFO] Scroll wheel and drag handle should feel smooth",
+    "[SCAN] Preview path updated",
+    "[DEVICE] Spectrum mock ready",
+    "[DEVICE] Camera mock ready",
+    "[INFO] QA seed line 13",
+    "[INFO] QA seed line 14",
+    "[INFO] QA seed line 15",
+    "[INFO] QA seed line 16",
 )
 
 
@@ -259,9 +268,10 @@ class CommercialBottomDock(QWidget):
         toolbar_layout.addWidget(clear_button)
 
         log_view = QPlainTextEdit(page)
-        log_view.setObjectName("nfsLogView")
+        log_view.setObjectName("commercialLogView")
         log_view.setReadOnly(True)
         log_view.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+        configure_abstract_scroll_area(log_view)
         log_view.setPlainText("\n".join(_LOG_SEED_LINES))
         metrics = QFontMetrics(log_view.font())
         line_height = metrics.lineSpacing()

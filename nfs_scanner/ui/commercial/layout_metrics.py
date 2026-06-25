@@ -42,6 +42,7 @@ class CommercialLayoutMetrics:
     screen_available_width: int = 0
     screen_available_height: int = 0
     is_maximized: bool = False
+    scroll_usability: dict = field(default_factory=dict)
     checks: list[LayoutMetricCheck] = field(default_factory=list)
 
     def all_passed(self) -> bool:
@@ -117,6 +118,20 @@ def collect_layout_metrics(shell: QMainWindow) -> CommercialLayoutMetrics:
     QApplication.processEvents()
 
     metrics.checks = _build_checks(metrics)
+
+    from nfs_scanner.ui.commercial.scroll_metrics import collect_scroll_usability_metrics
+
+    scroll_metrics = collect_scroll_usability_metrics(shell)
+    for scroll_check in scroll_metrics.checks:
+        metrics.checks.append(
+            LayoutMetricCheck(
+                name=scroll_check.name,
+                expected=scroll_check.expected,
+                actual=scroll_check.actual,
+                passed=scroll_check.passed,
+            )
+        )
+    metrics.scroll_usability = scroll_metrics.to_dict()
     return metrics
 
 

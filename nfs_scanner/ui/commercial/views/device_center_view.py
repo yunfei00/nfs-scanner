@@ -33,6 +33,7 @@ from nfs_scanner.core.motion_connection_adapter import (
 )
 from nfs_scanner.core.serial_discovery import list_serial_ports
 
+from ..scroll_helpers import configure_abstract_scroll_area, configure_scroll_area
 from ..widgets import NFSCard, NFSPrimaryButton, NFSSecondaryButton, NFSStatusBadge
 
 
@@ -98,6 +99,7 @@ class DeviceCenterView(QWidget):
 
         scroll = QScrollArea(self)
         scroll.setObjectName("deviceCenterScroll")
+        configure_scroll_area(scroll, vertical=True, horizontal=False)
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QScrollArea.Shape.NoFrame)
 
@@ -113,6 +115,7 @@ class DeviceCenterView(QWidget):
         self._dry_run_log_view = QPlainTextEdit(log_card.body)
         self._dry_run_log_view.setObjectName("nfsDryRunLogView")
         self._dry_run_log_view.setReadOnly(True)
+        configure_abstract_scroll_area(self._dry_run_log_view)
         self._dry_run_log_view.setPlaceholderText("DRY RUN - NO HARDWARE CONTROL")
         log_card.body_layout.addWidget(self._dry_run_log_view, 1)
         root_layout.addWidget(log_card)

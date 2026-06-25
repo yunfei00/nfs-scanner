@@ -31,6 +31,7 @@ from nfs_scanner.core.scan_config import (
     ScanRegion,
 )
 
+from .scroll_helpers import configure_scroll_area
 from .preview_stats_display import update_density_badge, update_mode_badge, update_preview_stat_labels
 from .widgets import NFSCard, NFSDangerButton, NFSNumericField, NFSParameterGroup, NFSPrimaryButton, NFSSecondaryButton, NFSStatusBadge
 
@@ -51,6 +52,7 @@ class CommercialPropertyPanel(QScrollArea):
         self.setObjectName("commercialPropertyPanel")
         self.setWidgetResizable(True)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self._debounce_timer = QTimer(self)
         self._debounce_timer.setSingleShot(True)
         self._debounce_timer.timeout.connect(self._emit_scan_config)
@@ -79,6 +81,7 @@ class CommercialPropertyPanel(QScrollArea):
         tabs.addTab(self._build_instrument_tab(tabs), "仪表设置")
         layout.addWidget(tabs)
         self.setWidget(container)
+        configure_scroll_area(self, vertical=True, horizontal=False)
 
     def _build_scan_tab(self, parent: QWidget) -> QWidget:
         page = QWidget(parent)

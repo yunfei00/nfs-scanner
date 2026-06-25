@@ -24,6 +24,7 @@ from .device_status_panel import CommercialDeviceStatusPanel
 from .property_panel import CommercialPropertyPanel
 from .runtime import MockScanController
 from .services import CommercialServiceBundle, create_commercial_services
+from .scroll_helpers import apply_commercial_scroll_config, configure_scroll_area
 from .status_bar import CommercialStatusBar
 from .title_bar import CommercialTitleBar
 from .toolbar import CommercialToolbar
@@ -91,6 +92,7 @@ class CommercialMainShell(QMainWindow):
         self._services.project.open_mock_project()
         self._refresh_project_ui()
         self.workflow_panel.mark_completed_through(0)
+        apply_commercial_scroll_config(self)
 
     def uses_custom_title_bar(self) -> bool:
         """Return True when the shell hides the native title bar."""
@@ -417,6 +419,7 @@ class CommercialMainShell(QMainWindow):
 
         device_scroll = QScrollArea(left_container)
         device_scroll.setObjectName("commercialDeviceScroll")
+        configure_scroll_area(device_scroll, vertical=True, horizontal=False)
         device_scroll.setFrameShape(QFrame.Shape.NoFrame)
         device_scroll.setWidgetResizable(True)
         device_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -428,6 +431,7 @@ class CommercialMainShell(QMainWindow):
 
         scroll_area = QScrollArea(self)
         scroll_area.setObjectName("commercialLeftScroll")
+        configure_scroll_area(scroll_area, vertical=True, horizontal=False)
         scroll_area.setFrameShape(QFrame.Shape.NoFrame)
         scroll_area.setWidgetResizable(True)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
