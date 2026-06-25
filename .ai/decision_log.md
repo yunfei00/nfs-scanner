@@ -24,7 +24,14 @@ Needs Review: yes/no
 - Impact: Cursor/Codex 可以在低风险细节上继续推进，并把非重大决策记录下来。
 - Needs Review: no
 
-### 2026-06-25 - Sprint 002 Task 07 Marker Tooltip
+### 2026-06-25 - Sprint 002 Task 08 Assistive Widget Placement
+
+- Date: 2026-06-25
+- Task: sprint-002-task-08-colorbar-minimap
+- Decision: ColorBar 放画布右侧，MiniMap 作为 canvas 子控件叠在右下角。
+- Reason: 不遮挡主画布操作区，符合 ui-spec assistive UI 要求。
+- Impact: Task 09 集成时在 RealtimeView 内完成布局绑定。
+- Needs Review: no
 
 - Date: 2026-06-25
 - Task: sprint-002-task-07-marker-layer
