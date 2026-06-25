@@ -438,3 +438,12 @@ Needs Review: yes/no
 - Impact: Windows 本地可运行；headless skip。
 - Needs Review: no
 
+### 2026-06-26 - Commercial Target Alignment
+
+- Date: 2026-06-26
+- Task: commercial-target-alignment
+- Decision: 工具栏主/次分组 + 1366px overflow；状态栏 chip；左侧 workflow 固定 + 设备区 QScrollArea；layout metrics 增加 canvas/colorbar/toolbar/status 检查；QSS 统一 toolbar/status/workflow pending。
+- Reason: 对齐用户确认的商业版目标图，减少人工 UI 逐项验收。
+- Impact: 仅商业 UI；138 tests + visual check PASS。
+- Needs Review: no
+

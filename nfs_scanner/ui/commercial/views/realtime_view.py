@@ -26,6 +26,7 @@ class RealtimeView(QWidget):
         super().__init__(parent)
         self.setObjectName("realtimeView")
         self.canvas = RealtimeCanvas(self)
+        self.canvas.setMinimumHeight(260)
         self.layer_manager = LayerManager(self.canvas.graphics_scene)
         self.color_bar = ColorBar(self)
         self.mini_map = MiniMap(self.canvas, self.canvas)
@@ -61,7 +62,7 @@ class RealtimeView(QWidget):
         canvas_row = QWidget(self)
         canvas_row_layout = QHBoxLayout(canvas_row)
         canvas_row_layout.setContentsMargins(0, 0, 0, 0)
-        canvas_row_layout.setSpacing(4)
+        canvas_row_layout.setSpacing(2)
 
         canvas_container = QWidget(canvas_row)
         canvas_container_layout = QVBoxLayout(canvas_container)

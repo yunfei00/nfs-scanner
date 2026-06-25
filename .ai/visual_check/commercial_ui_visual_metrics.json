@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-26T00:17:33",
+  "generated_at": "2026-06-26T00:21:18",
   "default": {
     "uses_custom_title_bar": true,
     "title_bar_height": 34,
@@ -9,6 +9,11 @@
     "left_panel_width": 280,
     "right_panel_width": 380,
     "workspace_width": 596,
+    "canvas_width": 536,
+    "canvas_height": 307,
+    "colorbar_gap_px": 2,
+    "toolbar_overflow": false,
+    "status_bar_visible": true,
     "window_width": 1280,
     "window_height": 720,
     "screen_available_width": 1280,
@@ -46,6 +51,18 @@
         "passed": true
       },
       {
+        "name": "canvas_size",
+        "expected": "height >= 240px",
+        "actual": "536x307px",
+        "passed": true
+      },
+      {
+        "name": "colorbar_adjacent",
+        "expected": "gap <= 12 px",
+        "actual": "2px",
+        "passed": true
+      },
+      {
         "name": "right_panel_width",
         "expected": "320–460 px",
         "actual": "380px",
@@ -61,6 +78,18 @@
         "name": "workspace_wider_than_right_panel",
         "expected": "workspace > right panel",
         "actual": "596px > 380px",
+        "passed": true
+      },
+      {
+        "name": "toolbar_no_overflow",
+        "expected": "toolbar fits layout",
+        "actual": "overflow=False",
+        "passed": true
+      },
+      {
+        "name": "status_bar_visible",
+        "expected": "status bar visible",
+        "actual": "True",
         "passed": true
       },
       {
@@ -81,6 +110,11 @@
     "left_panel_width": 280,
     "right_panel_width": 380,
     "workspace_width": 596,
+    "canvas_width": 536,
+    "canvas_height": 307,
+    "colorbar_gap_px": 2,
+    "toolbar_overflow": false,
+    "status_bar_visible": true,
     "window_width": 1280,
     "window_height": 720,
     "screen_available_width": 1280,
@@ -118,6 +152,18 @@
         "passed": true
       },
       {
+        "name": "canvas_size",
+        "expected": "height >= 240px",
+        "actual": "536x307px",
+        "passed": true
+      },
+      {
+        "name": "colorbar_adjacent",
+        "expected": "gap <= 12 px",
+        "actual": "2px",
+        "passed": true
+      },
+      {
         "name": "right_panel_width",
         "expected": "320–460 px",
         "actual": "380px",
@@ -136,8 +182,20 @@
         "passed": true
       },
       {
+        "name": "toolbar_no_overflow",
+        "expected": "toolbar fits layout",
+        "actual": "overflow=False",
+        "passed": true
+      },
+      {
+        "name": "status_bar_visible",
+        "expected": "status bar visible",
+        "actual": "True",
+        "passed": true
+      },
+      {
         "name": "maximized_window",
-        "expected": "isMaximized() == True",
+        "expected": "custom maximized == True",
         "actual": "True",
         "passed": true
       }

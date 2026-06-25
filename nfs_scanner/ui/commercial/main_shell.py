@@ -20,7 +20,6 @@ from nfs_scanner.core.demo_session import DemoServiceBundle, DemoSessionControll
 from nfs_scanner.core.mock_scan_runtime import MockScanRuntimeService
 
 from .bottom_dock import CommercialBottomDock
-from .demo_banner import DemoModeBanner
 from .device_status_panel import CommercialDeviceStatusPanel
 from .property_panel import CommercialPropertyPanel
 from .runtime import MockScanController
@@ -42,8 +41,8 @@ class CommercialMainShell(QMainWindow):
     RIGHT_PANEL_MIN_WIDTH = 360
     RIGHT_PANEL_MAX_WIDTH = 420
     BOTTOM_DOCK_MIN_HEIGHT = 220
-    BOTTOM_DOCK_RATIO = 0.30
-    BOTTOM_DOCK_MAXIMIZED_RATIO = 0.24
+    BOTTOM_DOCK_RATIO = 0.28
+    BOTTOM_DOCK_MAXIMIZED_RATIO = 0.22
     DEFAULT_WINDOW_WIDTH = 1600
     DEFAULT_WINDOW_HEIGHT = 900
 
@@ -62,7 +61,6 @@ class CommercialMainShell(QMainWindow):
         self._services = services or create_commercial_services()
         self._demo_controller = DemoSessionController()
         self.title_bar = CommercialTitleBar(self)
-        self.demo_banner = DemoModeBanner(self)
         self.toolbar = CommercialToolbar(self)
         self.workflow_panel = CommercialWorkflowPanel(self)
         self.device_status_panel = CommercialDeviceStatusPanel(self._services.devices, parent=self)
@@ -119,6 +117,7 @@ class CommercialMainShell(QMainWindow):
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
         self.title_bar.sync_maximize_button()
+        self.toolbar.update_compact_mode(event.size().width())
         self._apply_splitter_sizes(event.size().width(), event.size().height())
 
     def changeEvent(self, event: QEvent) -> None:
@@ -138,7 +137,7 @@ class CommercialMainShell(QMainWindow):
         device_center.devices_changed.connect(self._on_devices_changed)
 
     def _connect_project_workflow(self) -> None:
-        self.demo_banner.reset_requested.connect(self._reset_demo_session)
+        self.toolbar.demo_reset_requested.connect(self._reset_demo_session)
 
     def _connect_toolbar_actions(self) -> None:
         self.toolbar.project_new_requested.connect(self._on_new_project)
@@ -376,7 +375,6 @@ class CommercialMainShell(QMainWindow):
         content_layout.setContentsMargins(8, 6, 8, 8)
         content_layout.setSpacing(6)
 
-        content_layout.addWidget(self.demo_banner, 0)
         content_layout.addWidget(self.toolbar, 0)
         content_layout.addWidget(self._build_body_splitter(), 1)
 
@@ -415,8 +413,18 @@ class CommercialMainShell(QMainWindow):
         left_layout = QVBoxLayout(left_container)
         left_layout.setContentsMargins(8, 8, 8, 8)
         left_layout.setSpacing(8)
-        left_layout.addWidget(self.workflow_panel)
-        left_layout.addWidget(self.device_status_panel)
+        left_layout.addWidget(self.workflow_panel, 0)
+
+        device_scroll = QScrollArea(left_container)
+        device_scroll.setObjectName("commercialDeviceScroll")
+        device_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        device_scroll.setWidgetResizable(True)
+        device_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        device_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        device_scroll.setWidget(self.device_status_panel)
+        device_scroll.setMinimumHeight(120)
+        device_scroll.setMaximumHeight(240)
+        left_layout.addWidget(device_scroll, 1)
 
         scroll_area = QScrollArea(self)
         scroll_area.setObjectName("commercialLeftScroll")
@@ -547,10 +555,9 @@ class CommercialMainShell(QMainWindow):
 
             chrome_height = (
                 self.title_bar.height()
-                + self.demo_banner.height()
                 + self.toolbar.height()
                 + self.status_bar_widget.height()
-                + 56
+                + 44
             )
             body_height = max(height - chrome_height, 360 if compact else 420)
             bottom_ratio = (

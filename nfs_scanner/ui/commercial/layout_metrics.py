@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QMainWindow, QPlainTextEdit, QWidget
+from PySide6.QtWidgets import QApplication, QMainWindow
 
 
 @dataclass(slots=True)
@@ -30,6 +29,11 @@ class CommercialLayoutMetrics:
     left_panel_width: int = 0
     right_panel_width: int = 0
     workspace_width: int = 0
+    canvas_width: int = 0
+    canvas_height: int = 0
+    colorbar_gap_px: int = 0
+    toolbar_overflow: bool = False
+    status_bar_visible: bool = False
     window_width: int = 0
     window_height: int = 0
     screen_available_width: int = 0
@@ -59,6 +63,14 @@ def collect_layout_metrics(shell: QMainWindow) -> CommercialLayoutMetrics:
     if not isinstance(shell, CommercialMainShell):
         raise TypeError("Expected CommercialMainShell instance")
 
+    realtime = shell.workspace.realtime_view()
+    canvas = realtime.canvas
+    colorbar = realtime.color_bar
+
+    canvas_global = canvas.mapToGlobal(canvas.rect().topLeft())
+    colorbar_global = colorbar.mapToGlobal(colorbar.rect().topLeft())
+    colorbar_gap = max(colorbar_global.x() - (canvas_global.x() + canvas.width()), 0)
+
     metrics = CommercialLayoutMetrics(
         uses_custom_title_bar=shell.uses_custom_title_bar(),
         title_bar_height=shell.title_bar.height(),
@@ -66,6 +78,11 @@ def collect_layout_metrics(shell: QMainWindow) -> CommercialLayoutMetrics:
         left_panel_width=shell.left_scroll_area.width(),
         right_panel_width=shell.property_panel.width(),
         workspace_width=shell.workspace.width(),
+        canvas_width=canvas.width(),
+        canvas_height=canvas.height(),
+        colorbar_gap_px=colorbar_gap,
+        toolbar_overflow=shell.toolbar.has_layout_overflow(),
+        status_bar_visible=shell.status_bar_widget.is_fully_visible(),
         window_width=shell.width(),
         window_height=shell.height(),
         is_maximized=shell.is_custom_maximized() or shell.isMaximized(),
@@ -76,6 +93,8 @@ def collect_layout_metrics(shell: QMainWindow) -> CommercialLayoutMetrics:
         available = screen.availableGeometry()
         metrics.screen_available_width = available.width()
         metrics.screen_available_height = available.height()
+
+    shell.toolbar.update_compact_mode(shell.width())
 
     log_view = shell.bottom_dock.log_view_widget()
     shell.bottom_dock.switch_to_logs_tab()
@@ -98,6 +117,7 @@ def _build_checks(metrics: CommercialLayoutMetrics) -> list[LayoutMetricCheck]:
     dock_min_required = 195 if compact_screen else 200
     log_min_required = 100 if compact_screen else 120
     stats_min_required = 100 if compact_screen else 120
+    canvas_min_height = 240 if compact_screen else (360 if metrics.is_maximized else 280)
 
     checks = [
         LayoutMetricCheck(
@@ -131,6 +151,18 @@ def _build_checks(metrics: CommercialLayoutMetrics) -> list[LayoutMetricCheck]:
             passed=metrics.statistics_panel_height >= stats_min_required,
         ),
         LayoutMetricCheck(
+            name="canvas_size",
+            expected=f"height >= {canvas_min_height}px",
+            actual=f"{metrics.canvas_width}x{metrics.canvas_height}px",
+            passed=metrics.canvas_height >= canvas_min_height and metrics.canvas_width >= 320,
+        ),
+        LayoutMetricCheck(
+            name="colorbar_adjacent",
+            expected="gap <= 12 px",
+            actual=f"{metrics.colorbar_gap_px}px",
+            passed=metrics.colorbar_gap_px <= 12,
+        ),
+        LayoutMetricCheck(
             name="right_panel_width",
             expected="320–460 px",
             actual=f"{metrics.right_panel_width}px",
@@ -147,6 +179,18 @@ def _build_checks(metrics: CommercialLayoutMetrics) -> list[LayoutMetricCheck]:
             expected="workspace > right panel",
             actual=f"{metrics.workspace_width}px > {metrics.right_panel_width}px",
             passed=metrics.workspace_width > metrics.right_panel_width,
+        ),
+        LayoutMetricCheck(
+            name="toolbar_no_overflow",
+            expected="toolbar fits layout",
+            actual=f"overflow={metrics.toolbar_overflow}",
+            passed=not metrics.toolbar_overflow,
+        ),
+        LayoutMetricCheck(
+            name="status_bar_visible",
+            expected="status bar visible",
+            actual=str(metrics.status_bar_visible),
+            passed=metrics.status_bar_visible,
         ),
     ]
 
@@ -169,7 +213,7 @@ def _build_checks(metrics: CommercialLayoutMetrics) -> list[LayoutMetricCheck]:
         checks.append(
             LayoutMetricCheck(
                 name="maximized_window",
-                expected="isMaximized() == True",
+                expected="custom maximized == True",
                 actual=str(metrics.is_maximized),
                 passed=metrics.is_maximized,
             )
