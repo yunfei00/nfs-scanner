@@ -24,7 +24,14 @@ Needs Review: yes/no
 - Impact: Cursor/Codex 可以在低风险细节上继续推进，并把非重大决策记录下来。
 - Needs Review: no
 
-### 2026-06-25 - Sprint 002 Task 03 Layer Z-Order
+### 2026-06-25 - Sprint 002 Task 04 Mock Board Size
+
+- Date: 2026-06-25
+- Task: sprint-002-task-04-photo-layer
+- Decision: Mock 板图默认尺寸 800x600，与 canvas 空状态一致。
+- Reason: 保证热力图与路径层可对齐叠加。
+- Impact: 后续图层无需额外坐标变换即可共享 scene rect。
+- Needs Review: no
 
 - Date: 2026-06-25
 - Task: sprint-002-task-03-layer-manager

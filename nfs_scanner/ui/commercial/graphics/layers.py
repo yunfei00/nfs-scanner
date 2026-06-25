@@ -5,7 +5,10 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from enum import Enum
 
-from PySide6.QtWidgets import QGraphicsItem, QGraphicsScene
+from PySide6.QtGui import QImage
+from PySide6.QtWidgets import QGraphicsItem, QGraphicsPixmapItem, QGraphicsScene
+
+from .mock_assets import CANVAS_HEIGHT, CANVAS_WIDTH, create_mock_board_qimage
 
 
 class LayerKind(str, Enum):
@@ -56,12 +59,41 @@ class BaseLayer(ABC):
 
 
 class PhotoLayer(BaseLayer):
-    """Photo layer. Expanded in Task 04."""
+    """Display camera photos, imported images, or mock board backgrounds."""
 
     kind = LayerKind.PHOTO
 
+    def __init__(self, scene: QGraphicsScene) -> None:
+        super().__init__(scene)
+        self._pixmap_item: QGraphicsPixmapItem | None = None
+
     def build_mock(self) -> None:
-        return
+        """Show a generated mock board image."""
+
+        self.set_photo_image(create_mock_board_qimage())
+
+    def set_photo_image(self, image: QImage) -> None:
+        """Load one photo image into the layer (future camera/import API)."""
+
+        from PySide6.QtGui import QPixmap
+
+        self.clear()
+        pixmap = QPixmap.fromImage(image)
+        item = QGraphicsPixmapItem(pixmap)
+        item.setPos(0, 0)
+        self._pixmap_item = self._register_item(item)
+
+    @property
+    def canvas_width(self) -> int:
+        if self._pixmap_item is not None:
+            return int(self._pixmap_item.pixmap().width())
+        return CANVAS_WIDTH
+
+    @property
+    def canvas_height(self) -> int:
+        if self._pixmap_item is not None:
+            return int(self._pixmap_item.pixmap().height())
+        return CANVAS_HEIGHT
 
 
 class HeatmapLayer(BaseLayer):
