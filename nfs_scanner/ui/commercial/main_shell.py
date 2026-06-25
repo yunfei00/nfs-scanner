@@ -38,12 +38,12 @@ class CommercialMainShell(QMainWindow):
     LEFT_PANEL_WIDTH = 240
     LEFT_PANEL_MIN_WIDTH = 220
     LEFT_PANEL_MAX_WIDTH = 260
-    RIGHT_PANEL_WIDTH = 320
-    RIGHT_PANEL_MIN_WIDTH = 300
+    RIGHT_PANEL_WIDTH = 350
+    RIGHT_PANEL_MIN_WIDTH = 340
     RIGHT_PANEL_MAX_WIDTH = 360
-    BOTTOM_DOCK_MIN_HEIGHT = 220
-    BOTTOM_DOCK_RATIO = 0.24
-    BOTTOM_DOCK_MAXIMIZED_RATIO = 0.20
+    BOTTOM_DOCK_MIN_HEIGHT = 240
+    BOTTOM_DOCK_RATIO = 0.26
+    BOTTOM_DOCK_MAXIMIZED_RATIO = 0.22
     DEFAULT_WINDOW_WIDTH = 1600
     DEFAULT_WINDOW_HEIGHT = 900
 
@@ -55,6 +55,7 @@ class CommercialMainShell(QMainWindow):
     ) -> None:
         super().__init__(parent)
         self.setObjectName("commercialMainShell")
+        self.setProperty("targetStyleMode", "true")
         self.setWindowFlags(
             Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint
         )
@@ -91,7 +92,8 @@ class CommercialMainShell(QMainWindow):
         self.toolbar.apply_integration_safety()
         self._services.project.open_mock_project()
         self._refresh_project_ui()
-        self.workflow_panel.mark_completed_through(0)
+        self.workflow_panel.apply_target_demo_state(active_index=4, progress_percent=65.2)
+        self.bottom_dock.seed_target_demo_stats()
         apply_commercial_scroll_config(self)
 
     def uses_custom_title_bar(self) -> bool:
@@ -150,6 +152,9 @@ class CommercialMainShell(QMainWindow):
         self.toolbar.export_data_requested.connect(self._on_export_data)
         self.toolbar.report_center_requested.connect(self._on_report_center)
         self.toolbar.device_center_requested.connect(self._on_connect_device)
+        self.toolbar.mock_action_requested.connect(
+            lambda action: self.bottom_dock.append_log_line(f"Mock 操作: {action}", level="INFO")
+        )
 
     def _connect_workflow_navigation(self) -> None:
         self.workflow_panel.step_selected.connect(self._on_workflow_step_selected)
@@ -427,7 +432,7 @@ class CommercialMainShell(QMainWindow):
         device_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         device_scroll.setWidget(self.device_status_panel)
         device_scroll.setMinimumHeight(100)
-        device_scroll.setMaximumHeight(180)
+        device_scroll.setMaximumHeight(200)
         left_layout.addWidget(device_scroll, 1)
 
         scroll_area = QScrollArea(self)
@@ -464,7 +469,7 @@ class CommercialMainShell(QMainWindow):
         upper_splitter.setStretchFactor(0, 1)
         upper_splitter.setStretchFactor(1, 0)
 
-        self.bottom_dock.setMinimumHeight(220)
+        self.bottom_dock.setMinimumHeight(240)
         self.bottom_dock.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         center_splitter.addWidget(upper_splitter)

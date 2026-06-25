@@ -910,3 +910,104 @@ QWidget#nfsMiniMap {
     background-color: transparent;
     border: none;
 }
+
+/* --- Target screenshot replication extras --- */
+
+QWidget#commercialTitleBarAuth {
+    background-color: transparent;
+}
+
+QLabel#commercialTitleBarAuthDot {
+    color: #22C55E;
+    font-size: 10px;
+}
+
+QLabel#commercialTitleBarAuthLabel,
+QLabel#commercialTitleBarUser {
+    color: #AAB7C8;
+    font-size: 11px;
+}
+
+QToolButton#commercialIconToolSuccess {
+    background-color: rgba(34, 197, 94, 0.14);
+    border-color: rgba(34, 197, 94, 0.35);
+    color: #4ADE80;
+}
+
+QLabel#nfsWorkflowTimelineProgress {
+    color: #38B6FF;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+QFrame#nfsWorkflowTimelineStep[active="true"] {
+    background-color: rgba(14, 165, 255, 0.16);
+    border: 1px solid rgba(56, 182, 255, 0.55);
+    border-radius: 6px;
+}
+
+QLabel#canvasCursorTitle {
+    color: #E8EEF8;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+QWidget#commercialPropertyGridRow QLabel#nfsMutedLabel {
+    font-size: 11px;
+}
+
+QLabel#commercialLogCategoryTag {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background-color: rgba(105, 120, 141, 0.18);
+    color: #AAB7C8;
+}
+
+QLabel#commercialLogCategoryTag[logLevel="INFO"] {
+    color: #38B6FF;
+    background-color: rgba(56, 182, 255, 0.12);
+}
+
+QLabel#commercialLogCategoryTag[logLevel="WARN"] {
+    color: #FBBF24;
+    background-color: rgba(251, 191, 36, 0.12);
+}
+
+QLabel#commercialLogCategoryTag[logLevel="ERROR"] {
+    color: #F87171;
+    background-color: rgba(248, 113, 113, 0.12);
+}
+
+QLabel#commercialLogCategoryTag[logLevel="SCAN"] {
+    color: #4ADE80;
+    background-color: rgba(74, 222, 128, 0.12);
+}
+
+QLabel#commercialLogCategoryTag[logLevel="DATA"] {
+    color: #A78BFA;
+    background-color: rgba(167, 139, 250, 0.12);
+}
+
+QWidget#commercialToolbar {
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    min-height: 40px;
+    max-height: 40px;
+}
+
+QFrame#commercialTitleBar {
+    border-bottom: none;
+}
+
+QTabWidget#commercialPropertyTabs::pane {
+    border: none;
+    background-color: transparent;
+}
+
+QTabBar::tab {
+    min-height: 24px;
+    padding: 2px 10px;
+    font-size: 11px;
+}
