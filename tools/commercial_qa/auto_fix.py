@@ -44,6 +44,7 @@ def apply_runtime_mitigations(shell: CommercialMainShell, failures: list[QACheck
         "title_bar_height",
         "left_panel_width",
         "right_panel_width",
+        "center_canvas_priority",
         "canvas_wider_than_right_panel",
         "bottom_dock_height",
         "log_view_height",

@@ -1,16 +1,19 @@
 {
-  "generated_at": "2026-06-26T00:21:18",
+  "generated_at": "2026-06-26T07:14:43",
   "default": {
     "uses_custom_title_bar": true,
     "title_bar_height": 34,
     "bottom_dock_height": 195,
     "log_view_height": 111,
     "statistics_panel_height": 149,
-    "left_panel_width": 280,
-    "right_panel_width": 380,
-    "workspace_width": 596,
-    "canvas_width": 536,
+    "left_panel_width": 240,
+    "right_panel_width": 320,
+    "workspace_width": 696,
+    "canvas_width": 636,
     "canvas_height": 307,
+    "canvas_to_right_ratio": 1.9875,
+    "canvas_to_left_ratio": 2.65,
+    "canvas_view_area_ratio": 0.8061402277400229,
     "colorbar_gap_px": 2,
     "toolbar_overflow": false,
     "status_bar_visible": true,
@@ -53,7 +56,7 @@
       {
         "name": "canvas_size",
         "expected": "height >= 240px",
-        "actual": "536x307px",
+        "actual": "636x307px",
         "passed": true
       },
       {
@@ -64,20 +67,26 @@
       },
       {
         "name": "right_panel_width",
-        "expected": "320–460 px",
-        "actual": "380px",
+        "expected": "300–380 px",
+        "actual": "320px",
         "passed": true
       },
       {
         "name": "left_panel_width",
-        "expected": "240–330 px",
-        "actual": "280px",
+        "expected": "220–280 px",
+        "actual": "240px",
+        "passed": true
+      },
+      {
+        "name": "center_canvas_priority",
+        "expected": "canvas >= 1.6x right, >= 2.0x left, area >= 50%",
+        "actual": "right=1.99x, left=2.65x, area=81%",
         "passed": true
       },
       {
         "name": "workspace_wider_than_right_panel",
         "expected": "workspace > right panel",
-        "actual": "596px > 380px",
+        "actual": "696px > 320px",
         "passed": true
       },
       {
@@ -107,11 +116,14 @@
     "bottom_dock_height": 195,
     "log_view_height": 111,
     "statistics_panel_height": 149,
-    "left_panel_width": 280,
-    "right_panel_width": 380,
-    "workspace_width": 596,
-    "canvas_width": 536,
+    "left_panel_width": 240,
+    "right_panel_width": 320,
+    "workspace_width": 696,
+    "canvas_width": 636,
     "canvas_height": 307,
+    "canvas_to_right_ratio": 1.9875,
+    "canvas_to_left_ratio": 2.65,
+    "canvas_view_area_ratio": 0.8061402277400229,
     "colorbar_gap_px": 2,
     "toolbar_overflow": false,
     "status_bar_visible": true,
@@ -154,7 +166,7 @@
       {
         "name": "canvas_size",
         "expected": "height >= 240px",
-        "actual": "536x307px",
+        "actual": "636x307px",
         "passed": true
       },
       {
@@ -165,20 +177,26 @@
       },
       {
         "name": "right_panel_width",
-        "expected": "320–460 px",
-        "actual": "380px",
+        "expected": "300–380 px",
+        "actual": "320px",
         "passed": true
       },
       {
         "name": "left_panel_width",
-        "expected": "240–330 px",
-        "actual": "280px",
+        "expected": "220–280 px",
+        "actual": "240px",
+        "passed": true
+      },
+      {
+        "name": "center_canvas_priority",
+        "expected": "canvas >= 1.6x right, >= 2.0x left, area >= 50%",
+        "actual": "right=1.99x, left=2.65x, area=81%",
         "passed": true
       },
       {
         "name": "workspace_wider_than_right_panel",
         "expected": "workspace > right panel",
-        "actual": "596px > 380px",
+        "actual": "696px > 320px",
         "passed": true
       },
       {

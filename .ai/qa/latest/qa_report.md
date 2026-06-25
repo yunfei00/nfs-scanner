@@ -1,6 +1,6 @@
 # Commercial Demo QA Report
 
-- Generated: 2026-06-26 00:24:58
+- Generated: 2026-06-26 07:14:35
 - Round: 1
 - Overall: **PASS**
 
@@ -29,9 +29,10 @@
 | title_bar_height | 28–44 px | 34px | PASS |
 | demo_indicator_visible | demo banner or DEMO MODE label visible | title bar demo label: DEMO MODE | PASS |
 | toolbar_no_overflow | toolbar fits layout | overflow=False | PASS |
-| left_panel_width | 240–330 px | 280px | PASS |
-| right_panel_width | 320–460 px | 380px | PASS |
-| canvas_wider_than_right_panel | workspace > right panel | 596px > 380px | PASS |
+| left_panel_width | 220–280 px | 240px | PASS |
+| right_panel_width | 300–380 px | 320px | PASS |
+| center_canvas_priority | canvas >= 1.6x right, >= 2.0x left, area >= 50% | right=1.99x, left=2.65x, area=81% | PASS |
+| canvas_wider_than_right_panel | workspace > right panel | 696px > 320px | PASS |
 | bottom_dock_height | >= 195px | 195px | PASS |
 | log_view_height | >= 100px | 111px | PASS |
 | log_visible_lines | >= 6 visible lines | estimated=8 | PASS |
@@ -43,9 +44,10 @@
 | maximized_title_bar_height | 28–44 px | 34px | PASS |
 | maximized_demo_indicator_visible | demo banner or DEMO MODE label visible | title bar demo label: DEMO MODE | PASS |
 | maximized_toolbar_no_overflow | toolbar fits layout | overflow=False | PASS |
-| maximized_left_panel_width | 240–330 px | 280px | PASS |
-| maximized_right_panel_width | 320–460 px | 380px | PASS |
-| maximized_canvas_wider_than_right_panel | workspace > right panel | 596px > 380px | PASS |
+| maximized_left_panel_width | 220–280 px | 240px | PASS |
+| maximized_right_panel_width | 300–380 px | 320px | PASS |
+| maximized_center_canvas_priority | canvas >= 1.6x right, >= 2.0x left, area >= 50% | right=1.99x, left=2.65x, area=81% | PASS |
+| maximized_canvas_wider_than_right_panel | workspace > right panel | 696px > 320px | PASS |
 | maximized_bottom_dock_height | >= 195px | 195px | PASS |
 | maximized_log_view_height | >= 100px | 111px | PASS |
 | maximized_log_visible_lines | >= 6 visible lines | estimated=6 | PASS |
@@ -68,7 +70,7 @@
 | scan_completes_or_stops | runtime status completed or stopped | completed | PASS |
 | data_view_mock_task | data view lists mock scan tasks | 4 | PASS |
 | report_center_preview | report preview populated | Demo Near Field Scan | PASS |
-| mock_report_export | markdown/txt report file created | C:\Users\yunfei\.nfs_scanner\reports\report_mock-84a5a7f5_20260626_002500.md | PASS |
+| mock_report_export | markdown/txt report file created | C:\Users\yunfei\.nfs_scanner\reports\report_mock-4f3cdae0_20260626_071436.md | PASS |
 | reset_demo_restores_state | runtime idle and demo reset applied | status=stopped, tasks 4->2 | PASS |
 
 ## Safety — PASS

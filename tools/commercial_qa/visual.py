@@ -96,17 +96,33 @@ def build_qa_visual_checks(metrics: CommercialLayoutMetrics, *, shell: QMainWind
         QACheck(
             name="left_panel_width",
             category="visual",
-            expected="240–330 px",
+            expected="220–280 px",
             actual=f"{metrics.left_panel_width}px",
-            passed=_between(metrics.left_panel_width, 240, 330),
+            passed=_between(metrics.left_panel_width, 220, 280),
             auto_fixable=True,
         ),
         QACheck(
             name="right_panel_width",
             category="visual",
-            expected="320–460 px",
+            expected="300–380 px",
             actual=f"{metrics.right_panel_width}px",
-            passed=_between(metrics.right_panel_width, 320, 460),
+            passed=_between(metrics.right_panel_width, 300, 380),
+            auto_fixable=True,
+        ),
+        QACheck(
+            name="center_canvas_priority",
+            category="visual",
+            expected="canvas >= 1.6x right, >= 2.0x left, area >= 50%",
+            actual=(
+                f"right={metrics.canvas_to_right_ratio:.2f}x, "
+                f"left={metrics.canvas_to_left_ratio:.2f}x, "
+                f"area={metrics.canvas_view_area_ratio:.0%}"
+            ),
+            passed=(
+                metrics.canvas_to_right_ratio >= 1.6
+                and metrics.canvas_to_left_ratio >= 2.0
+                and metrics.canvas_view_area_ratio >= 0.50
+            ),
             auto_fixable=True,
         ),
         QACheck(

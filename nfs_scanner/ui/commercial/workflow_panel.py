@@ -30,8 +30,8 @@ class _WorkflowStepFrame(QFrame):
         self._index = index
         self.setObjectName("nfsWorkflowStep")
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 8, 10, 8)
-        layout.setSpacing(2)
+        layout.setContentsMargins(8, 6, 8, 6)
+        layout.setSpacing(1)
 
         header = QLabel(f"{number}. {title}", self)
         header.setObjectName("nfsSectionTitle")
@@ -64,7 +64,7 @@ class CommercialWorkflowPanel(QWidget):
         body = QWidget(self)
         body_layout = QVBoxLayout(body)
         body_layout.setContentsMargins(0, 0, 0, 0)
-        body_layout.setSpacing(6)
+        body_layout.setSpacing(4)
 
         for index, (number, title, description) in enumerate(WORKFLOW_STEPS):
             frame = _WorkflowStepFrame(index, number, title, description, body)

@@ -83,14 +83,14 @@ class CommercialPropertyPanel(QScrollArea):
     def _build_scan_tab(self, parent: QWidget) -> QWidget:
         page = QWidget(parent)
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(8)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(6)
 
         preview_card = NFSCard("预览统计", page)
         preview_card.setProperty("cardRole", "previewStats")
         preview_form = QFormLayout()
         preview_form.setContentsMargins(0, 0, 0, 0)
-        preview_form.setVerticalSpacing(8)
+        preview_form.setVerticalSpacing(4)
 
         header_row = QWidget(preview_card.body)
         header_layout = QHBoxLayout(header_row)
@@ -310,7 +310,7 @@ class CommercialPropertyPanel(QScrollArea):
     def _build_display_tab(self, parent: QWidget) -> QWidget:
         page = QWidget(parent)
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setContentsMargins(6, 6, 6, 6)
 
         card = NFSCard("显示设置", page)
         form = NFSParameterGroup(parent=card.body)
@@ -335,7 +335,7 @@ class CommercialPropertyPanel(QScrollArea):
     def _build_instrument_tab(self, parent: QWidget) -> QWidget:
         page = QWidget(parent)
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setContentsMargins(6, 6, 6, 6)
 
         card = NFSCard("仪表设置", page)
         form = NFSParameterGroup(parent=card.body)

@@ -31,6 +31,9 @@ class CommercialLayoutMetrics:
     workspace_width: int = 0
     canvas_width: int = 0
     canvas_height: int = 0
+    canvas_to_right_ratio: float = 0.0
+    canvas_to_left_ratio: float = 0.0
+    canvas_view_area_ratio: float = 0.0
     colorbar_gap_px: int = 0
     toolbar_overflow: bool = False
     status_bar_visible: bool = False
@@ -66,6 +69,8 @@ def collect_layout_metrics(shell: QMainWindow) -> CommercialLayoutMetrics:
     realtime = shell.workspace.realtime_view()
     canvas = realtime.canvas
     colorbar = realtime.color_bar
+    view_area = max(realtime.width() * realtime.height(), 1)
+    canvas_area = max(canvas.width() * canvas.height(), 0)
 
     canvas_global = canvas.mapToGlobal(canvas.rect().topLeft())
     colorbar_global = colorbar.mapToGlobal(colorbar.rect().topLeft())
@@ -80,6 +85,9 @@ def collect_layout_metrics(shell: QMainWindow) -> CommercialLayoutMetrics:
         workspace_width=shell.workspace.width(),
         canvas_width=canvas.width(),
         canvas_height=canvas.height(),
+        canvas_to_right_ratio=canvas.width() / max(shell.property_panel.width(), 1),
+        canvas_to_left_ratio=canvas.width() / max(shell.left_scroll_area.width(), 1),
+        canvas_view_area_ratio=canvas_area / view_area,
         colorbar_gap_px=colorbar_gap,
         toolbar_overflow=shell.toolbar.has_layout_overflow(),
         status_bar_visible=shell.status_bar_widget.is_fully_visible(),
@@ -164,15 +172,29 @@ def _build_checks(metrics: CommercialLayoutMetrics) -> list[LayoutMetricCheck]:
         ),
         LayoutMetricCheck(
             name="right_panel_width",
-            expected="320–460 px",
+            expected="300–380 px",
             actual=f"{metrics.right_panel_width}px",
-            passed=_between(metrics.right_panel_width, 320, 460),
+            passed=_between(metrics.right_panel_width, 300, 380),
         ),
         LayoutMetricCheck(
             name="left_panel_width",
-            expected="240–330 px",
+            expected="220–280 px",
             actual=f"{metrics.left_panel_width}px",
-            passed=_between(metrics.left_panel_width, 240, 330),
+            passed=_between(metrics.left_panel_width, 220, 280),
+        ),
+        LayoutMetricCheck(
+            name="center_canvas_priority",
+            expected="canvas >= 1.6x right, >= 2.0x left, area >= 50%",
+            actual=(
+                f"right={metrics.canvas_to_right_ratio:.2f}x, "
+                f"left={metrics.canvas_to_left_ratio:.2f}x, "
+                f"area={metrics.canvas_view_area_ratio:.0%}"
+            ),
+            passed=(
+                metrics.canvas_to_right_ratio >= 1.6
+                and metrics.canvas_to_left_ratio >= 2.0
+                and metrics.canvas_view_area_ratio >= 0.50
+            ),
         ),
         LayoutMetricCheck(
             name="workspace_wider_than_right_panel",

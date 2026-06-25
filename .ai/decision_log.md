@@ -456,3 +456,12 @@ Needs Review: yes/no
 - Impact: PNG gitignore；qa_report.md / qa_result.json 提交；142 tests + QA PASS。
 - Needs Review: no
 
+### 2026-06-26 - Canvas Priority Alignment
+
+- Date: 2026-06-26
+- Task: commercial-target-canvas-priority
+- Decision: 左栏 240 / 右栏 320；bottom dock 24%/20%；center splitter 8:2；新增 `center_canvas_priority` 布局断言（canvas >= 1.6x 右栏、>= 2.0x 左栏、面积 >= 50%）。
+- Reason: 中央实时画布应成为视觉中心，左右/底部不应挤压主画布。
+- Impact: 720p canvas 636×307；visual + QA PASS。
+- Needs Review: no
+

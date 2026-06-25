@@ -1,6 +1,6 @@
 # Commercial UI Visual Report
 
-- Generated: 2026-06-26 00:21:18
+- Generated: 2026-06-26 07:14:43
 - Default screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_default.png`
 - Maximized screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_maximized.png`
 
@@ -15,11 +15,12 @@
 | bottom_dock_height | >= 195 px | 195px | PASS |
 | log_view_height | >= 100 px | 111px | PASS |
 | statistics_panel_height | >= 100 px | 149px | PASS |
-| canvas_size | height >= 240px | 536x307px | PASS |
+| canvas_size | height >= 240px | 636x307px | PASS |
 | colorbar_adjacent | gap <= 12 px | 2px | PASS |
-| right_panel_width | 320–460 px | 380px | PASS |
-| left_panel_width | 240–330 px | 280px | PASS |
-| workspace_wider_than_right_panel | workspace > right panel | 596px > 380px | PASS |
+| right_panel_width | 300–380 px | 320px | PASS |
+| left_panel_width | 220–280 px | 240px | PASS |
+| center_canvas_priority | canvas >= 1.6x right, >= 2.0x left, area >= 50% | right=1.99x, left=2.65x, area=81% | PASS |
+| workspace_wider_than_right_panel | workspace > right panel | 696px > 320px | PASS |
 | toolbar_no_overflow | toolbar fits layout | overflow=False | PASS |
 | status_bar_visible | status bar visible | True | PASS |
 | default_window_within_screen | window <= available screen | 1280x720 <= 1280x720 | PASS |
@@ -35,11 +36,12 @@
 | bottom_dock_height | >= 195 px | 195px | PASS |
 | log_view_height | >= 100 px | 111px | PASS |
 | statistics_panel_height | >= 100 px | 149px | PASS |
-| canvas_size | height >= 240px | 536x307px | PASS |
+| canvas_size | height >= 240px | 636x307px | PASS |
 | colorbar_adjacent | gap <= 12 px | 2px | PASS |
-| right_panel_width | 320–460 px | 380px | PASS |
-| left_panel_width | 240–330 px | 280px | PASS |
-| workspace_wider_than_right_panel | workspace > right panel | 596px > 380px | PASS |
+| right_panel_width | 300–380 px | 320px | PASS |
+| left_panel_width | 220–280 px | 240px | PASS |
+| center_canvas_priority | canvas >= 1.6x right, >= 2.0x left, area >= 50% | right=1.99x, left=2.65x, area=81% | PASS |
+| workspace_wider_than_right_panel | workspace > right panel | 696px > 320px | PASS |
 | toolbar_no_overflow | toolbar fits layout | overflow=False | PASS |
 | status_bar_visible | status bar visible | True | PASS |
 | maximized_window | custom maximized == True | True | PASS |

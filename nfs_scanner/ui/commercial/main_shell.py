@@ -34,15 +34,15 @@ from .workflow_panel import CommercialWorkflowPanel
 class CommercialMainShell(QMainWindow):
     """Commercial UI shell with custom title bar, split regions and status bar."""
 
-    LEFT_PANEL_WIDTH = 280
-    LEFT_PANEL_MIN_WIDTH = 260
-    LEFT_PANEL_MAX_WIDTH = 300
-    RIGHT_PANEL_WIDTH = 380
-    RIGHT_PANEL_MIN_WIDTH = 360
-    RIGHT_PANEL_MAX_WIDTH = 420
-    BOTTOM_DOCK_MIN_HEIGHT = 220
-    BOTTOM_DOCK_RATIO = 0.28
-    BOTTOM_DOCK_MAXIMIZED_RATIO = 0.22
+    LEFT_PANEL_WIDTH = 240
+    LEFT_PANEL_MIN_WIDTH = 220
+    LEFT_PANEL_MAX_WIDTH = 260
+    RIGHT_PANEL_WIDTH = 320
+    RIGHT_PANEL_MIN_WIDTH = 300
+    RIGHT_PANEL_MAX_WIDTH = 360
+    BOTTOM_DOCK_MIN_HEIGHT = 200
+    BOTTOM_DOCK_RATIO = 0.24
+    BOTTOM_DOCK_MAXIMIZED_RATIO = 0.20
     DEFAULT_WINDOW_WIDTH = 1600
     DEFAULT_WINDOW_HEIGHT = 900
 
@@ -422,8 +422,8 @@ class CommercialMainShell(QMainWindow):
         device_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         device_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         device_scroll.setWidget(self.device_status_panel)
-        device_scroll.setMinimumHeight(120)
-        device_scroll.setMaximumHeight(240)
+        device_scroll.setMinimumHeight(100)
+        device_scroll.setMaximumHeight(180)
         left_layout.addWidget(device_scroll, 1)
 
         scroll_area = QScrollArea(self)
@@ -464,8 +464,8 @@ class CommercialMainShell(QMainWindow):
 
         center_splitter.addWidget(upper_splitter)
         center_splitter.addWidget(self.bottom_dock)
-        center_splitter.setStretchFactor(0, 7)
-        center_splitter.setStretchFactor(1, 3)
+        center_splitter.setStretchFactor(0, 8)
+        center_splitter.setStretchFactor(1, 2)
 
         self._center_splitter = center_splitter
         self._upper_splitter = upper_splitter
