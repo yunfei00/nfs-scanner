@@ -52,7 +52,9 @@ class CommercialMainShell(QMainWindow):
         for source in (self.property_panel, self.toolbar):
             source.scan_start_requested.connect(self._start_mock_scan)
             source.scan_stop_requested.connect(self._stop_mock_scan)
+        self.property_panel.scan_pause_toggle_requested.connect(self._toggle_mock_scan_pause)
         self.mock_scan.snapshot_changed.connect(self._on_mock_scan_snapshot)
+        self.mock_scan.log_line.connect(self.bottom_dock.append_log_line)
         self._update_scan_controls(self.mock_scan.snapshot())
 
     def _start_mock_scan(self) -> None:
@@ -63,8 +65,21 @@ class CommercialMainShell(QMainWindow):
     def _stop_mock_scan(self) -> None:
         self.mock_scan.stop()
 
+    def _toggle_mock_scan_pause(self) -> None:
+        snapshot = self.mock_scan.snapshot()
+        if snapshot.status == "paused":
+            self.mock_scan.resume()
+        elif snapshot.status == "running":
+            self.mock_scan.pause()
+
     def _on_mock_scan_snapshot(self, snapshot) -> None:
         self.workspace.realtime_view().update_scan_progress(snapshot)
+        self.status_bar_widget.update_runtime_snapshot(snapshot)
+        self.bottom_dock.update_runtime_stats(snapshot)
+        self.property_panel.set_pause_button_state(
+            visible=snapshot.status in ("running", "paused"),
+            paused=snapshot.status == "paused",
+        )
         self._update_scan_controls(snapshot)
 
     def _update_scan_controls(self, snapshot) -> None:

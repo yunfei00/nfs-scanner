@@ -32,7 +32,7 @@ from nfs_scanner.core.scan_config import (
 )
 
 from .preview_stats_display import update_density_badge, update_mode_badge, update_preview_stat_labels
-from .widgets import NFSCard, NFSDangerButton, NFSNumericField, NFSParameterGroup, NFSPrimaryButton, NFSStatusBadge
+from .widgets import NFSCard, NFSDangerButton, NFSNumericField, NFSParameterGroup, NFSPrimaryButton, NFSSecondaryButton, NFSStatusBadge
 
 
 class CommercialPropertyPanel(QScrollArea):
@@ -42,6 +42,7 @@ class CommercialPropertyPanel(QScrollArea):
     scan_preview_updated = Signal(ScanPreviewStats)
     scan_start_requested = Signal()
     scan_stop_requested = Signal()
+    scan_pause_toggle_requested = Signal()
 
     _DEBOUNCE_MS = 250
 
@@ -61,6 +62,7 @@ class CommercialPropertyPanel(QScrollArea):
         self._density_badge: NFSStatusBadge | None = None
         self._start_scan_button: NFSPrimaryButton | None = None
         self._stop_scan_button: NFSDangerButton | None = None
+        self._pause_scan_button: NFSSecondaryButton | None = None
         self._setup_ui()
         QTimer.singleShot(0, self._emit_scan_config)
 
@@ -175,7 +177,11 @@ class CommercialPropertyPanel(QScrollArea):
         self._stop_scan_button = NFSDangerButton("停止扫描", button_row)
         self._start_scan_button.clicked.connect(self.scan_start_requested.emit)
         self._stop_scan_button.clicked.connect(self.scan_stop_requested.emit)
+        self._pause_scan_button = NFSSecondaryButton("暂停扫描", button_row)
+        self._pause_scan_button.clicked.connect(self.scan_pause_toggle_requested.emit)
+        self._pause_scan_button.setVisible(False)
         button_layout.addWidget(self._start_scan_button)
+        button_layout.addWidget(self._pause_scan_button)
         button_layout.addWidget(self._stop_scan_button)
         layout.addWidget(button_row)
         layout.addStretch(1)
@@ -291,6 +297,15 @@ class CommercialPropertyPanel(QScrollArea):
             self._start_scan_button.setEnabled(start_enabled)
         if self._stop_scan_button is not None:
             self._stop_scan_button.setEnabled(stop_enabled)
+
+    def set_pause_button_state(self, *, visible: bool, paused: bool, enabled: bool = True) -> None:
+        """Show pause/resume toggle while a mock scan is active."""
+
+        if self._pause_scan_button is None:
+            return
+        self._pause_scan_button.setVisible(visible)
+        self._pause_scan_button.setText("继续扫描" if paused else "暂停扫描")
+        self._pause_scan_button.setEnabled(enabled)
 
     def _build_display_tab(self, parent: QWidget) -> QWidget:
         page = QWidget(parent)
