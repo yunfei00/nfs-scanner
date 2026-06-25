@@ -192,6 +192,15 @@ python -m nfs_scanner.main
 
 ## AI Development Workflow
 
+Automation rule entries:
+
+- `.ai/constitution.md`: highest-level AI autonomy and stop-condition rules.
+- `.ai/assumptions.md`: default assumptions for ordinary implementation details.
+- `.ai/night_mode.md`: unattended evening/overnight execution rules.
+- `.ai/decision_log.md`: record of non-major implementation decisions.
+- `.ai/cursor_workflow.md`: fixed Cursor execution flow.
+- `.ai/cursor_night_run.md`: long-session night run guide.
+
 本项目使用文档驱动的 AI 开发流程。开始任务前应优先阅读以下入口：
 
 - `.ai/cursor_workflow.md`：Cursor 固定执行流程。
