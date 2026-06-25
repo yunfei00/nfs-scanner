@@ -9,6 +9,7 @@ from .realtime_canvas import RealtimeCanvas
 
 __all__ = [
     "AnnotationLayer",
+    "BaseLayer",
     "ColorBar",
     "HeatmapLayer",
     "LayerManager",

@@ -24,7 +24,14 @@ Needs Review: yes/no
 - Impact: Cursor/Codex 可以在低风险细节上继续推进，并把非重大决策记录下来。
 - Needs Review: no
 
-### 2026-06-25 - Sprint 002 Task 02 Canvas Interaction
+### 2026-06-25 - Sprint 002 Task 03 Layer Z-Order
+
+- Date: 2026-06-25
+- Task: sprint-002-task-03-layer-manager
+- Decision: 图层 Z 值按 photo→heatmap→path→marker→annotation 固定递增。
+- Reason: 与 ui-spec 图层顺序一致，避免后续叠加错乱。
+- Impact: 所有图层 item 共享 scene 坐标，缩放平移后仍对齐。
+- Needs Review: no
 
 - Date: 2026-06-25
 - Task: sprint-002-task-02-realtime-canvas
