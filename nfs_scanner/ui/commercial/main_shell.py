@@ -2,9 +2,19 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QShowEvent
-from PySide6.QtWidgets import QFrame, QMainWindow, QScrollArea, QSizePolicy, QSplitter, QVBoxLayout, QWidget
+from PySide6.QtCore import QEvent, Qt, QTimer
+from PySide6.QtGui import QResizeEvent, QShowEvent
+from PySide6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QMainWindow,
+    QScrollArea,
+    QSizeGrip,
+    QSizePolicy,
+    QSplitter,
+    QVBoxLayout,
+    QWidget,
+)
 
 from nfs_scanner.core.demo_session import DemoServiceBundle, DemoSessionController
 from nfs_scanner.core.mock_scan_runtime import MockScanRuntimeService
@@ -16,20 +26,26 @@ from .property_panel import CommercialPropertyPanel
 from .runtime import MockScanController
 from .services import CommercialServiceBundle, create_commercial_services
 from .status_bar import CommercialStatusBar
+from .title_bar import CommercialTitleBar
 from .toolbar import CommercialToolbar
 from .workspace import CommercialWorkspace
 from .workflow_panel import CommercialWorkflowPanel
 
 
 class CommercialMainShell(QMainWindow):
-    """Commercial UI shell with toolbar, split regions and status bar."""
+    """Commercial UI shell with custom title bar, split regions and status bar."""
 
-    LEFT_PANEL_WIDTH = 248
-    RIGHT_PANEL_WIDTH = 360
-    RIGHT_PANEL_MIN_WIDTH = 340
-    BOTTOM_DOCK_MIN_HEIGHT = 200
+    LEFT_PANEL_WIDTH = 280
+    LEFT_PANEL_MIN_WIDTH = 260
+    LEFT_PANEL_MAX_WIDTH = 300
+    RIGHT_PANEL_WIDTH = 380
+    RIGHT_PANEL_MIN_WIDTH = 360
+    RIGHT_PANEL_MAX_WIDTH = 420
+    BOTTOM_DOCK_MIN_HEIGHT = 220
     BOTTOM_DOCK_RATIO = 0.30
-    UPPER_WORKSPACE_RATIO = 0.70
+    BOTTOM_DOCK_MAXIMIZED_RATIO = 0.24
+    DEFAULT_WINDOW_WIDTH = 1600
+    DEFAULT_WINDOW_HEIGHT = 900
 
     def __init__(
         self,
@@ -39,8 +55,13 @@ class CommercialMainShell(QMainWindow):
     ) -> None:
         super().__init__(parent)
         self.setObjectName("commercialMainShell")
+        self.setWindowFlags(
+            Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint
+        )
+        self.setMinimumSize(960, 480)
         self._services = services or create_commercial_services()
         self._demo_controller = DemoSessionController()
+        self.title_bar = CommercialTitleBar(self)
         self.demo_banner = DemoModeBanner(self)
         self.toolbar = CommercialToolbar(self)
         self.workflow_panel = CommercialWorkflowPanel(self)
@@ -49,12 +70,13 @@ class CommercialMainShell(QMainWindow):
         self.property_panel = CommercialPropertyPanel(self)
         self.bottom_dock = CommercialBottomDock(self)
         self.status_bar_widget = CommercialStatusBar(self)
+        self.left_scroll_area: QScrollArea | None = None
         self.mock_scan = MockScanController(self._services.runtime, self)
         self._last_dry_run_point = 0
         self._body_splitter: QSplitter | None = None
         self._center_splitter: QSplitter | None = None
         self._upper_splitter: QSplitter | None = None
-        self._dark_title_applied = False
+        self._custom_maximized = False
         self._setup_ui()
         self._apply_initial_window_size()
         self._connect_scan_preview()
@@ -72,14 +94,38 @@ class CommercialMainShell(QMainWindow):
         self._refresh_project_ui()
         self.workflow_panel.mark_completed_through(0)
 
+    def uses_custom_title_bar(self) -> bool:
+        """Return True when the shell hides the native title bar."""
+
+        return bool(self.windowFlags() & Qt.WindowType.FramelessWindowHint)
+
+    def is_custom_maximized(self) -> bool:
+        """Return True when the frameless shell fills the available screen."""
+
+        return self._custom_maximized
+
+    def set_custom_maximized(self, value: bool) -> None:
+        self._custom_maximized = value
+        self._update_screen_constraints()
+        self.title_bar.sync_maximize_button()
+
     def showEvent(self, event: QShowEvent) -> None:
         super().showEvent(event)
-        if not self._dark_title_applied:
-            from .window_chrome import apply_dark_title_bar
-
-            apply_dark_title_bar(self)
-            self._dark_title_applied = True
+        self.title_bar.sync_maximize_button()
+        self._clamp_window_to_available_screen()
+        self._update_screen_constraints()
         QTimer.singleShot(0, self._reapply_splitter_sizes)
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        self.title_bar.sync_maximize_button()
+        self._apply_splitter_sizes(event.size().width(), event.size().height())
+
+    def changeEvent(self, event: QEvent) -> None:
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.WindowStateChange:
+            self.title_bar.sync_maximize_button()
+            QTimer.singleShot(0, self._reapply_splitter_sizes)
 
     def _reapply_splitter_sizes(self) -> None:
         self._apply_splitter_sizes(self.width(), self.height())
@@ -316,17 +362,35 @@ class CommercialMainShell(QMainWindow):
         )
 
     def _setup_ui(self) -> None:
-        root = QWidget(self)
-        root.setObjectName("commercialRoot")
-        root_layout = QVBoxLayout(root)
-        root_layout.setContentsMargins(8, 8, 8, 8)
-        root_layout.setSpacing(8)
+        outer = QWidget(self)
+        outer.setObjectName("commercialRoot")
+        outer_layout = QVBoxLayout(outer)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(0)
 
-        root_layout.addWidget(self.demo_banner, 0)
-        root_layout.addWidget(self.toolbar, 0)
-        root_layout.addWidget(self._build_body_splitter(), 1)
-        root_layout.addWidget(self.status_bar_widget, 0)
-        self.setCentralWidget(root)
+        outer_layout.addWidget(self.title_bar, 0)
+
+        content = QWidget(outer)
+        content.setObjectName("commercialContent")
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(8, 6, 8, 8)
+        content_layout.setSpacing(6)
+
+        content_layout.addWidget(self.demo_banner, 0)
+        content_layout.addWidget(self.toolbar, 0)
+        content_layout.addWidget(self._build_body_splitter(), 1)
+
+        status_row = QHBoxLayout()
+        status_row.setContentsMargins(0, 0, 0, 0)
+        status_row.setSpacing(0)
+        status_row.addWidget(self.status_bar_widget, 1)
+        resize_grip = QSizeGrip(content)
+        resize_grip.setObjectName("commercialResizeGrip")
+        status_row.addWidget(resize_grip, 0, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight)
+        content_layout.addLayout(status_row, 0)
+
+        outer_layout.addWidget(content, 1)
+        self.setCentralWidget(outer)
 
     def _build_body_splitter(self) -> QSplitter:
         body_splitter = QSplitter(Qt.Orientation.Horizontal, self)
@@ -344,8 +408,8 @@ class CommercialMainShell(QMainWindow):
     def _build_left_area(self) -> QScrollArea:
         left_container = QFrame(self)
         left_container.setObjectName("commercialLeftArea")
-        left_container.setMinimumWidth(self.LEFT_PANEL_WIDTH)
-        left_container.setMaximumWidth(self.LEFT_PANEL_WIDTH)
+        left_container.setMinimumWidth(self.LEFT_PANEL_MIN_WIDTH)
+        left_container.setMaximumWidth(self.LEFT_PANEL_MAX_WIDTH)
         left_container.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
 
         left_layout = QVBoxLayout(left_container)
@@ -360,7 +424,9 @@ class CommercialMainShell(QMainWindow):
         scroll_area.setWidgetResizable(True)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setFixedWidth(self.LEFT_PANEL_WIDTH)
         scroll_area.setWidget(left_container)
+        self.left_scroll_area = scroll_area
         return scroll_area
 
     def _build_center_column(self) -> QSplitter:
@@ -375,9 +441,9 @@ class CommercialMainShell(QMainWindow):
         upper_splitter.setHandleWidth(4)
 
         self.workspace.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.workspace.setMinimumWidth(480)
+        self.workspace.setMinimumWidth(420)
         self.property_panel.setMinimumWidth(self.RIGHT_PANEL_MIN_WIDTH)
-        self.property_panel.setMaximumWidth(self.RIGHT_PANEL_WIDTH)
+        self.property_panel.setMaximumWidth(self.RIGHT_PANEL_MAX_WIDTH)
         self.property_panel.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
 
         upper_splitter.addWidget(self.workspace)
@@ -385,7 +451,7 @@ class CommercialMainShell(QMainWindow):
         upper_splitter.setStretchFactor(0, 1)
         upper_splitter.setStretchFactor(1, 0)
 
-        self.bottom_dock.setMinimumHeight(self.BOTTOM_DOCK_MIN_HEIGHT)
+        self.bottom_dock.setMinimumHeight(195)
         self.bottom_dock.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         center_splitter.addWidget(upper_splitter)
@@ -402,37 +468,98 @@ class CommercialMainShell(QMainWindow):
 
         screen = self.screen() or QApplication.primaryScreen()
         if screen is None:
-            self.resize(1600, 900)
-            self._apply_splitter_sizes(1600, 900)
+            self.resize(self.DEFAULT_WINDOW_WIDTH, self.DEFAULT_WINDOW_HEIGHT)
             return
 
         available = screen.availableGeometry()
-        width = min(max(int(available.width() * 0.92), 1366), available.width())
-        height = min(max(int(available.height() * 0.92), 768), available.height())
+        if available.height() <= 768:
+            width = available.width()
+            height = available.height()
+        else:
+            width = min(self.DEFAULT_WINDOW_WIDTH, available.width())
+            height = min(self.DEFAULT_WINDOW_HEIGHT, available.height())
+            if available.width() < self.DEFAULT_WINDOW_WIDTH:
+                width = max(int(available.width() * 0.92), 1024)
+            if available.height() < self.DEFAULT_WINDOW_HEIGHT:
+                height = max(int(available.height() * 0.92), 640)
+            width = min(width, available.width())
+            height = min(height, available.height())
         self.resize(width, height)
-        self._apply_splitter_sizes(width, height)
+        self._clamp_window_to_available_screen()
+        self._update_screen_constraints()
+
+    def _clamp_window_to_available_screen(self) -> None:
+        from PySide6.QtWidgets import QApplication
+
+        screen = self.screen() or QApplication.primaryScreen()
+        if screen is None:
+            return
+        available = screen.availableGeometry()
+        target_width = min(self.width(), available.width())
+        target_height = min(self.height(), available.height())
+        if target_width != self.width() or target_height != self.height():
+            self.resize(target_width, target_height)
+        frame = self.frameGeometry()
+        if frame.left() < available.left():
+            self.move(available.left(), frame.top())
+        if frame.top() < available.top():
+            self.move(frame.left(), available.top())
+        if frame.right() > available.right():
+            self.move(max(available.right() - self.width(), available.left()), frame.top())
+        if frame.bottom() > available.bottom():
+            self.move(frame.left(), max(available.bottom() - self.height(), available.top()))
+
+    def _update_screen_constraints(self) -> None:
+        from PySide6.QtWidgets import QApplication
+
+        screen = self.screen() or QApplication.primaryScreen()
+        if screen is None:
+            return
+        available = screen.availableGeometry()
+        if self._custom_maximized:
+            self.setMaximumSize(16777215, 16777215)
+            return
+        self.setMaximumSize(available.width(), available.height())
+        if self.width() > available.width() or self.height() > available.height():
+            self.resize(
+                min(self.width(), available.width()),
+                min(self.height(), available.height()),
+            )
 
     def _apply_splitter_sizes(self, width: int, height: int) -> None:
-        """Apply layout ratios tuned for 1366x768 minimum and 1920x1080 comfort."""
+        """Apply layout ratios tuned for default and maximized window states."""
 
-        if self._body_splitter is not None:
-            center_width = max(width - self.LEFT_PANEL_WIDTH - 24, 900)
-            self._body_splitter.setSizes([self.LEFT_PANEL_WIDTH, center_width])
+        if self._body_splitter is not None and self.left_scroll_area is not None:
+            left_width = self.LEFT_PANEL_WIDTH
+            center_width = max(width - left_width - 24, 720)
+            self._body_splitter.setSizes([left_width, center_width])
 
         if self._upper_splitter is not None:
-            workspace_width = max(width - self.LEFT_PANEL_WIDTH - self.RIGHT_PANEL_WIDTH - 32, 640)
-            self._upper_splitter.setSizes([workspace_width, self.RIGHT_PANEL_WIDTH])
+            left_width = self.LEFT_PANEL_WIDTH
+            right_width = self.RIGHT_PANEL_WIDTH
+            workspace_width = max(width - left_width - right_width - 40, 480)
+            self._upper_splitter.setSizes([workspace_width, right_width])
 
         if self._center_splitter is not None:
+            compact = height <= 768
+            dock_min = 195 if compact else self.BOTTOM_DOCK_MIN_HEIGHT
+            self.bottom_dock.setMinimumHeight(dock_min)
+
             chrome_height = (
-                self.demo_banner.height()
+                self.title_bar.height()
+                + self.demo_banner.height()
                 + self.toolbar.height()
                 + self.status_bar_widget.height()
-                + 48
+                + 56
             )
-            body_height = max(height - chrome_height, 480)
-            bottom_height = max(int(body_height * self.BOTTOM_DOCK_RATIO), self.BOTTOM_DOCK_MIN_HEIGHT)
-            upper_height = max(body_height - bottom_height, 360)
+            body_height = max(height - chrome_height, 360 if compact else 420)
+            bottom_ratio = (
+                self.BOTTOM_DOCK_MAXIMIZED_RATIO
+                if (self.isMaximized() or self._custom_maximized)
+                else self.BOTTOM_DOCK_RATIO
+            )
+            bottom_height = max(int(body_height * bottom_ratio), dock_min)
+            upper_height = max(body_height - bottom_height, 280 if compact else 320)
             self._center_splitter.setSizes([upper_height, bottom_height])
 
     def _on_scan_config_changed(self, region, path_config) -> None:
