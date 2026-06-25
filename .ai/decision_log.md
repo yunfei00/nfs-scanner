@@ -24,7 +24,14 @@ Needs Review: yes/no
 - Impact: Cursor/Codex 可以在低风险细节上继续推进，并把非重大决策记录下来。
 - Needs Review: no
 
-### 2026-06-25 - Sprint 002 Task 05 Heatmap Rendering
+### 2026-06-25 - Sprint 002 Task 06 Snake Path Mock
+
+- Date: 2026-06-25
+- Task: sprint-002-task-06-scan-path-layer
+- Decision: Mock 蛇形路径使用 12x8 网格、步距 50x45，起点 (80,80)。
+- Reason: 路径完全落在 800x600 板图可视区域内。
+- Impact: 与 Photo/Heatmap 同坐标系，缩放后仍对齐。
+- Needs Review: no
 
 - Date: 2026-06-25
 - Task: sprint-002-task-05-heatmap-layer

@@ -30,6 +30,25 @@ def create_mock_board_qimage(width: int = CANVAS_WIDTH, height: int = CANVAS_HEI
     return _array_to_qimage(base)
 
 
+def generate_snake_path_points(
+    *,
+    start_x: float = 80.0,
+    start_y: float = 80.0,
+    cols: int = 12,
+    rows: int = 8,
+    step_x: float = 50.0,
+    step_y: float = 45.0,
+) -> list[tuple[float, float]]:
+    """Generate a snake scan path in scene coordinates."""
+
+    points: list[tuple[float, float]] = []
+    for row in range(rows):
+        x_values = range(cols) if row % 2 == 0 else range(cols - 1, -1, -1)
+        for col in x_values:
+            points.append((start_x + col * step_x, start_y + row * step_y))
+    return points
+
+
 def create_mock_heatmap_qimage(
     width: int = CANVAS_WIDTH,
     height: int = CANVAS_HEIGHT,

@@ -142,12 +142,69 @@ class HeatmapLayer(BaseLayer):
 
 
 class ScanPathLayer(BaseLayer):
-    """Scan path layer. Expanded in Task 06."""
+    """Display mock snake scan paths, points, and direction hints."""
 
     kind = LayerKind.PATH
 
+    def __init__(self, scene: QGraphicsScene) -> None:
+        super().__init__(scene)
+        self._points: list[tuple[float, float]] = []
+        self._current_index = 0
+        self._completed_count = 0
+
     def build_mock(self) -> None:
-        return
+        from .mock_assets import generate_snake_path_points
+
+        self.set_path_points(generate_snake_path_points())
+        self.set_progress(current_index=3, completed_count=2)
+
+    def set_path_points(self, points: list[tuple[float, float]]) -> None:
+        from PySide6.QtCore import QPointF, Qt
+        from PySide6.QtGui import QBrush, QColor, QPainterPath, QPen, QPolygonF
+        from PySide6.QtWidgets import QGraphicsEllipseItem, QGraphicsPathItem, QGraphicsPolygonItem
+
+        self.clear()
+        self._points = list(points)
+        if len(self._points) < 2:
+            return
+
+        path = QPainterPath(QPointF(*self._points[0]))
+        for x_value, y_value in self._points[1:]:
+            path.lineTo(x_value, y_value)
+
+        path_item = QGraphicsPathItem(path)
+        path_item.setPen(QPen(QColor("#06D6E8"), 2.0))
+        self._register_item(path_item)
+
+        for index in range(len(self._points) - 1):
+            start = QPointF(*self._points[index])
+            end = QPointF(*self._points[index + 1])
+            direction = end - start
+            if direction.manhattanLength() == 0:
+                continue
+            arrow = QPolygonF(
+                [
+                    end,
+                    end + QPointF(-8, -4),
+                    end + QPointF(-8, 4),
+                ]
+            )
+            arrow_item = QGraphicsPolygonItem(arrow)
+            arrow_item.setBrush(QBrush(QColor("#0EA5FF")))
+            arrow_item.setPen(QPen(Qt.PenStyle.NoPen))
+            self._register_item(arrow_item)
+
+        for x_value, y_value in self._points:
+            dot = QGraphicsEllipseItem(x_value - 3, y_value - 3, 6, 6)
+            dot.setBrush(QBrush(QColor("#E8EEF8")))
+            dot.setPen(QPen(QColor("#2A3A52")))
+            self._register_item(dot)
+
+    def set_progress(self, *, current_index: int, completed_count: int) -> None:
+        """Reserve scan progress state for future runtime integration."""
+
+        self._current_index = max(0, current_index)
+        self._completed_count = max(0, completed_count)
 
 
 class MarkerLayer(BaseLayer):
