@@ -140,3 +140,30 @@ Needs Review: yes/no
 - Reason: 符合 constitution 与 review_gate 对 sprint 结束的强制 review 要求。
 - Impact: 后续工作需人工 review 视觉统一性后再规划。
 - Needs Review: yes
+
+### 2026-06-25 - Sprint 004 Mock Board Scale
+
+- Date: 2026-06-25
+- Task: sprint-004-task-01
+- Decision: Mock 板图改为 12% 边距矩形区域（约 76% 场景面积）；fit_view 以 72% viewport 填充比留边。
+- Reason: 原 mock 板图仅为小圆点，启动后视觉中心不突出。
+- Impact: photo/heatmap/path/marker 仍共享 800x600 坐标；延迟 fit 避免 viewport 未布局时缩放异常。
+- Needs Review: no
+
+### 2026-06-25 - Sprint 004 Shell Splitter Ratios
+
+- Date: 2026-06-25
+- Task: sprint-004-task-02
+- Decision: 左 248px、右 360px、bottom dock 160-240px，workspace stretch 优先。
+- Reason: 对齐 ui-spec，1366x768 可用且 1920x1080 中央画布更宽。
+- Impact: 仅商业 Shell 初始尺寸；用户仍可拖拽 splitter。
+- Needs Review: no
+
+### 2026-06-25 - Sprint 004 Review Gate Stop
+
+- Date: 2026-06-25
+- Task: sprint-004-review
+- Decision: Sprint 004 在 Review Gate 停止，不自动进入 Sprint 005。
+- Reason: 符合 constitution 与 review_gate 要求。
+- Impact: 需人工确认中央画布视觉中心效果。
+- Needs Review: yes
