@@ -200,6 +200,10 @@ Automation rule entries:
 - `.ai/decision_log.md`: record of non-major implementation decisions.
 - `.ai/cursor_workflow.md`: fixed Cursor execution flow.
 - `.ai/cursor_night_run.md`: long-session night run guide.
+- `docs/master-roadmap/`: V1.0 master roadmap, milestones, and dependency map.
+- `docs/sprints/sprint-002-realtime-workspace.md`: Sprint 002 realtime workspace plan.
+- `docs/development/project_coding_standard.md`: project coding and layering standard.
+- `docs/architecture/10_service_architecture.md`: planned service layer responsibilities.
 
 本项目使用文档驱动的 AI 开发流程。开始任务前应优先阅读以下入口：
 

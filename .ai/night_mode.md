@@ -22,6 +22,8 @@ Before starting unattended work, read:
 - Record non-major decisions in `.ai/decision_log.md`.
 - Execute only one task at a time.
 - Keep changes small and reviewable.
+- When executing Sprint 002 by default, start from `.ai/backlog/sprint-002-task-01-graphics-package.md`.
+- Do not automatically enter Phase 3.
 
 ## Per-Task Completion
 
@@ -39,8 +41,11 @@ Stop only when:
 
 - A Stop Condition in `.ai/constitution.md` is reached.
 - A Review Gate in `.ai/review_gate.md` is reached.
+- `.ai/backlog/sprint-002-task-10-sprint-review.md` is completed.
 - The app cannot start and cannot be fixed within task scope.
 - The current task requires real hardware and no mock path is valid.
+
+After `sprint-002-task-10-sprint-review.md`, stop and wait for human review.
 
 ## Final Night Report
 

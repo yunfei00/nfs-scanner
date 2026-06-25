@@ -16,6 +16,7 @@ The goal is to keep human developers and AI coding agents aligned while the proj
 - `07_state_machine.md` - scan and device state machines.
 - `08_threading_model.md` - threading, workers and UI responsiveness.
 - `09_configuration.md` - configuration, profiles and persistence.
+- `10_service_architecture.md` - planned service layer responsibilities and boundaries.
 
 ## Architecture Principles
 

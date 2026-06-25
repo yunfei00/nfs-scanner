@@ -75,3 +75,12 @@ During unattended night runs:
 - Record small assumptions in `.ai/decision_log.md`.
 - After each task, run checks, commit, and write a daily report.
 - Stop only for Stop Conditions or Review Gates.
+
+## 8. Documentation Freeze
+
+After the Master Roadmap, Sprint 002 plan, and Review Checklists are completed, stop expanding the documentation system.
+
+- Future work should prioritize code implementation unless a documentation gap directly blocks development.
+- Do not create large new documentation areas by default.
+- New documentation must directly reduce Cursor/Codex questions or directly support the current sprint.
+- Prefer updating existing task, sprint, or review files over creating new document families.
