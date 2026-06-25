@@ -25,8 +25,8 @@ class CommercialToolbar(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("commercialToolbar")
-        self.setMinimumHeight(64)
-        self.setMaximumHeight(64)
+        self.setMinimumHeight(52)
+        self.setMaximumHeight(52)
         self._start_scan_button: NFSPrimaryButton | None = None
         self._pause_scan_button: NFSSecondaryButton | None = None
         self._stop_scan_button: NFSDangerButton | None = None
@@ -37,7 +37,7 @@ class CommercialToolbar(QWidget):
 
     def _setup_ui(self) -> None:
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setContentsMargins(12, 6, 12, 6)
         layout.setSpacing(6)
 
         brand = QWidget(self)

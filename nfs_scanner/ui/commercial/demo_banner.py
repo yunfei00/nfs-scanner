@@ -16,10 +16,10 @@ class DemoModeBanner(QFrame):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("demoModeBanner")
-        self.setMaximumHeight(32)
+        self.setMaximumHeight(28)
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 4, 12, 4)
-        layout.setSpacing(12)
+        layout.setContentsMargins(10, 2, 10, 2)
+        layout.setSpacing(8)
 
         badges = ("MOCK", "DRY RUN", "NO HARDWARE CONTROL")
         for text in badges:

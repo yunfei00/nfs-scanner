@@ -383,3 +383,30 @@ Needs Review: yes/no
 - Reason: 演示前一键恢复初始状态。
 - Impact: clear_analysis_tasks=True 时恢复 2 条内置 demo 任务。
 - Needs Review: no
+
+### 2026-06-25 - Windows Dark Title Bar (DWM)
+
+- Date: 2026-06-25
+- Task: ui-polish-task-01
+- Decision: 商业 UI 在 `showEvent` 调用 `window_chrome.apply_dark_title_bar()`，通过 `DwmSetWindowAttribute` attribute 20（回退 19）启用 immersive dark mode。
+- Reason: 系统标题栏与 #0B1220 主体风格统一；不做 frameless 重构。
+- Impact: 仅 Windows；失败时静默返回 False，不崩溃。
+- Needs Review: no
+
+### 2026-06-25 - Bottom Dock 30% Layout Ratio
+
+- Date: 2026-06-25
+- Task: ui-polish-task-02
+- Decision: 移除 bottom dock 240px 上限；默认占 center column 30%（stretch 7:3），min height 200px。
+- Reason: 1366×768 下日志/统计仅 1–2 行不可用。
+- Impact: 中央画布约 70%；用户仍可拖拽 splitter。
+- Needs Review: no
+
+### 2026-06-25 - Bottom Dock Log/Stats Compact Layout
+
+- Date: 2026-06-25
+- Task: ui-polish-task-03-04
+- Decision: 日志 Tab 去掉 NFSCard 厚边框，默认选中，8 行种子 + auto-scroll；统计 Tab 双列 `dockStatPanel` 展示预览与运行时指标。
+- Reason: 提升 dock 信息密度与可读性。
+- Impact: 仅商业 UI bottom dock；右侧 property 预览统计保留。
+- Needs Review: no

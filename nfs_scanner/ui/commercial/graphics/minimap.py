@@ -51,7 +51,7 @@ class MiniMap(QWidget):
             return
 
         map_rect = self.rect().adjusted(6, 6, -6, -6)
-        painter.setPen(QPen(QColor("#2A3A52")))
+        painter.setPen(QPen(QColor(42, 58, 82, 120)))
         painter.drawRect(map_rect)
 
         scale_x = map_rect.width() / scene_rect.width()
@@ -72,8 +72,8 @@ class MiniMap(QWidget):
         )
 
         viewport_rect = self._viewport_rect(scene_rect, origin_x, origin_y, scale)
-        painter.setPen(QPen(QColor("#0EA5FF"), 2))
-        painter.setBrush(QBrush(QColor(14, 165, 255, 40)))
+        painter.setPen(QPen(QColor(14, 165, 255, 140), 1))
+        painter.setBrush(QBrush(QColor(14, 165, 255, 28)))
         painter.drawRect(viewport_rect)
         painter.end()
         super().paintEvent(event)

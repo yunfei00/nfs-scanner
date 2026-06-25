@@ -4,9 +4,17 @@ Last updated: 2026-06-25
 
 ## Current Mode
 
-**COMPLETE — Overnight Demo 闭环 v0.1 (Sprint 016–022)**
+**COMPLETE — Demo 闭环 v0.1 + UI Polish (bottom dock / title bar)**
 
-商业版 Mock Demo 可演示：项目流 → Mock 设备 → Mock 扫描 → Data View → Report 导出。
+商业版 Mock Demo 可演示；2026-06-25 修复底部 dock 高度、日志/统计可读性、Windows 深色标题栏。
+
+## Recent UI Polish (2026-06-25)
+
+- Windows DWM dark title bar (`window_chrome.py`)
+- Bottom dock 默认 ~30% 高度（min 200px），stretch 7:3
+- 日志 Tab 默认打开、8 行种子、自动滚动
+- 统计 Tab 双列卡片：预览 + 运行时（含进度%）
+- 工具栏压缩、mini-map 边框弱化
 
 ## Sprint Progress
 
