@@ -239,3 +239,12 @@ Needs Review: yes/no
 - Reason: mock 节奏与配置参数一致，小路径仍保持可见动画。
 - Impact: 高密度路径 mock 扫描仍较快完成（dwell 下限 25ms）。
 - Needs Review: no
+
+### 2026-06-25 - Sprint 008 Runtime Log Throttle
+
+- Date: 2026-06-25
+- Task: sprint-008-task-02
+- Decision: 每个 tick 不向日志 Tab 写入点位消息，仅记录 start/pause/resume/stop/complete 等生命周期事件。
+- Reason: 高密度 mock 扫描会产生数百条重复日志，淹没有用信息。
+- Impact: `MockScanController._on_tick` 过滤 `Mock point` 前缀消息。
+- Needs Review: no

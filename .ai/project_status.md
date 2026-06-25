@@ -17,15 +17,14 @@ Last updated: 2026-06-25
 | Sprint 005 | done | Scan Configuration + Path Preview |
 | Sprint 006 | done | Scan Preview UX Polish |
 | Sprint 007 | done | Mock Scan Runtime |
-| Sprint 008 | **next** | Mock Scan Progress + Logs |
-| Sprint 009 | planned | Data View Mock |
+| Sprint 008 | done | Mock Scan Progress + Logs |
+| Sprint 009 | **next** | Data View Mock |
 | Sprint 010 | blocked until Major Review | Before Real Device Integration |
 
 ## Next Actions (Autopilot)
 
-1. Start **Sprint 008 — Mock Scan Progress, Logs and Runtime Controls**.
-2. Continue through Sprint 009 without pausing for human review.
-3. **Stop before Sprint 010** — Major Review Gate (real device / real scan integration).
+1. Start **Sprint 009 — Data View Mock Analysis**.
+2. **Stop before Sprint 010** — Major Review Gate (real device / real scan integration).
 
 ## Major Review Gate
 
@@ -35,6 +34,12 @@ Next mandatory stop: **before Sprint 010 / real device integration / real scan r
 
 - Legacy UI (default): `python -m nfs_scanner.main`
 - Commercial UI: `NFS_SCANNER_UI=commercial python -m nfs_scanner.main`
+
+## Recent Capabilities (Sprint 008)
+
+- Status bar and bottom dock reflect mock runtime progress, elapsed/ETA.
+- Runtime log tab receives mock scan lifecycle messages.
+- Property panel pause/resume toggle wired to `MockScanController`.
 
 ## Recent Capabilities (Sprint 007)
 
