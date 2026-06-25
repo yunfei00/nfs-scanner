@@ -4,37 +4,40 @@ Last updated: 2026-06-25
 
 ## Current Mode
 
-**STOP — Major Review Gate (post Sprint 010 Real Integration Preparation)**
+**STOP — Sprint 014 Major Review Gate**
 
-Major Review Gate（接入前）已通过；**真实设备控制尚未批准**。
+Sprints 011–013 complete. **Real device control not approved.**
 
 ## Sprint Progress
 
 | Sprint | Status | Notes |
 |--------|--------|-------|
-| Sprint 001–009 | done | Shell through Data View Mock |
-| Sprint 010 | done | Real Integration Preparation (protocols + safety) |
-| Real Device Control | **blocked** | Requires separate Major Review |
+| Sprint 001–010 | done | Shell through integration prep |
+| Sprint 011 | done | Device Center UX (mock) |
+| Sprint 012 | done | Device configuration models |
+| Sprint 013 | done | Dry-run command layer |
+| Sprint 014 | **Major Review Gate** | Before real hardware control |
+| Real Device Control | **blocked** | Separate Major Review required |
 
 ## Next Actions (Human)
 
-1. Review `.ai/daily/2026-06-25-sprint010-real-integration-prep.md`
-2. Approve or redirect before **Real Device Control Sprint**
-3. Verify commercial UI still runs with mock services
+1. Review `.ai/daily/2026-06-25-sprint014-major-review-gate.md`
+2. Verify Device Center + mock scan dry-run logs in commercial UI
+3. Approve or redirect before any real hardware control Sprint
 
 ## Application Entry Points
 
 - Legacy UI (default): `python -m nfs_scanner.main`
 - Commercial UI: `NFS_SCANNER_UI=commercial python -m nfs_scanner.main`
 
-## Recent Capabilities (Sprint 010)
+## Recent Capabilities (Sprint 011–013)
 
-- `ScanRuntimeServiceProtocol` / `DeviceServiceProtocol` — UI-agnostic contracts
-- `MockScanRuntimeService` + `MockDeviceService` — default commercial implementations
-- `CommercialServiceBundle` — centralized service injection in `entry.py`
-- `integration_safety.py` — `REAL_DEVICE_ENABLED=false`; toolbar real-device entry disabled
+- Device Center: connect/disconnect/refresh + config editing (in-memory)
+- Sidebar device summary syncs with Device Center
+- Dry-run motion/spectrum/camera command log during mock scan
+- `DRY RUN - NO HARDWARE CONTROL` labeling in logs
 
 ## Constraints (unchanged)
 
-- No real device motion commands, spectrum, or camera until explicitly approved.
-- No CSV format changes. Old UI must remain available.
+- No real device commands, ScanManager, or CSV changes until approved.
+- `REAL_DEVICE_ENABLED=false`; do not set `NFS_SCANNER_REAL_DEVICES=1` without approval.

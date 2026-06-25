@@ -284,3 +284,39 @@ Needs Review: yes/no
 - Reason: 用户批准集成准备但未批准真实设备控制；需独立 Major Review。
 - Impact: 工具栏「连接设备」默认禁用；`require_real_device_control()` 供未来真实 adapter 入口使用。
 - Needs Review: yes
+
+### 2026-06-25 - Sprint 011 Device Center Ownership
+
+- Date: 2026-06-25
+- Task: sprint-011
+- Decision: 详细 connect/disconnect/refresh 仅放在 Device Center；左侧 DeviceStatusPanel 仅摘要。
+- Reason: 符合产品 Device Center 职责划分；侧栏保持紧凑。
+- Impact: `devices_changed` 信号同步侧栏与设备中心。
+- Needs Review: no
+
+### 2026-06-25 - Sprint 012 In-Memory Device Config
+
+- Date: 2026-06-25
+- Task: sprint-012
+- Decision: 设备配置仅存 `MockDeviceConfigService` 内存，不持久化、不保存密码。
+- Reason: 真实接入前只做配置模型与 validation UX。
+- Impact: Device Center 表单可编辑并即时校验。
+- Needs Review: no
+
+### 2026-06-25 - Sprint 013 Dry Run Without Safety Guard
+
+- Date: 2026-06-25
+- Task: sprint-013
+- Decision: Dry-run adapter 不调用 `require_real_device_control()`；仅在真实 adapter 入口使用该 guard。
+- Reason: dry-run 必须在 `REAL_DEVICE_ENABLED=false` 下仍可记录命令供 review。
+- Impact: mock 扫描 tick 写入 `DryRunCommandLog` 并在设备中心/底部 dock 显示。
+- Needs Review: no
+
+### 2026-06-25 - Sprint 014 Major Review Stop
+
+- Date: 2026-06-25
+- Task: sprint-014-major-review
+- Decision: Autopilot 在 Sprint 014 Major Review Gate 停止；真实设备控制需单独 Major Review 批准。
+- Reason: 用户明确不批准真实设备控制；dry-run 层已完成预演。
+- Impact: 011–013 已 push；下一步需人工批准 Real Device Control Sprint。
+- Needs Review: yes
