@@ -1,4 +1,4 @@
-"""Right property panel — compact instrument-style scan parameters."""
+"""Right property panel — target-style compact instrument parameters."""
 
 from __future__ import annotations
 
@@ -10,7 +10,9 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QPushButton,
     QScrollArea,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -37,7 +39,7 @@ from .widgets import NFSDangerButton, NFSNumericField, NFSPrimaryButton, NFSSeco
 
 
 class CommercialPropertyPanel(QScrollArea):
-    """Compact scrollable property panel for scan and instrument parameters."""
+    """Tabbed compact property panel matching the target screenshot."""
 
     scan_config_changed = Signal(ScanRegion, ScanPathConfig)
     scan_preview_updated = Signal(ScanPreviewStats)
@@ -46,11 +48,13 @@ class CommercialPropertyPanel(QScrollArea):
     scan_pause_toggle_requested = Signal()
 
     _DEBOUNCE_MS = 250
+    _COMPACT_FIELD_WIDTH = 64
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("commercialPropertyPanel")
         self.setProperty("compactMode", "true")
+        self.setProperty("targetStyleMode", "true")
         self.setWidgetResizable(True)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
@@ -70,27 +74,36 @@ class CommercialPropertyPanel(QScrollArea):
     def _setup_ui(self) -> None:
         container = QWidget(self)
         layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        tabs = QTabWidget(container)
+        tabs.setObjectName("commercialPropertyTabs")
+        tabs.addTab(self._build_scan_tab(tabs), "扫描参数")
+        tabs.addTab(self._build_display_tab(tabs), "显示设置")
+        tabs.addTab(self._build_instrument_tab(tabs), "仪表设置")
+        layout.addWidget(tabs)
+        self.setWidget(container)
+        configure_scroll_area(self, vertical=True, horizontal=False)
+
+    def _build_scan_tab(self, parent: QWidget) -> QWidget:
+        page = QWidget(parent)
+        layout = QVBoxLayout(page)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
 
-        title = QLabel("扫描参数", container)
-        title.setObjectName("nfsSectionTitle")
-        layout.addWidget(title)
+        layout.addWidget(self._build_region_section(page))
+        layout.addWidget(self._build_stats_grid(page))
+        layout.addWidget(self._build_scan_settings_section(page))
+        layout.addWidget(self._build_action_buttons(page))
+        layout.addWidget(self._build_frequency_section(page))
 
-        layout.addWidget(self._build_region_section(container))
-        layout.addWidget(self._build_stats_grid(container))
-        layout.addWidget(self._build_scan_settings_section(container))
-        layout.addWidget(self._build_frequency_section(container))
-        layout.addWidget(self._build_action_buttons(container))
-
-        self._validation_label = QLabel("", container)
+        self._validation_label = QLabel("", page)
         self._validation_label.setObjectName("nfsMutedLabel")
         self._validation_label.setWordWrap(True)
         layout.addWidget(self._validation_label)
         layout.addStretch(1)
-
-        self.setWidget(container)
-        configure_scroll_area(self, vertical=True, horizontal=False)
+        return page
 
     def _section_frame(self, parent: QWidget, caption: str) -> tuple[QFrame, QVBoxLayout]:
         frame = QFrame(parent)
@@ -103,52 +116,64 @@ class CommercialPropertyPanel(QScrollArea):
         frame_layout.addWidget(label)
         return frame, frame_layout
 
+    def _compact_field(self, parent: QWidget, key: str, default: float, unit: str = "mm") -> NFSNumericField:
+        field = NFSNumericField(unit, parent)
+        field.setText(f"{default:g}")
+        field.setMaximumWidth(self._COMPACT_FIELD_WIDTH)
+        field.valueChanged.connect(self._schedule_emit_scan_config)
+        self._field_map[key] = field
+        return field
+
+    def _build_xyz_row(
+        self,
+        parent: QWidget,
+        row_label: str,
+        specs: tuple[tuple[str, float], ...],
+    ) -> QWidget:
+        row = QWidget(parent)
+        row.setObjectName("commercialPropertyGridRow")
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+        caption = QLabel(row_label, row)
+        caption.setObjectName("nfsMutedLabel")
+        caption.setFixedWidth(28)
+        layout.addWidget(caption)
+        axis_names = {"x_start": "X", "y_start": "Y", "z_height": "Z", "x_stop": "X", "y_stop": "Y", "z_stop": "Z", "x_step": "X", "y_step": "Y", "z_step": "Z"}
+        for key, default in specs:
+            axis = QLabel(axis_names[key], row)
+            axis.setFixedWidth(12)
+            layout.addWidget(axis)
+            layout.addWidget(self._compact_field(row, key, default))
+        layout.addStretch(1)
+        return row
+
     def _build_region_section(self, parent: QWidget) -> QWidget:
         frame, frame_layout = self._section_frame(parent, "扫描区域")
-
         region_combo = QComboBox(frame)
         region_combo.addItems(["矩形区域", "全板区域", "自定义 ROI"])
         frame_layout.addWidget(region_combo)
-
-        for row_label, field_specs in (
-            (
+        frame_layout.addWidget(
+            self._build_xyz_row(
+                frame,
                 "起点",
-                (
-                    ("x_start", DEFAULT_X_START),
-                    ("y_start", DEFAULT_Y_START),
-                    ("z_height", DEFAULT_Z_HEIGHT),
-                ),
-            ),
-            (
+                (("x_start", DEFAULT_X_START), ("y_start", DEFAULT_Y_START), ("z_height", DEFAULT_Z_HEIGHT)),
+            )
+        )
+        frame_layout.addWidget(
+            self._build_xyz_row(
+                frame,
                 "终点",
-                (
-                    ("x_stop", DEFAULT_X_STOP),
-                    ("y_stop", DEFAULT_Y_STOP),
-                ),
-            ),
-            (
+                (("x_stop", DEFAULT_X_STOP), ("y_stop", DEFAULT_Y_STOP)),
+            )
+        )
+        frame_layout.addWidget(
+            self._build_xyz_row(
+                frame,
                 "步长",
-                (
-                    ("x_step", DEFAULT_X_STEP),
-                    ("y_step", DEFAULT_Y_STEP),
-                ),
-            ),
-        ):
-            row = QWidget(frame)
-            row_layout = QHBoxLayout(row)
-            row_layout.setContentsMargins(0, 0, 0, 0)
-            row_layout.setSpacing(4)
-            row_layout.addWidget(QLabel(row_label, row))
-            axis_names = {"x_start": "X", "y_start": "Y", "z_height": "Z", "x_stop": "X", "y_stop": "Y", "x_step": "X", "y_step": "Y"}
-            for key, default in field_specs:
-                field = NFSNumericField("mm", row)
-                field.setText(f"{default:g}")
-                field.valueChanged.connect(self._schedule_emit_scan_config)
-                self._field_map[key] = field
-                row_layout.addWidget(QLabel(axis_names[key], row))
-                row_layout.addWidget(field, 1)
-            frame_layout.addWidget(row)
-
+                (("x_step", DEFAULT_X_STEP), ("y_step", DEFAULT_Y_STEP)),
+            )
+        )
         return frame
 
     def _build_stats_grid(self, parent: QWidget) -> QWidget:
@@ -158,7 +183,6 @@ class CommercialPropertyPanel(QScrollArea):
         grid.setContentsMargins(0, 0, 0, 0)
         grid.setHorizontalSpacing(6)
         grid.setVerticalSpacing(6)
-
         for index, (key, caption) in enumerate(
             (
                 ("point_count", "点数"),
@@ -172,11 +196,9 @@ class CommercialPropertyPanel(QScrollArea):
             card_layout = QVBoxLayout(card)
             card_layout.setContentsMargins(6, 4, 6, 4)
             card_layout.setSpacing(2)
-            name = QLabel(caption, card)
-            name.setObjectName("nfsMutedLabel")
+            card_layout.addWidget(QLabel(caption, card))
             value = QLabel("--", card)
             value.setObjectName("nfsPreviewStatValue")
-            card_layout.addWidget(name)
             card_layout.addWidget(value)
             grid.addWidget(card, index // 2, index % 2)
             self._preview_stat_labels[key] = value
@@ -184,29 +206,39 @@ class CommercialPropertyPanel(QScrollArea):
 
     def _build_scan_settings_section(self, parent: QWidget) -> QWidget:
         frame, frame_layout = self._section_frame(parent, "扫描设置")
+        grid = QGridLayout()
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setHorizontalSpacing(6)
+        grid.setVerticalSpacing(6)
 
         self._mode_combo = QComboBox(frame)
         self._mode_combo.addItems(["snake", "raster"])
         self._mode_combo.currentTextChanged.connect(self._on_scan_mode_changed)
-        frame_layout.addWidget(self._labeled_row(frame, "扫描模式", self._mode_combo))
 
         dwell_field = NFSNumericField("ms", frame)
         dwell_field.setText(str(DEFAULT_DWELL_MS))
         dwell_field.valueChanged.connect(self._schedule_emit_scan_config)
         self._field_map["dwell_ms"] = dwell_field
-        frame_layout.addWidget(self._labeled_row(frame, "驻留时间", dwell_field))
 
         avg_field = NFSNumericField("次", frame)
         avg_field.setText("4")
-        frame_layout.addWidget(self._labeled_row(frame, "平均次数", avg_field))
 
         speed_field = NFSNumericField("mm/min", frame)
         speed_field.setText(f"{DEFAULT_SPEED_MM_MIN:g}")
         speed_field.valueChanged.connect(self._schedule_emit_scan_config)
         self._field_map["speed_mm_min"] = speed_field
-        frame_layout.addWidget(self._labeled_row(frame, "速度", speed_field))
 
-        heatmap_checkbox = QCheckBox("实时热力图", frame)
+        grid.addWidget(QLabel("扫描模式", frame), 0, 0)
+        grid.addWidget(self._mode_combo, 0, 1)
+        grid.addWidget(QLabel("驻留时间", frame), 0, 2)
+        grid.addWidget(dwell_field, 0, 3)
+        grid.addWidget(QLabel("平均次数", frame), 1, 0)
+        grid.addWidget(avg_field, 1, 1)
+        grid.addWidget(QLabel("速度", frame), 1, 2)
+        grid.addWidget(speed_field, 1, 3)
+        frame_layout.addLayout(grid)
+
+        heatmap_checkbox = QCheckBox("实时显示热力图", frame)
         heatmap_checkbox.setChecked(True)
         home_checkbox = QCheckBox("扫描完成回零 (Mock)", frame)
         frame_layout.addWidget(heatmap_checkbox)
@@ -215,6 +247,10 @@ class CommercialPropertyPanel(QScrollArea):
 
     def _build_frequency_section(self, parent: QWidget) -> QWidget:
         frame, frame_layout = self._section_frame(parent, "频率设置")
+        grid = QGridLayout()
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setHorizontalSpacing(6)
+        grid.setVerticalSpacing(4)
 
         source_combo = QComboBox(frame)
         source_combo.addItems(["内部源", "外部源"])
@@ -222,41 +258,75 @@ class CommercialPropertyPanel(QScrollArea):
         trace_combo.addItems(["Trace 1", "Trace 2"])
         mode_combo = QComboBox(frame)
         mode_combo.addItems(["扫频", "FFT", "Max Hold"])
-
-        for caption, widget in (
-            ("源", source_combo),
-            ("Trace", trace_combo),
-            ("模式", mode_combo),
-        ):
-            frame_layout.addWidget(self._labeled_row(frame, caption, widget))
-
         start_field = NFSNumericField("MHz", frame)
         start_field.setText("100")
         stop_field = NFSNumericField("MHz", frame)
-        stop_field.setText("3000")
+        stop_field.setText("6000")
         points_field = NFSNumericField("pts", frame)
         points_field.setText("1001")
-        frame_layout.addWidget(self._labeled_row(frame, "起始频率", start_field))
-        frame_layout.addWidget(self._labeled_row(frame, "终止频率", stop_field))
-        frame_layout.addWidget(self._labeled_row(frame, "点数", points_field))
+
+        rows = (
+            ("源", source_combo),
+            ("Trace", trace_combo),
+            ("模式", mode_combo),
+            ("起始频率", start_field),
+            ("终止频率", stop_field),
+            ("点数", points_field),
+        )
+        for row_index, (caption, widget) in enumerate(rows):
+            grid.addWidget(QLabel(caption, frame), row_index, 0)
+            grid.addWidget(widget, row_index, 1)
+        frame_layout.addLayout(grid)
+
+        apply_button = QPushButton("应用", frame)
+        apply_button.setObjectName("nfsSecondaryButton")
+        apply_button.setEnabled(False)
+        apply_button.setToolTip("Mock 占位")
+        frame_layout.addWidget(apply_button)
         return frame
 
     def _build_action_buttons(self, parent: QWidget) -> QWidget:
         row = QWidget(parent)
-        layout = QVBoxLayout(row)
+        layout = QHBoxLayout(row)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
         self._start_scan_button = NFSPrimaryButton("开始扫描", row)
         self._stop_scan_button = NFSDangerButton("停止扫描", row)
         self._start_scan_button.clicked.connect(self.scan_start_requested.emit)
         self._stop_scan_button.clicked.connect(self.scan_stop_requested.emit)
-        self._pause_scan_button = NFSSecondaryButton("暂停扫描", row)
+        self._pause_scan_button = NFSSecondaryButton("暂停", row)
         self._pause_scan_button.clicked.connect(self.scan_pause_toggle_requested.emit)
         self._pause_scan_button.setVisible(False)
-        layout.addWidget(self._start_scan_button)
-        layout.addWidget(self._pause_scan_button)
-        layout.addWidget(self._stop_scan_button)
+        layout.addWidget(self._start_scan_button, 1)
+        layout.addWidget(self._stop_scan_button, 1)
         return row
+
+    def _build_display_tab(self, parent: QWidget) -> QWidget:
+        page = QWidget(parent)
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(8, 8, 8, 8)
+        frame, frame_layout = self._section_frame(page, "显示设置")
+        heatmap_checkbox = QCheckBox("显示热力图", frame)
+        heatmap_checkbox.setChecked(True)
+        lut_combo = QComboBox(frame)
+        lut_combo.addItems(["Turbo", "Viridis", "Plasma"])
+        frame_layout.addWidget(heatmap_checkbox)
+        frame_layout.addWidget(self._labeled_row(frame, "色图", lut_combo))
+        layout.addWidget(frame)
+        layout.addStretch(1)
+        return page
+
+    def _build_instrument_tab(self, parent: QWidget) -> QWidget:
+        page = QWidget(parent)
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(8, 8, 8, 8)
+        frame, frame_layout = self._section_frame(page, "仪表设置")
+        device_combo = QComboBox(frame)
+        device_combo.addItems(["TCPIP-SCPI", "USB-TMC", "Mock-Spectrum"])
+        frame_layout.addWidget(self._labeled_row(frame, "设备类型", device_combo))
+        layout.addWidget(frame)
+        layout.addStretch(1)
+        return page
 
     @staticmethod
     def _labeled_row(parent: QWidget, caption: str, widget: QWidget) -> QWidget:
@@ -370,5 +440,10 @@ class CommercialPropertyPanel(QScrollArea):
         if self._pause_scan_button is None:
             return
         self._pause_scan_button.setVisible(visible)
-        self._pause_scan_button.setText("继续扫描" if paused else "暂停扫描")
+        self._pause_scan_button.setText("继续" if paused else "暂停")
         self._pause_scan_button.setEnabled(enabled)
+
+    def has_horizontal_clipping(self) -> bool:
+        """Return True when horizontal clipping or scroll is required."""
+
+        return self.horizontalScrollBar().isVisible()
