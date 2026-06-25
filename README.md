@@ -19,6 +19,28 @@ NFS Scanner 旨在构建统一的软件平台，实现扫描、采集、分析�
 
 ---
 
+## Product Specification
+
+商业版 UI、功能路线、Codex 连续开发任务已经整理到：
+
+- `docs/product-spec/README.md`：产品规格总入口
+- `docs/product-spec/06_codex_tasks.md`：Codex 任务清单
+- `docs/product-spec/07_acceptance_checklist.md`：任务验收清单
+- `.ai/codex.md`：Codex/AI Agent 开发规则
+- `.ai/backlog/`：可逐项执行的任务队列
+- `.ai/prompts/`：远程控制 Codex 时可复制的提示词
+- `.ai/reviews/`：代码审查模板
+
+推荐开发流程：
+
+1. 先读取 `.ai/codex.md`。
+2. 再读取 `docs/product-spec/README.md`。
+3. 从 `.ai/backlog/` 选择第一个未完成任务。
+4. 每次只实现一个任务。
+5. 使用 `docs/product-spec/07_acceptance_checklist.md` 验收。
+
+---
+
 ## 核心功能
 
 ### 自动扫描控制
