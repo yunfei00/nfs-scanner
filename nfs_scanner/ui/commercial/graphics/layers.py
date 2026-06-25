@@ -201,23 +201,34 @@ class ScanPathLayer(BaseLayer):
         from PySide6.QtGui import QBrush, QColor, QPainterPath, QPen, QPolygonF
         from PySide6.QtWidgets import QGraphicsEllipseItem, QGraphicsPathItem, QGraphicsPolygonItem
 
+        from .path_display_policy import (
+            path_line_width,
+            resolve_display_level,
+            select_arrow_segment_indices,
+            select_dot_indices,
+        )
+
         self.clear()
         self._points = list(points)
         if len(self._points) < 2:
             return
+
+        display_level = resolve_display_level(len(self._points))
+        line_width = path_line_width(display_level)
 
         path = QPainterPath(QPointF(*self._points[0]))
         for x_value, y_value in self._points[1:]:
             path.lineTo(x_value, y_value)
 
         path_item = QGraphicsPathItem(path)
-        path_item.setPen(QPen(QColor("#06D6E8"), 2.0))
+        path_item.setPen(QPen(QColor("#06D6E8"), line_width))
         self._register_item(path_item)
 
-        for index in range(len(self._points) - 1):
+        dot_radius = 3.0 if display_level.value == "full" else 2.5
+        for index in select_arrow_segment_indices(len(self._points), display_level):
             start = QPointF(*self._points[index])
             end = QPointF(*self._points[index + 1])
-            arrow = _direction_arrow_polygon(end, end - start)
+            arrow = _direction_arrow_polygon(end, end - start, size=7.0 if display_level.value == "full" else 6.0)
             if arrow.isEmpty():
                 continue
             arrow_item = QGraphicsPolygonItem(arrow)
@@ -225,8 +236,14 @@ class ScanPathLayer(BaseLayer):
             arrow_item.setPen(QPen(Qt.PenStyle.NoPen))
             self._register_item(arrow_item)
 
-        for x_value, y_value in self._points:
-            dot = QGraphicsEllipseItem(x_value - 3, y_value - 3, 6, 6)
+        for index in select_dot_indices(len(self._points), display_level):
+            x_value, y_value = self._points[index]
+            dot = QGraphicsEllipseItem(
+                x_value - dot_radius,
+                y_value - dot_radius,
+                dot_radius * 2,
+                dot_radius * 2,
+            )
             dot.setBrush(QBrush(QColor("#E8EEF8")))
             dot.setPen(QPen(QColor("#2A3A52")))
             self._register_item(dot)

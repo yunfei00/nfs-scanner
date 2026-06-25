@@ -16,6 +16,7 @@ DEFAULT_X_STEP = 5.0
 DEFAULT_Y_STEP = 5.0
 DEFAULT_DWELL_MS = 100
 DEFAULT_SPEED_MM_MIN = 600.0
+HIGH_DENSITY_PREVIEW_THRESHOLD = 400
 
 
 @dataclass(slots=True)
@@ -112,6 +113,12 @@ class ScanPreviewStats:
     path_length_mm: float
     estimated_seconds: float
     scan_mode: ScanMode
+
+    @property
+    def is_high_density(self) -> bool:
+        """Whether the preview exceeds comfortable on-screen point density."""
+
+        return self.point_count > HIGH_DENSITY_PREVIEW_THRESHOLD
 
     @classmethod
     def empty(cls, scan_mode: ScanMode = "snake") -> ScanPreviewStats:
