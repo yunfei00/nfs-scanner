@@ -221,3 +221,21 @@ Needs Review: yes/no
 - Reason: 符合 constitution 与 review_gate 要求。
 - Impact: 需人工验证高密度路径可读性与参数输入 UX。
 - Needs Review: yes
+
+### 2026-06-25 - Sprint 007 Mock Runtime Isolation
+
+- Date: 2026-06-25
+- Task: sprint-007-task-01
+- Decision: 商业 UI 使用独立 `MockScanRuntimeService` + `MockScanController`，不修改 `ScanManager` 或真实扫描逻辑。
+- Reason: Major Review Gate 前禁止真实扫描集成；mock 层可独立测试与迭代。
+- Impact: 开始/停止仅驱动路径进度可视化，不接设备与频谱采集。
+- Needs Review: no
+
+### 2026-06-25 - Sprint 007 Tick Interval
+
+- Date: 2026-06-25
+- Task: sprint-007-task-03
+- Decision: QTimer 间隔取 `max(dwell_ms, 25ms)`，与参数面板驻留时间联动。
+- Reason: mock 节奏与配置参数一致，小路径仍保持可见动画。
+- Impact: 高密度路径 mock 扫描仍较快完成（dwell 下限 25ms）。
+- Needs Review: no
