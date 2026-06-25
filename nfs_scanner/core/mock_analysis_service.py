@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import uuid4
 
-from .mock_scan_runtime import MockScanRuntimeSnapshot
+from .runtime_service import RuntimeSnapshot
 from .scan_config import ScanPathConfig, ScanRegion
 
 
@@ -79,7 +79,7 @@ class MockAnalysisService:
 
     def register_completed_mock_scan(
         self,
-        snapshot: MockScanRuntimeSnapshot,
+        snapshot: RuntimeSnapshot,
         region: ScanRegion,
         path_config: ScanPathConfig,
     ) -> MockScanTaskRecord:

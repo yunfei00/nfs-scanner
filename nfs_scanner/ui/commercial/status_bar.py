@@ -7,7 +7,7 @@ from datetime import datetime
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QWidget
 
-from nfs_scanner.core.mock_scan_runtime import MockScanRuntimeSnapshot
+from nfs_scanner.core.runtime_service import RuntimeSnapshot
 
 from .runtime_display import format_runtime_status
 
@@ -62,7 +62,7 @@ class CommercialStatusBar(QFrame):
     def _refresh_clock(self) -> None:
         self.time_label.setText(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
-    def update_runtime_snapshot(self, snapshot: MockScanRuntimeSnapshot) -> None:
+    def update_runtime_snapshot(self, snapshot: RuntimeSnapshot) -> None:
         """Refresh status labels from mock scan runtime state."""
 
         self.system_label.setText(f"系统状态: {format_runtime_status(snapshot.status)}")

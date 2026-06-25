@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 
 from nfs_scanner.core.mock_analysis_service import MockAnalysisService
-from nfs_scanner.core.mock_scan_runtime import MockScanRuntimeSnapshot
+from nfs_scanner.core.runtime_service import RuntimeSnapshot
 from nfs_scanner.core.scan_config import ScanPathConfig, ScanRegion
 
 
@@ -25,7 +25,7 @@ class MockAnalysisServiceTestCase(unittest.TestCase):
         self.assertEqual(summary.view_mode, "frequency")
 
     def test_register_completed_mock_scan(self) -> None:
-        snapshot = MockScanRuntimeSnapshot(
+        snapshot = RuntimeSnapshot(
             status="completed",
             total_points=9,
             completed_points=9,

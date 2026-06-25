@@ -9,6 +9,7 @@ from .bottom_dock import CommercialBottomDock
 from .device_status_panel import CommercialDeviceStatusPanel
 from .property_panel import CommercialPropertyPanel
 from .runtime import MockScanController
+from .services import CommercialServiceBundle, create_commercial_services
 from .status_bar import CommercialStatusBar
 from .toolbar import CommercialToolbar
 from .workspace import CommercialWorkspace
@@ -25,17 +26,23 @@ class CommercialMainShell(QMainWindow):
     BOTTOM_DOCK_MIN_HEIGHT = 160
     BOTTOM_DOCK_MAX_HEIGHT = 240
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        services: CommercialServiceBundle | None = None,
+    ) -> None:
         super().__init__(parent)
         self.setObjectName("commercialMainShell")
+        self._services = services or create_commercial_services()
         self.toolbar = CommercialToolbar(self)
         self.workflow_panel = CommercialWorkflowPanel(self)
-        self.device_status_panel = CommercialDeviceStatusPanel(self)
+        self.device_status_panel = CommercialDeviceStatusPanel(self._services.devices, parent=self)
         self.workspace = CommercialWorkspace(self)
         self.property_panel = CommercialPropertyPanel(self)
         self.bottom_dock = CommercialBottomDock(self)
         self.status_bar_widget = CommercialStatusBar(self)
-        self.mock_scan = MockScanController(self)
+        self.mock_scan = MockScanController(self._services.runtime, self)
         self._body_splitter: QSplitter | None = None
         self._center_splitter: QSplitter | None = None
         self._upper_splitter: QSplitter | None = None

@@ -58,6 +58,17 @@ class CommercialUiSmokeTestCase(unittest.TestCase):
         finally:
             shell.close()
 
+    def test_shell_uses_service_bundle(self) -> None:
+        from nfs_scanner.ui.commercial.services import create_commercial_services
+
+        services = create_commercial_services()
+        shell = create_commercial_shell(services=services)
+        try:
+            self.assertIs(services.runtime, shell.mock_scan.service)
+            self.assertEqual(len(services.devices.list_devices()), 3)
+        finally:
+            shell.close()
+
     def test_property_panel_and_realtime_view_construct(self) -> None:
         panel = CommercialPropertyPanel()
         view = RealtimeView()

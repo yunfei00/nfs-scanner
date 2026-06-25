@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QFormLayout, QHBoxLayout, QLabel, QPlainTextEdit, QSizePolicy, QVBoxLayout, QWidget
 
-from nfs_scanner.core.mock_scan_runtime import MockScanRuntimeSnapshot
+from nfs_scanner.core.runtime_service import RuntimeSnapshot
 from nfs_scanner.core.scan_config import ScanPreviewStats
 
 from .preview_stats_display import update_density_badge, update_mode_badge, update_preview_stat_labels
@@ -44,7 +44,7 @@ class CommercialBottomDock(QWidget):
         update_density_badge(self._density_badge, stats)
         update_preview_stat_labels(self._preview_stat_labels, stats)
 
-    def update_runtime_stats(self, snapshot: MockScanRuntimeSnapshot) -> None:
+    def update_runtime_stats(self, snapshot: RuntimeSnapshot) -> None:
         """Refresh runtime progress fields in the statistics tab."""
 
         status_label = {

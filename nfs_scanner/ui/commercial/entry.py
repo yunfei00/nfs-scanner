@@ -7,6 +7,7 @@ import os
 from PySide6.QtWidgets import QWidget
 
 from .main_shell import CommercialMainShell
+from .services import CommercialServiceBundle, create_commercial_services
 from .theme import apply_commercial_theme
 
 COMMERCIAL_UI_ENV_VAR = "NFS_SCANNER_UI"
@@ -18,9 +19,14 @@ def is_commercial_ui_enabled() -> bool:
     return os.getenv(COMMERCIAL_UI_ENV_VAR, "").strip().lower() == "commercial"
 
 
-def create_commercial_shell(parent: QWidget | None = None) -> CommercialMainShell:
+def create_commercial_shell(
+    parent: QWidget | None = None,
+    *,
+    services: CommercialServiceBundle | None = None,
+) -> CommercialMainShell:
     """Create the commercial main shell without affecting legacy startup."""
 
-    shell = CommercialMainShell(parent)
+    bundle = services or create_commercial_services()
+    shell = CommercialMainShell(parent, services=bundle)
     apply_commercial_theme(shell)
     return shell
