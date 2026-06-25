@@ -27,6 +27,7 @@ class CommercialWorkspace(QWidget):
     """Central workspace tabs hosting placeholder work modes."""
 
     REALTIME_TAB_INDEX = 0
+    DATA_VIEW_TAB_INDEX = 1
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -51,4 +52,12 @@ class CommercialWorkspace(QWidget):
         widget = self.tab_widget.widget(self.REALTIME_TAB_INDEX)
         if not isinstance(widget, RealtimeView):
             raise RuntimeError("Realtime tab is not a RealtimeView instance")
+        return widget
+
+    def data_view(self) -> DataView:
+        """Return the offline data analysis workspace tab."""
+
+        widget = self.tab_widget.widget(self.DATA_VIEW_TAB_INDEX)
+        if not isinstance(widget, DataView):
+            raise RuntimeError("Data tab is not a DataView instance")
         return widget
