@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel, QTabWidget, QVBoxLayout, QWidget
 
 from .bottom_dock import CommercialBottomDock
+from .device_status_panel import CommercialDeviceStatusPanel
 from .property_panel import CommercialPropertyPanel
 from .status_bar import CommercialStatusBar
 from .toolbar import CommercialToolbar
+from .widgets import CommercialCard
 from .workspace import CommercialWorkspace
 from .workflow_panel import CommercialWorkflowPanel
-from .device_status_panel import CommercialDeviceStatusPanel
 
 
 class CommercialMainShell(QWidget):
@@ -32,7 +33,19 @@ class CommercialMainShell(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
+        layout.addWidget(self.toolbar)
 
-        placeholder = QLabel("Commercial UI Shell (placeholder)", self)
-        placeholder.setObjectName("commercialShellPlaceholder")
-        layout.addWidget(placeholder)
+        preview_card = CommercialCard("Theme Preview", self)
+        tabs = QTabWidget(preview_card.body)
+        tabs.addTab(self._create_preview_page("Buttons"), "Controls")
+        tabs.addTab(self._create_preview_page("Cards / Tabs"), "Panels")
+        preview_card.body_layout.addWidget(tabs)
+        layout.addWidget(preview_card, 1)
+
+    def _create_preview_page(self, text: str) -> QWidget:
+        page = QWidget(self)
+        page_layout = QVBoxLayout(page)
+        label = QLabel(text, page)
+        label.setObjectName("commercialMutedLabel")
+        page_layout.addWidget(label)
+        return page
