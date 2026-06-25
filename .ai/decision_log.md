@@ -338,3 +338,48 @@ Needs Review: yes/no
 - Reason: 连接测试与运动控制必须分阶段批准。
 - Impact: 015 已 push；不得自动进入 motion control Sprint。
 - Needs Review: yes
+
+### 2026-06-25 - Overnight Toolbar Connect Device Mock-First
+
+- Date: 2026-06-25
+- Task: sprint-016–021 overnight
+- Decision: 工具栏「连接设备」始终启用，跳转 Device Center 做 Mock 连接；真实串口仍仅在 Device Center 内且需 env。
+- Reason: Demo 闭环步骤 2 不能被 REAL_DEVICE gate 阻断。
+- Impact: smoke test 改为断言按钮 enabled。
+- Needs Review: no
+
+### 2026-06-25 - Mock Charts via QPainter
+
+- Date: 2026-06-25
+- Task: sprint-019
+- Decision: 频谱/热力图使用 QPainter 自绘 widget，不引入 matplotlib/pyqtgraph。
+- Reason: 用户禁止重大依赖；Demo 只需视觉占位。
+- Impact: 图表为 deterministic mock，非真实 trace。
+- Needs Review: no
+
+### 2026-06-25 - Project Save Metadata Only
+
+- Date: 2026-06-25
+- Task: sprint-017
+- Decision: save_project 仅写 JSON 元数据到 ~/.nfs_scanner/projects/，不含 CSV 或扫描数据。
+- Reason: 不修改历史数据格式；Demo 级持久化足够。
+- Impact: open 仍为内存 mock，不读盘。
+- Needs Review: no
+
+### 2026-06-25 - Report Export Markdown
+
+- Date: 2026-06-25
+- Task: sprint-020
+- Decision: Mock 报告导出为 Markdown 到 ~/.nfs_scanner/reports/，不做 PDF。
+- Reason: 无 PDF 依赖；满足 Demo 交付预览。
+- Impact: 报告为 mock 摘要，非真实客户数据。
+- Needs Review: no
+
+### 2026-06-25 - Demo Reset Controller
+
+- Date: 2026-06-25
+- Task: sprint-021
+- Decision: DemoSessionController 重置 runtime、dry-run log、默认 mock 设备、可选 analysis 任务；不触硬件。
+- Reason: 演示前一键恢复初始状态。
+- Impact: clear_analysis_tasks=True 时恢复 2 条内置 demo 任务。
+- Needs Review: no

@@ -4,39 +4,45 @@ Last updated: 2026-06-25
 
 ## Current Mode
 
-**STOP — Sprint 016 Major Review Gate**
+**COMPLETE — Overnight Demo 闭环 v0.1 (Sprint 016–022)**
 
-Sprint 015 complete (motion connection test only). **Real motion control not approved.**
+商业版 Mock Demo 可演示：项目流 → Mock 设备 → Mock 扫描 → Data View → Report 导出。
 
 ## Sprint Progress
 
 | Sprint | Status | Notes |
 |--------|--------|-------|
-| Sprint 001–014 | done | Through dry-run layer + review |
-| Sprint 015 | done | Motion connection test only (no motion commands) |
-| Sprint 016 | **Major Review Gate** | Before real motion control |
-| Real Motion Control | **blocked** | Separate Major Review required |
-
-## Next Actions (Human)
-
-1. Review `.ai/daily/2026-06-25-sprint016-major-review-gate.md`
-2. Optionally test real serial connect with `NFS_SCANNER_REAL_DEVICES=1`
-3. Approve before any jog/home/move Sprint
+| Sprint 001–015 | done | Shell, mock scan, device center, dry-run, motion connection test |
+| Sprint 016 | done | Commercial UI visual polish |
+| Sprint 017 | done | Mock project workflow |
+| Sprint 018 | done | Full mock scan demo loop |
+| Sprint 019 | done | Data view with mock charts |
+| Sprint 020 | done | Report center Markdown export |
+| Sprint 021 | done | Demo banner + reset |
+| Sprint 022 | done | Final overnight review |
+| Real Motion Control | **blocked** | Major Review required |
 
 ## Application Entry Points
 
-- Legacy UI: `python -m nfs_scanner.main`
-- Commercial UI: `NFS_SCANNER_UI=commercial python -m nfs_scanner.main`
+- Legacy UI (default): `python -m nfs_scanner.main`
+- Commercial Demo UI: `NFS_SCANNER_UI=commercial python -m nfs_scanner.main`
+- Autoclose (CI/smoke): `NFS_SCANNER_AUTOCLOSE_MS=1500 python -m nfs_scanner.main`
 
-## Recent Capabilities (Sprint 015)
+## Demo Capabilities
 
-- Motion config: mock vs `real_connection_test`
-- Serial port discovery (optional pyserial)
-- Device Center real connect/disconnect with read-only connection log
-- `MotionConnectionAdapter` — open/close serial only
+- MockProjectService: new / open / save metadata JSON
+- MockScanController: start / pause / resume / stop
+- MockAnalysisService: task registry + summaries
+- MockReportService: preview + Markdown export to `~/.nfs_scanner/reports/`
+- DemoSessionController: one-click reset
 
-## Constraints
+## Constraints (unchanged)
 
 - No motion commands (home/jog/move/G-code).
-- No spectrum/camera/scan/CSV changes.
+- No real spectrum/camera/scan/CSV changes.
 - `REAL_DEVICE_ENABLED=false` by default.
+
+## Next Actions (Human)
+
+1. Manual demo walkthrough (see `.ai/daily/overnight-final-review.md`)
+2. Approve or defer real motion control Sprint
