@@ -245,12 +245,14 @@ class MarkerLayer(BaseLayer):
 
     def build_mock(self) -> None:
         from .marker_items import MarkerData, MarkerItem
+        from .mock_assets import board_content_rect
 
         self.clear()
+        board_x, board_y, board_w, board_h = board_content_rect()
         marker = MarkerItem(
             MarkerData(
-                x=320.0,
-                y=240.0,
+                x=board_x + board_w * 0.55,
+                y=board_y + board_h * 0.42,
                 z=5.0,
                 frequency="1.00 GHz",
                 amplitude="-41.2 dBm",

@@ -13,6 +13,7 @@ class RealtimeCanvas(QGraphicsView):
     MIN_ZOOM = 0.1
     MAX_ZOOM = 8.0
     ZOOM_FACTOR = 1.15
+    VIEW_FILL_RATIO = 0.72
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -50,15 +51,25 @@ class RealtimeCanvas(QGraphicsView):
 
         self._scene.setSceneRect(x, y, width, height)
 
-    def fit_view(self) -> None:
-        """Fit the entire scene rect into the viewport."""
+    def fit_view(self, fill_ratio: float | None = None) -> None:
+        """Fit the scene into the viewport, leaving a small visual margin."""
 
         scene_rect = self._scene.sceneRect()
         if scene_rect.isEmpty():
             return
         self.resetTransform()
         self._zoom_level = 1.0
-        self.fitInView(scene_rect, Qt.AspectRatioMode.KeepAspectRatio)
+
+        ratio = self.VIEW_FILL_RATIO if fill_ratio is None else max(min(fill_ratio, 1.0), 0.5)
+        if ratio >= 0.999:
+            self.fitInView(scene_rect, Qt.AspectRatioMode.KeepAspectRatio)
+            return
+
+        padding_scale = (1.0 / ratio - 1.0) / 2.0
+        pad_x = scene_rect.width() * padding_scale
+        pad_y = scene_rect.height() * padding_scale
+        padded_rect = scene_rect.adjusted(-pad_x, -pad_y, pad_x, pad_y)
+        self.fitInView(padded_rect, Qt.AspectRatioMode.KeepAspectRatio)
 
     def reset_view(self) -> None:
         """Reset transform and center on the scene."""

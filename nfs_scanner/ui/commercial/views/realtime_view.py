@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent, Qt
+from PySide6.QtCore import QEvent, QTimer, Qt
 from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 
 from ..graphics import ColorBar, LayerKind, LayerManager, MiniMap, RealtimeCanvas
@@ -95,6 +95,15 @@ class RealtimeView(QWidget):
         marker_layer.build_mock()
 
         self.canvas.set_scene_rect(0, 0, photo_layer.canvas_width, photo_layer.canvas_height)
+        QTimer.singleShot(0, self._finalize_canvas_layout)
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        QTimer.singleShot(0, self._finalize_canvas_layout)
+
+    def _finalize_canvas_layout(self) -> None:
+        if self.canvas.viewport().width() < 32 or self.canvas.viewport().height() < 32:
+            return
         self.canvas.fit_view()
         self.mini_map.bind_canvas(self.canvas)
         self._position_mini_map()
