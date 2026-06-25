@@ -26,6 +26,8 @@ WORKSPACE_TABS = (
 class CommercialWorkspace(QWidget):
     """Central workspace tabs hosting placeholder work modes."""
 
+    REALTIME_TAB_INDEX = 0
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("commercialWorkspace")
@@ -42,3 +44,11 @@ class CommercialWorkspace(QWidget):
         for title, view_type in WORKSPACE_TABS:
             self.tab_widget.addTab(view_type(self.tab_widget), title)
         layout.addWidget(self.tab_widget, 1)
+
+    def realtime_view(self) -> RealtimeView:
+        """Return the live realtime workspace tab."""
+
+        widget = self.tab_widget.widget(self.REALTIME_TAB_INDEX)
+        if not isinstance(widget, RealtimeView):
+            raise RuntimeError("Realtime tab is not a RealtimeView instance")
+        return widget

@@ -39,6 +39,10 @@ class CommercialMainShell(QMainWindow):
         self._upper_splitter: QSplitter | None = None
         self._setup_ui()
         self._apply_initial_window_size()
+        self._connect_scan_preview()
+
+    def _connect_scan_preview(self) -> None:
+        self.property_panel.scan_config_changed.connect(self._on_scan_config_changed)
 
     def _setup_ui(self) -> None:
         root = QWidget(self)
@@ -157,3 +161,6 @@ class CommercialMainShell(QMainWindow):
             )
             upper_height = max(body_height - bottom_height, 420)
             self._center_splitter.setSizes([upper_height, bottom_height])
+
+    def _on_scan_config_changed(self, region, path_config) -> None:
+        self.workspace.realtime_view().update_path_preview(region, path_config)

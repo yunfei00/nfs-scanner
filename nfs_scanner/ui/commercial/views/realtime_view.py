@@ -5,7 +5,11 @@ from __future__ import annotations
 from PySide6.QtCore import QEvent, QTimer, Qt
 from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 
+from nfs_scanner.core.path_planner import generate_preview_points
+from nfs_scanner.core.scan_config import ScanPathConfig, ScanRegion
+
 from ..graphics import ColorBar, LayerKind, LayerManager, MiniMap, RealtimeCanvas
+from ..scan_scene_mapper import map_points_to_scene
 from ..widgets import NFSSecondaryButton
 
 
@@ -19,6 +23,8 @@ class RealtimeView(QWidget):
         self.layer_manager = LayerManager(self.canvas.graphics_scene)
         self.color_bar = ColorBar(self)
         self.mini_map = MiniMap(self.canvas, self.canvas)
+        self._current_region = ScanRegion()
+        self._current_path_config = ScanPathConfig()
         self._setup_ui()
         self._load_mock_layers()
 
@@ -95,6 +101,10 @@ class RealtimeView(QWidget):
         marker_layer = self.layer_manager.ensure_layer(LayerKind.MARKER)
         marker_layer.build_mock()
 
+        self._current_region = ScanRegion()
+        self._current_path_config = ScanPathConfig()
+        self.update_path_preview(self._current_region, self._current_path_config)
+
         self.canvas.set_scene_rect(0, 0, photo_layer.canvas_width, photo_layer.canvas_height)
         QTimer.singleShot(0, self._finalize_canvas_layout)
 
@@ -108,3 +118,24 @@ class RealtimeView(QWidget):
         self.canvas.fit_view()
         self.mini_map.bind_canvas(self.canvas)
         self._position_mini_map()
+
+    def update_path_preview(self, region: ScanRegion, path_config: ScanPathConfig) -> None:
+        """Regenerate ScanPathLayer from scan configuration without touching other layers."""
+
+        safe_region = region.clamped() if not region.is_valid else region
+        safe_config = path_config.clamped() if not path_config.is_valid else path_config
+        self._current_region = safe_region
+        self._current_path_config = safe_config
+
+        photo_layer = self.layer_manager.ensure_layer(LayerKind.PHOTO)
+        preview_points = generate_preview_points(safe_region, safe_config)
+        scene_points = map_points_to_scene(
+            preview_points,
+            safe_region,
+            canvas_width=photo_layer.canvas_width,
+            canvas_height=photo_layer.canvas_height,
+        )
+
+        path_layer = self.layer_manager.ensure_layer(LayerKind.PATH)
+        path_layer.set_path_points(scene_points)
+        self.mini_map.update()
