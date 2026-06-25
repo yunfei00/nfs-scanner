@@ -23,6 +23,7 @@ class MockDeviceServiceTestCase(unittest.TestCase):
     def test_connect_and_disconnect(self) -> None:
         device = self.service.connect_device("spectrum-001")
         self.assertEqual(device.connection_status, "connected")
+        self.assertTrue(device.last_message)
         disconnected = self.service.disconnect_device("spectrum-001")
         self.assertEqual(disconnected.connection_status, "disconnected")
 

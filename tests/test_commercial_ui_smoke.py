@@ -130,6 +130,20 @@ class CommercialUiSmokeTestCase(unittest.TestCase):
         finally:
             view.close()
 
+    def test_shell_device_center_syncs_sidebar(self) -> None:
+        shell = create_commercial_shell()
+        try:
+            center = shell.workspace.device_center_view()
+            center._connect("spectrum-001")
+            sidebar_device = next(
+                item
+                for item in shell._services.devices.list_devices()
+                if item.device_id == "spectrum-001"
+            )
+            self.assertEqual(sidebar_device.connection_status, "connected")
+        finally:
+            shell.close()
+
     def test_high_density_preview_samples_path_markers(self) -> None:
         view = RealtimeView()
         try:
