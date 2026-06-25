@@ -3,6 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
+
+from .integration_safety import is_real_device_control_allowed
+
+MotionConnectionMode = Literal["mock", "real_connection_test"]
 
 
 @dataclass(slots=True)
@@ -12,6 +17,8 @@ class MotionDeviceConfig:
     port: str = "COM3"
     baudrate: int = 115200
     protocol: str = "GRBL"
+    timeout: float = 1.0
+    connection_mode: MotionConnectionMode = "mock"
 
     def validate(self) -> list[str]:
         errors: list[str] = []
@@ -19,8 +26,22 @@ class MotionDeviceConfig:
             errors.append("串口名称不能为空")
         if self.baudrate <= 0:
             errors.append("波特率必须大于 0")
+        if self.timeout <= 0:
+            errors.append("超时时间必须大于 0")
         if self.protocol.strip().upper() not in ("GRBL", "MARLIN", "MOCK"):
             errors.append("协议必须为 GRBL / MARLIN / MOCK")
+        if self.connection_mode not in ("mock", "real_connection_test"):
+            errors.append("连接模式必须为 mock 或 real_connection_test")
+        return errors
+
+    def validate_for_real_connection_test(self) -> list[str]:
+        """Extra checks before attempting a real serial open (no motion commands)."""
+
+        errors = self.validate()
+        if self.connection_mode != "real_connection_test":
+            errors.append("连接模式必须为 real_connection_test")
+        if not is_real_device_control_allowed():
+            errors.append("真实连接测试需要设置 NFS_SCANNER_REAL_DEVICES=1")
         return errors
 
     @property

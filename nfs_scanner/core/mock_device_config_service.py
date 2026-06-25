@@ -51,7 +51,8 @@ class MockDeviceConfigService:
     def summary_for_device(self, device_id: str, kind: str) -> str:
         if kind == "motion":
             cfg = self.get_motion(device_id)
-            return f"{cfg.port} @ {cfg.baudrate} / {cfg.protocol}"
+            mode_label = "mock" if cfg.connection_mode == "mock" else "real_connection_test"
+            return f"{cfg.port} @ {cfg.baudrate} / {cfg.protocol} [{mode_label}]"
         if kind == "spectrum":
             cfg = self.get_spectrum(device_id)
             return f"{cfg.model} @ {cfg.ip}:{cfg.port}"

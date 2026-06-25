@@ -27,6 +27,16 @@ class DeviceConfigTestCase(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(service.get_motion("motion-001").port, "COM5")
 
+    def test_motion_defaults_to_mock_connection_mode(self) -> None:
+        config = MotionDeviceConfig()
+        self.assertEqual(config.connection_mode, "mock")
+        self.assertEqual(config.timeout, 1.0)
+        self.assertTrue(config.is_valid)
+
+    def test_real_connection_test_requires_env_at_connect_validation(self) -> None:
+        config = MotionDeviceConfig(connection_mode="real_connection_test")
+        self.assertIn("NFS_SCANNER_REAL_DEVICES", " ".join(config.validate_for_real_connection_test()))
+
     def test_mock_config_service_rejects_invalid_spectrum(self) -> None:
         service = MockDeviceConfigService()
         errors = service.set_spectrum("spectrum-001", SpectrumDeviceConfig(port=0))
