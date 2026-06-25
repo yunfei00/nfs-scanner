@@ -205,6 +205,10 @@ def run_commercial_qa(*, include_external: bool = True, round_number: int = 1) -
             check.name = f"maximized_{check.name}"
         result.checks.extend(maximized_checks)
 
+        from .scroll_checks import build_scroll_interaction_checks
+
+        result.checks.extend(build_scroll_interaction_checks(shell))
+
     finally:
         if shell is not None:
             shell.close()

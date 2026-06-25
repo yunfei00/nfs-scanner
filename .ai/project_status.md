@@ -4,16 +4,16 @@ Last updated: 2026-06-26
 
 ## Current Mode
 
-**COMPLETE — Commercial Target Page Alignment (Canvas Priority)**
+**COMPLETE — Commercial Scrollbar / Slider UX Alignment**
 
-中央实时画布成为视觉中心；左右侧栏压缩，bottom dock 平衡；visual check + QA pipeline 含 `center_canvas_priority` 断言。
+商业 UI 滚动条/滑块统一加粗（14px）、handle 最小 48px、hover/pressed 清晰；QA 含 scrollbar 可用性检查。
 
 ## Recent (2026-06-26)
 
-- 左栏 240px / 右栏 320px（原 280/380）
-- Bottom dock ratio 24%/20%（原 28%/22%），center splitter 8:2
-- `center_canvas_priority`：canvas >= 1.6x 右栏、>= 2.0x 左栏、面积 >= 50%
-- 720p 下 canvas 636×307，area ratio 81%
+- 全局 QScrollBar/QSlider/QProgressBar QSS 重写
+- `scroll_helpers.py` + 各区域 scroll 配置
+- `scroll_metrics.py` + QA interaction 检查
+- 720p visual + QA **PASS**
 
 ## Application Entry Points
 

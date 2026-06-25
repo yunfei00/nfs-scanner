@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
-QACategory = Literal["startup", "visual", "functional", "safety", "external"]
+QACategory = Literal["startup", "visual", "functional", "safety", "external", "interaction"]
 
 
 @dataclass(slots=True)

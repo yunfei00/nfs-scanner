@@ -39,7 +39,7 @@ def _render_markdown(result: QAResult) -> str:
     else:
         lines.append("- (none)")
 
-    for category in ("startup", "visual", "functional", "safety", "external"):
+    for category in ("startup", "visual", "functional", "interaction", "safety", "external"):
         section_checks = [item for item in result.checks if item.category == category]
         if not section_checks:
             continue
@@ -64,6 +64,20 @@ def _render_markdown(result: QAResult) -> str:
             lines.append(f"- {issue}")
     else:
         lines.append("- none")
+
+    interaction_checks = [item for item in result.checks if item.category == "interaction"]
+    if interaction_checks:
+        lines.extend(["", "## Manual Behavior Verification", ""])
+        wheel = next((item for item in interaction_checks if item.name == "wheel_test"), None)
+        handle = next((item for item in interaction_checks if item.name == "scrollbar_handle_drag"), None)
+        slider = next((item for item in interaction_checks if item.name == "slider_drag"), None)
+        if wheel is not None:
+            lines.append(f"- 滚轮测试: {'PASS' if wheel.passed else 'FAIL'}")
+        if handle is not None:
+            status = "PASS" if handle.passed else handle.actual
+            lines.append(f"- Scrollbar handle 拖动测试: {status}")
+        if slider is not None:
+            lines.append(f"- Slider 拖动测试: {slider.actual}")
 
     lines.append("")
     return "\n".join(lines)

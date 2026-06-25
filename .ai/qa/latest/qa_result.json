@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-26 07:14:35",
+  "generated_at": "2026-06-26 07:23:00",
   "round_number": 1,
   "overall_pass": true,
   "screenshots": {
@@ -216,7 +216,7 @@
       "name": "log_visible_lines",
       "category": "visual",
       "expected": ">= 6 visible lines",
-      "actual": "estimated=8",
+      "actual": "estimated=16",
       "passed": true,
       "severity": "error",
       "auto_fixable": true,
@@ -366,7 +366,7 @@
       "name": "mock_report_export",
       "category": "functional",
       "expected": "markdown/txt report file created",
-      "actual": "C:\\Users\\yunfei\\.nfs_scanner\\reports\\report_mock-4f3cdae0_20260626_071436.md",
+      "actual": "C:\\Users\\yunfei\\.nfs_scanner\\reports\\report_mock-036e4742_20260626_072301.md",
       "passed": true,
       "severity": "error",
       "auto_fixable": true,
@@ -526,7 +526,7 @@
       "name": "maximized_log_visible_lines",
       "category": "visual",
       "expected": ">= 6 visible lines",
-      "actual": "estimated=6",
+      "actual": "estimated=26",
       "passed": true,
       "severity": "error",
       "auto_fixable": true,
@@ -560,6 +560,136 @@
       "passed": true,
       "severity": "error",
       "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "qss_scrollbar_handle_min_height",
+      "category": "interaction",
+      "expected": ">= 48px in QSS",
+      "actual": "48px",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "qss_scrollbar_handle_min_width",
+      "category": "interaction",
+      "expected": ">= 48px in QSS",
+      "actual": "48px",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "left_scrollbar_width",
+      "category": "interaction",
+      "expected": ">= 12px when visible",
+      "actual": "14px",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "property_scrollbar_width",
+      "category": "interaction",
+      "expected": ">= 12px when visible",
+      "actual": "14px",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "log_scrollbar_width",
+      "category": "interaction",
+      "expected": ">= 12px when scrollable",
+      "actual": "14px",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "log_area_scrollable",
+      "category": "interaction",
+      "expected": "log content scrollable",
+      "actual": "range=21",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "property_area_scrollable",
+      "category": "interaction",
+      "expected": "property panel scrollable",
+      "actual": "range=699",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "device_status_scrollable_or_compact",
+      "category": "interaction",
+      "expected": "device scroll visible when needed",
+      "actual": "width=14px",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "wheel_interaction",
+      "category": "interaction",
+      "expected": "wheel step changes scroll value",
+      "actual": "True",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "handle_position_interaction",
+      "category": "interaction",
+      "expected": "handle position can be set smoothly",
+      "actual": "True",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "wheel_test",
+      "category": "interaction",
+      "expected": "wheel step changes scroll value",
+      "actual": "PASS",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "scrollbar_handle_drag",
+      "category": "interaction",
+      "expected": "handle position adjustable (programmatic)",
+      "actual": "PASS",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": false,
+      "blocked": false
+    },
+    {
+      "name": "slider_drag",
+      "category": "interaction",
+      "expected": "slider interaction",
+      "actual": "Not Applicable",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": false,
       "blocked": false
     },
     {

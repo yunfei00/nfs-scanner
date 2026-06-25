@@ -35,6 +35,20 @@ def _write_report(
     default_shot: Path,
     maximized_shot: Path,
 ) -> None:
+    scroll_names = {
+        "qss_scrollbar_handle_min_height",
+        "qss_scrollbar_handle_min_width",
+        "left_scrollbar_width",
+        "property_scrollbar_width",
+        "log_scrollbar_width",
+        "log_area_scrollable",
+        "property_area_scrollable",
+        "device_status_scrollable_or_compact",
+        "wheel_interaction",
+        "handle_position_interaction",
+        "slider_widgets_present",
+    }
+
     lines = [
         "# Commercial UI Visual Report",
         "",
@@ -50,8 +64,40 @@ def _write_report(
         "|-------|----------|--------|--------|",
     ]
     for check in default_metrics.checks:
+        if check.name in scroll_names:
+            continue
         status = "PASS" if check.passed else "FAIL"
         lines.append(f"| {check.name} | {check.expected} | {check.actual} | {status} |")
+
+    scroll_default = default_metrics.scroll_usability if default_metrics.scroll_usability else {}
+    if scroll_default:
+        scroll_pass = all(item.passed for item in default_metrics.checks if item.name in scroll_names)
+        lines.extend(
+            [
+                "",
+                "## Scrollbar / Slider Usability (Default)",
+                "",
+                f"**Result: {'PASS' if scroll_pass else 'FAIL'}**",
+                "",
+                "| Check | Expected | Actual | Status |",
+                "|-------|----------|--------|--------|",
+            ]
+        )
+        for check in default_metrics.checks:
+            if check.name not in scroll_names:
+                continue
+            status = "PASS" if check.passed else "FAIL"
+            lines.append(f"| {check.name} | {check.expected} | {check.actual} | {status} |")
+        lines.extend(
+            [
+                "",
+                "### Manual Behavior Verification",
+                "",
+                f"- 滚轮测试: {'PASS' if scroll_default.get('wheel_test_passed') else 'FAIL'}",
+                f"- Scrollbar handle 拖动测试: {'PASS' if scroll_default.get('handle_drag_test_passed') else 'Manual Check Required'}",
+                f"- Slider 拖动测试: {scroll_default.get('slider_test_status', 'Not Applicable')}",
+            ]
+        )
 
     lines.extend(
         [
@@ -65,6 +111,8 @@ def _write_report(
         ]
     )
     for check in maximized_metrics.checks:
+        if check.name in scroll_names:
+            continue
         status = "PASS" if check.passed else "FAIL"
         lines.append(f"| {check.name} | {check.expected} | {check.actual} | {status} |")
 

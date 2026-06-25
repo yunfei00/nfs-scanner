@@ -465,3 +465,12 @@ Needs Review: yes/no
 - Impact: 720p canvas 636×307；visual + QA PASS。
 - Needs Review: no
 
+### 2026-06-26 - Scrollbar / Slider UX Alignment
+
+- Date: 2026-06-26
+- Task: commercial-scrollbar-ux
+- Decision: QScrollBar 14px + handle min 48px + hover/pressed；QSlider/QProgressBar 样式；`scroll_helpers.py` / `scroll_metrics.py`；QA interaction 检查。
+- Reason: 用户反馈滚动条太细、难拖、点击跳转体验差。
+- Impact: visual + QA PASS；145 tests。
+- Needs Review: no
+

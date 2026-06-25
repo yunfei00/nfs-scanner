@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-26T07:14:43",
+  "generated_at": "2026-06-26T07:23:08",
   "default": {
     "uses_custom_title_bar": true,
     "title_bar_height": 34,
@@ -22,6 +22,82 @@
     "screen_available_width": 1280,
     "screen_available_height": 720,
     "is_maximized": false,
+    "scroll_usability": {
+      "left_scrollbar_width": 14,
+      "device_scrollbar_width": 14,
+      "property_scrollbar_width": 14,
+      "log_scrollbar_width": 14,
+      "data_task_list_scrollbar_width": 0,
+      "qss_handle_min_height": 48,
+      "qss_handle_min_width": 48,
+      "has_slider_widgets": false,
+      "wheel_test_passed": true,
+      "handle_drag_test_passed": true,
+      "slider_test_status": "Not Applicable",
+      "checks": [
+        {
+          "name": "qss_scrollbar_handle_min_height",
+          "expected": ">= 48px in QSS",
+          "actual": "48px",
+          "passed": true
+        },
+        {
+          "name": "qss_scrollbar_handle_min_width",
+          "expected": ">= 48px in QSS",
+          "actual": "48px",
+          "passed": true
+        },
+        {
+          "name": "left_scrollbar_width",
+          "expected": ">= 12px when visible",
+          "actual": "14px",
+          "passed": true
+        },
+        {
+          "name": "property_scrollbar_width",
+          "expected": ">= 12px when visible",
+          "actual": "14px",
+          "passed": true
+        },
+        {
+          "name": "log_scrollbar_width",
+          "expected": ">= 12px when scrollable",
+          "actual": "14px",
+          "passed": true
+        },
+        {
+          "name": "log_area_scrollable",
+          "expected": "log content scrollable",
+          "actual": "range=11",
+          "passed": true
+        },
+        {
+          "name": "property_area_scrollable",
+          "expected": "property panel scrollable",
+          "actual": "range=699",
+          "passed": true
+        },
+        {
+          "name": "device_status_scrollable_or_compact",
+          "expected": "device scroll visible when needed",
+          "actual": "width=14px",
+          "passed": true
+        },
+        {
+          "name": "wheel_interaction",
+          "expected": "wheel step changes scroll value",
+          "actual": "True",
+          "passed": true
+        },
+        {
+          "name": "handle_position_interaction",
+          "expected": "handle position can be set smoothly",
+          "actual": "True",
+          "passed": true
+        }
+      ],
+      "all_passed": true
+    },
     "checks": [
       {
         "name": "custom_title_bar",
@@ -106,6 +182,66 @@
         "expected": "window <= available screen",
         "actual": "1280x720 <= 1280x720",
         "passed": true
+      },
+      {
+        "name": "qss_scrollbar_handle_min_height",
+        "expected": ">= 48px in QSS",
+        "actual": "48px",
+        "passed": true
+      },
+      {
+        "name": "qss_scrollbar_handle_min_width",
+        "expected": ">= 48px in QSS",
+        "actual": "48px",
+        "passed": true
+      },
+      {
+        "name": "left_scrollbar_width",
+        "expected": ">= 12px when visible",
+        "actual": "14px",
+        "passed": true
+      },
+      {
+        "name": "property_scrollbar_width",
+        "expected": ">= 12px when visible",
+        "actual": "14px",
+        "passed": true
+      },
+      {
+        "name": "log_scrollbar_width",
+        "expected": ">= 12px when scrollable",
+        "actual": "14px",
+        "passed": true
+      },
+      {
+        "name": "log_area_scrollable",
+        "expected": "log content scrollable",
+        "actual": "range=11",
+        "passed": true
+      },
+      {
+        "name": "property_area_scrollable",
+        "expected": "property panel scrollable",
+        "actual": "range=699",
+        "passed": true
+      },
+      {
+        "name": "device_status_scrollable_or_compact",
+        "expected": "device scroll visible when needed",
+        "actual": "width=14px",
+        "passed": true
+      },
+      {
+        "name": "wheel_interaction",
+        "expected": "wheel step changes scroll value",
+        "actual": "True",
+        "passed": true
+      },
+      {
+        "name": "handle_position_interaction",
+        "expected": "handle position can be set smoothly",
+        "actual": "True",
+        "passed": true
       }
     ],
     "all_passed": true
@@ -132,6 +268,82 @@
     "screen_available_width": 1280,
     "screen_available_height": 720,
     "is_maximized": true,
+    "scroll_usability": {
+      "left_scrollbar_width": 14,
+      "device_scrollbar_width": 14,
+      "property_scrollbar_width": 14,
+      "log_scrollbar_width": 14,
+      "data_task_list_scrollbar_width": 0,
+      "qss_handle_min_height": 48,
+      "qss_handle_min_width": 48,
+      "has_slider_widgets": false,
+      "wheel_test_passed": true,
+      "handle_drag_test_passed": true,
+      "slider_test_status": "Not Applicable",
+      "checks": [
+        {
+          "name": "qss_scrollbar_handle_min_height",
+          "expected": ">= 48px in QSS",
+          "actual": "48px",
+          "passed": true
+        },
+        {
+          "name": "qss_scrollbar_handle_min_width",
+          "expected": ">= 48px in QSS",
+          "actual": "48px",
+          "passed": true
+        },
+        {
+          "name": "left_scrollbar_width",
+          "expected": ">= 12px when visible",
+          "actual": "14px",
+          "passed": true
+        },
+        {
+          "name": "property_scrollbar_width",
+          "expected": ">= 12px when visible",
+          "actual": "14px",
+          "passed": true
+        },
+        {
+          "name": "log_scrollbar_width",
+          "expected": ">= 12px when scrollable",
+          "actual": "14px",
+          "passed": true
+        },
+        {
+          "name": "log_area_scrollable",
+          "expected": "log content scrollable",
+          "actual": "range=11",
+          "passed": true
+        },
+        {
+          "name": "property_area_scrollable",
+          "expected": "property panel scrollable",
+          "actual": "range=699",
+          "passed": true
+        },
+        {
+          "name": "device_status_scrollable_or_compact",
+          "expected": "device scroll visible when needed",
+          "actual": "width=14px",
+          "passed": true
+        },
+        {
+          "name": "wheel_interaction",
+          "expected": "wheel step changes scroll value",
+          "actual": "True",
+          "passed": true
+        },
+        {
+          "name": "handle_position_interaction",
+          "expected": "handle position can be set smoothly",
+          "actual": "True",
+          "passed": true
+        }
+      ],
+      "all_passed": true
+    },
     "checks": [
       {
         "name": "custom_title_bar",
@@ -214,6 +426,66 @@
       {
         "name": "maximized_window",
         "expected": "custom maximized == True",
+        "actual": "True",
+        "passed": true
+      },
+      {
+        "name": "qss_scrollbar_handle_min_height",
+        "expected": ">= 48px in QSS",
+        "actual": "48px",
+        "passed": true
+      },
+      {
+        "name": "qss_scrollbar_handle_min_width",
+        "expected": ">= 48px in QSS",
+        "actual": "48px",
+        "passed": true
+      },
+      {
+        "name": "left_scrollbar_width",
+        "expected": ">= 12px when visible",
+        "actual": "14px",
+        "passed": true
+      },
+      {
+        "name": "property_scrollbar_width",
+        "expected": ">= 12px when visible",
+        "actual": "14px",
+        "passed": true
+      },
+      {
+        "name": "log_scrollbar_width",
+        "expected": ">= 12px when scrollable",
+        "actual": "14px",
+        "passed": true
+      },
+      {
+        "name": "log_area_scrollable",
+        "expected": "log content scrollable",
+        "actual": "range=11",
+        "passed": true
+      },
+      {
+        "name": "property_area_scrollable",
+        "expected": "property panel scrollable",
+        "actual": "range=699",
+        "passed": true
+      },
+      {
+        "name": "device_status_scrollable_or_compact",
+        "expected": "device scroll visible when needed",
+        "actual": "width=14px",
+        "passed": true
+      },
+      {
+        "name": "wheel_interaction",
+        "expected": "wheel step changes scroll value",
+        "actual": "True",
+        "passed": true
+      },
+      {
+        "name": "handle_position_interaction",
+        "expected": "handle position can be set smoothly",
         "actual": "True",
         "passed": true
       }

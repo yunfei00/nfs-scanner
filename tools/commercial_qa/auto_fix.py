@@ -60,6 +60,25 @@ def apply_runtime_mitigations(shell: CommercialMainShell, failures: list[QACheck
         QApplication.processEvents()
         applied.append("reapply_splitter_sizes_and_compact_toolbar")
 
+    if names & {
+        "qss_scrollbar_handle_min_height",
+        "qss_scrollbar_handle_min_width",
+        "left_scrollbar_width",
+        "property_scrollbar_width",
+        "log_scrollbar_width",
+        "log_area_scrollable",
+        "property_area_scrollable",
+        "device_status_scrollable_or_compact",
+        "wheel_interaction",
+        "handle_position_interaction",
+    }:
+        from nfs_scanner.ui.commercial.scroll_helpers import apply_commercial_scroll_config
+
+        apply_commercial_scroll_config(shell)
+        shell.bottom_dock.switch_to_logs_tab()
+        QApplication.processEvents()
+        applied.append("retune_commercial_scrollbars")
+
     if "log_view_height" in names or "log_visible_lines" in names:
         shell.bottom_dock.switch_to_logs_tab()
         QApplication.processEvents()
