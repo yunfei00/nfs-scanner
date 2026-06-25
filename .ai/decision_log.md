@@ -410,3 +410,31 @@ Needs Review: yes/no
 - Reason: 提升 dock 信息密度与可读性。
 - Impact: 仅商业 UI bottom dock；右侧 property 预览统计保留。
 - Needs Review: no
+
+### 2026-06-26 - Frameless Custom Title Bar (Sprint 023)
+
+- Date: 2026-06-26
+- Task: sprint-023
+- Decision: 商业 UI 使用 `FramelessWindowHint` + `CommercialTitleBar` 完全替代原生标题栏；旧 UI 不变。最大化通过 `availableGeometry()` 填充（`set_custom_maximized`）。
+- Reason: DWM dark mode 仍显示浅色系统栏，与深色商业 UI 不统一。
+- Impact: 仅 `NFS_SCANNER_UI=commercial`；`window_chrome.py` 保留但商业 shell 不再依赖。
+- Needs Review: no
+
+### 2026-06-26 - Default Window Screen Clamp (Sprint 024)
+
+- Date: 2026-06-26
+- Task: sprint-024
+- Decision: 默认 1600×900；≤768px 高屏幕用全可用区域；`setMaximumSize` clamp；compact 模式 bottom dock min 195px。
+- Reason: 720p 远程桌面下窗口超出可用区域、日志区被压缩。
+- Impact: 左 280 / 右 380 面板；最大化时 bottom ratio 24%。
+- Needs Review: no
+
+### 2026-06-26 - Visual Self-Check Tool (Sprint 025–026)
+
+- Date: 2026-06-26
+- Task: sprint-025-026
+- Decision: `tools/commercial_ui_visual_check.py` 截图 + `layout_metrics.py` 几何断言；PNG gitignore，MD/JSON 报告提交。
+- Reason: 无人值守 UI 回归验证，不依赖人工截图。
+- Impact: Windows 本地可运行；headless skip。
+- Needs Review: no
+

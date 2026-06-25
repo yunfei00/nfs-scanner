@@ -1,0 +1,148 @@
+{
+  "generated_at": "2026-06-26T00:17:33",
+  "default": {
+    "uses_custom_title_bar": true,
+    "title_bar_height": 34,
+    "bottom_dock_height": 195,
+    "log_view_height": 111,
+    "statistics_panel_height": 149,
+    "left_panel_width": 280,
+    "right_panel_width": 380,
+    "workspace_width": 596,
+    "window_width": 1280,
+    "window_height": 720,
+    "screen_available_width": 1280,
+    "screen_available_height": 720,
+    "is_maximized": false,
+    "checks": [
+      {
+        "name": "custom_title_bar",
+        "expected": "frameless + title bar visible",
+        "actual": "custom=True, height=34px",
+        "passed": true
+      },
+      {
+        "name": "title_bar_height",
+        "expected": "28–44 px",
+        "actual": "34px",
+        "passed": true
+      },
+      {
+        "name": "bottom_dock_height",
+        "expected": ">= 195 px",
+        "actual": "195px",
+        "passed": true
+      },
+      {
+        "name": "log_view_height",
+        "expected": ">= 100 px",
+        "actual": "111px",
+        "passed": true
+      },
+      {
+        "name": "statistics_panel_height",
+        "expected": ">= 100 px",
+        "actual": "149px",
+        "passed": true
+      },
+      {
+        "name": "right_panel_width",
+        "expected": "320–460 px",
+        "actual": "380px",
+        "passed": true
+      },
+      {
+        "name": "left_panel_width",
+        "expected": "240–330 px",
+        "actual": "280px",
+        "passed": true
+      },
+      {
+        "name": "workspace_wider_than_right_panel",
+        "expected": "workspace > right panel",
+        "actual": "596px > 380px",
+        "passed": true
+      },
+      {
+        "name": "default_window_within_screen",
+        "expected": "window <= available screen",
+        "actual": "1280x720 <= 1280x720",
+        "passed": true
+      }
+    ],
+    "all_passed": true
+  },
+  "maximized": {
+    "uses_custom_title_bar": true,
+    "title_bar_height": 34,
+    "bottom_dock_height": 195,
+    "log_view_height": 111,
+    "statistics_panel_height": 149,
+    "left_panel_width": 280,
+    "right_panel_width": 380,
+    "workspace_width": 596,
+    "window_width": 1280,
+    "window_height": 720,
+    "screen_available_width": 1280,
+    "screen_available_height": 720,
+    "is_maximized": true,
+    "checks": [
+      {
+        "name": "custom_title_bar",
+        "expected": "frameless + title bar visible",
+        "actual": "custom=True, height=34px",
+        "passed": true
+      },
+      {
+        "name": "title_bar_height",
+        "expected": "28–44 px",
+        "actual": "34px",
+        "passed": true
+      },
+      {
+        "name": "bottom_dock_height",
+        "expected": ">= 195 px",
+        "actual": "195px",
+        "passed": true
+      },
+      {
+        "name": "log_view_height",
+        "expected": ">= 100 px",
+        "actual": "111px",
+        "passed": true
+      },
+      {
+        "name": "statistics_panel_height",
+        "expected": ">= 100 px",
+        "actual": "149px",
+        "passed": true
+      },
+      {
+        "name": "right_panel_width",
+        "expected": "320–460 px",
+        "actual": "380px",
+        "passed": true
+      },
+      {
+        "name": "left_panel_width",
+        "expected": "240–330 px",
+        "actual": "280px",
+        "passed": true
+      },
+      {
+        "name": "workspace_wider_than_right_panel",
+        "expected": "workspace > right panel",
+        "actual": "596px > 380px",
+        "passed": true
+      },
+      {
+        "name": "maximized_window",
+        "expected": "isMaximized() == True",
+        "actual": "True",
+        "passed": true
+      }
+    ],
+    "all_passed": true
+  },
+  "overall_pass": true
+}
