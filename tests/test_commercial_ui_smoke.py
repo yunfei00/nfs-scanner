@@ -83,6 +83,23 @@ class CommercialUiSmokeTestCase(unittest.TestCase):
         finally:
             shell.close()
 
+    def test_mock_scan_controller_start_stop(self) -> None:
+        from nfs_scanner.ui.commercial.runtime import MockScanController
+
+        controller = MockScanController()
+        region = ScanRegion(x_start=0.0, x_stop=20.0, y_start=0.0, y_stop=20.0, x_step=10.0, y_step=10.0)
+        config = ScanPathConfig(scan_mode="snake", dwell_ms=50, speed_mm_min=600.0)
+        snapshots: list = []
+        controller.snapshot_changed.connect(snapshots.append)
+        controller.start(region, config)
+        self.assertEqual(snapshots[-1].status, "running")
+        controller.pause()
+        self.assertEqual(snapshots[-1].status, "paused")
+        controller.resume()
+        self.assertEqual(snapshots[-1].status, "running")
+        controller.stop()
+        self.assertEqual(snapshots[-1].status, "stopped")
+
     def test_high_density_preview_samples_path_markers(self) -> None:
         view = RealtimeView()
         try:
