@@ -113,3 +113,30 @@ Needs Review: yes/no
 - Reason: 与 Sprint 001 商业 UI 目录约定一致，便于后续逐层实现。
 - Impact: 后续 canvas/layer 任务都在同一包内扩展，不影响旧 UI。
 - Needs Review: no
+
+### 2026-06-25 - Sprint 003 Instrument Device Cache
+
+- Date: 2026-06-25
+- Task: sprint-003-task-04
+- Decision: `config/instrument_devices.json` 作为运行时仪器发现缓存加入 `.gitignore`；仓库保留 `instrument_devices.example.json` 作为结构模板。
+- Reason: 旧 UI `scan_control_page` 在仪器搜索时写入该文件，内容随本机环境变化，不应纳入版本控制。
+- Impact: 首次运行无缓存时返回空列表；搜索后自动创建本地 JSON。无敏感路径或真实 IP 在示例中。
+- Needs Review: no
+
+### 2026-06-25 - Sprint 003 NFS Widget Library
+
+- Date: 2026-06-25
+- Task: sprint-003-task-01
+- Decision: 商业组件统一为 NFS* 命名（nfsCard、nfsPrimaryButton 等），旧 CommercialCard/StatusBadge 等保留为别名。
+- Reason: 设计系统与 component-library 文档要求统一 objectName 与 QSS 入口，同时不破坏已有 import。
+- Impact: 优先迁移 Shell 六处面板；其余 Workspace Tab 通过别名自动获得新样式。
+- Needs Review: no
+
+### 2026-06-25 - Sprint 003 Review Gate Stop
+
+- Date: 2026-06-25
+- Task: sprint-003-review
+- Decision: Sprint 003 在 Review Gate 停止，不自动进入 Sprint 004。
+- Reason: 符合 constitution 与 review_gate 对 sprint 结束的强制 review 要求。
+- Impact: 后续工作需人工 review 视觉统一性后再规划。
+- Needs Review: yes

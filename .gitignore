@@ -201,6 +201,9 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+# Runtime instrument discovery cache (see config/instrument_devices.example.json)
+config/instrument_devices.json
+
 # Marimo
 marimo/_static/
 marimo/_lsp/
