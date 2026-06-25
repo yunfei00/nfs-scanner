@@ -10,6 +10,7 @@ from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
 from .infra.logging_config import get_logger, setup_logging
+from .ui.commercial import create_commercial_shell, is_commercial_ui_enabled
 from .ui.main_window import MainWindow
 from .version import APP_NAME, APP_VERSION
 
@@ -32,7 +33,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     logger.info("应用启动，日志文件：%s", log_file)
 
     app = create_application(argv)
-    window = MainWindow()
+    if is_commercial_ui_enabled():
+        logger.info("启动商业版 UI（NFS_SCANNER_UI=commercial）")
+        window = create_commercial_shell()
+        window.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
+    else:
+        window = MainWindow()
     window.show()
 
     auto_close_ms = os.getenv("NFS_SCANNER_AUTOCLOSE_MS")
