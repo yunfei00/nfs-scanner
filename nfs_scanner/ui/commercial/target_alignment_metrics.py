@@ -7,13 +7,14 @@ from PySide6.QtWidgets import QApplication, QFrame, QLabel, QProgressBar, QTabWi
 from nfs_scanner.ui.commercial.graphics.layers import LayerKind
 from nfs_scanner.ui.commercial.layout_metrics import LayoutMetricCheck
 from nfs_scanner.ui.commercial.main_shell import CommercialMainShell
+from nfs_scanner.ui.commercial.widgets.brand_logo import NFSLogoWidget
 from nfs_scanner.ui.commercial.widgets.mock_chart_widgets import MockSpectrumWidget
 
 
 def collect_target_alignment_checks(shell: CommercialMainShell) -> list[LayoutMetricCheck]:
     """Build target-screenshot alignment assertions for visual QA."""
 
-    logo = shell.findChild(QFrame, "commercialTitleBarLogo")
+    logo = shell.findChild(NFSLogoWidget, "commercialTitleBarLogo")
     timeline_steps = shell.findChildren(QFrame, "nfsWorkflowTimelineStep")
     tri_panel = shell.findChild(QWidget, "commercialBottomDockTriPanel")
     spectrum = shell.findChild(QWidget, "commercialDockSpectrumPanel")

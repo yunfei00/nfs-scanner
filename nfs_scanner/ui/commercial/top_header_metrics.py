@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QApplication, QFrame, QLabel, QToolButton, QWidget
 from nfs_scanner.ui.commercial.layout_metrics import LayoutMetricCheck
 from nfs_scanner.ui.commercial.main_shell import CommercialMainShell
 from nfs_scanner.ui.commercial.widgets.brand_area import CommercialBrandArea
+from nfs_scanner.ui.commercial.widgets.brand_logo import NFSLogoWidget
 from nfs_scanner.ui.commercial.widgets.icon_tool_button import NFSIconToolButton, TOOL_BUTTON_WIDTH
 
 HEADER_HEIGHT_MIN = 48
@@ -66,7 +67,7 @@ def collect_top_header_checks(shell: CommercialMainShell) -> list[LayoutMetricCh
 
     top_header = shell.findChild(QFrame, "commercialTopHeader")
     brand_area = shell.findChild(CommercialBrandArea, "commercialBrandArea")
-    logo = shell.findChild(QFrame, "commercialTitleBarLogo")
+    logo = shell.findChild(NFSLogoWidget, "commercialTitleBarLogo")
     auth = shell.findChild(QWidget, "commercialTopStatusArea")
     auth_label = shell.findChild(QLabel, "commercialTitleBarAuthLabel")
 
@@ -122,6 +123,15 @@ def collect_top_header_checks(shell: CommercialMainShell) -> list[LayoutMetricCh
     badge_ok = badge is not None and badge.isVisible() and badge.text().startswith("v")
 
     logo_blue = logo is not None and logo.property("brandLogoBlue") is True and logo.width() >= 40
+    logo_widget_ok = isinstance(logo, NFSLogoWidget) or (
+        logo is not None and logo.property("brandLogoWidget") is True
+    )
+    plain_logo_label = shell.findChild(QLabel, "commercialTitleBarLogoText")
+    not_plain_label = plain_logo_label is None
+
+    custom_icon_buttons = [button for button in toolbar_buttons if button.uses_custom_icon()]
+    custom_icons_ok = len(custom_icon_buttons) == len(toolbar_buttons) and len(toolbar_buttons) >= 12
+    no_qt_default_icons = all(button.property("customToolIcon") is True for button in toolbar_buttons)
 
     auth_light = False
     if auth_label is not None:
@@ -138,12 +148,6 @@ def collect_top_header_checks(shell: CommercialMainShell) -> list[LayoutMetricCh
     )
 
     overflow_hidden_wide = window_width < OVERFLOW_FORBIDDEN_WIDTH or not overflow_visible
-    overflow_not_prominent = (
-        not overflow_visible
-        or (overflow_btn is not None and overflow_btn.width() <= 36 and overflow_btn.text() in {"", "⋯"} is False)
-    )
-    if overflow_btn is not None and overflow_visible:
-        overflow_not_prominent = overflow_btn.width() <= 36 and not overflow_btn.text().strip().startswith("...")
 
     close_buttons = (
         shell.top_header.findChildren(QToolButton, "commercialTitleBarClose")
@@ -197,6 +201,40 @@ def collect_top_header_checks(shell: CommercialMainShell) -> list[LayoutMetricCh
                 else "missing"
             ),
             passed=logo is not None and logo.isVisible() and logo.width() >= 40,
+        ),
+        LayoutMetricCheck(
+            name="brand_logo_widget_used",
+            expected="NFSLogoWidget or brandLogoWidget property",
+            actual=f"widget={isinstance(logo, NFSLogoWidget)}, prop={logo.property('brandLogoWidget') if logo else None}",
+            passed=logo_widget_ok,
+        ),
+        LayoutMetricCheck(
+            name="brand_logo_not_plain_label",
+            expected="logo is not a plain QLabel text block",
+            actual=f"plain_label={plain_logo_label is not None}",
+            passed=not_plain_label,
+        ),
+        LayoutMetricCheck(
+            name="toolbar_custom_icons_used",
+            expected="all toolbar buttons use customToolIcon",
+            actual=f"custom={len(custom_icon_buttons)}/{len(toolbar_buttons)}",
+            passed=custom_icons_ok,
+        ),
+        LayoutMetricCheck(
+            name="toolbar_no_qt_default_icon_mode",
+            expected="Qt standard icons not used for toolbar actions",
+            actual=str(no_qt_default_icons),
+            passed=no_qt_default_icons and bool(toolbar_buttons),
+        ),
+        LayoutMetricCheck(
+            name="auth_status_lightweight",
+            expected="lightweight auth label, not large chip",
+            actual=(
+                f"label_hint={auth_label.sizeHint().width()}x{auth_label.sizeHint().height()}"
+                if auth_label is not None
+                else "missing"
+            ),
+            passed=auth_light,
         ),
         LayoutMetricCheck(
             name="brand_logo_blue_enough",

@@ -1,6 +1,6 @@
 # Commercial UI Visual Report
 
-- Generated: 2026-06-26 20:51:29
+- Generated: 2026-06-26 21:08:53
 - Default screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_default.png`
 - Top header screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_top_header.png`
 - Maximized screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_maximized.png`
@@ -60,7 +60,12 @@
 | toolbar_separator_count_reasonable | strong separators <= 4 | 4 | PASS |
 | toolbar_button_width_reasonable | visible buttons width >= 56px | min=60px | PASS |
 | toolbar_no_text_touching | adjacent buttons gap >= 4px | count=10, min_gap>=4px | PASS |
-| brand_logo_exists | NFS logo square >= 40px | logo=True, size=42x42 | PASS |
+| brand_logo_exists | NFS logo square >= 40px | logo=True, size=44x44 | PASS |
+| brand_logo_widget_used | NFSLogoWidget or brandLogoWidget property | widget=True, prop=True | PASS |
+| brand_logo_not_plain_label | logo is not a plain QLabel text block | plain_label=False | PASS |
+| toolbar_custom_icons_used | all toolbar buttons use customToolIcon | custom=13/13 | PASS |
+| toolbar_no_qt_default_icon_mode | Qt standard icons not used for toolbar actions | True | PASS |
+| auth_status_lightweight | lightweight auth label, not large chip | label_hint=84x16 | PASS |
 | brand_logo_blue_enough | brandLogoBlue property on logo tile | brandLogoBlue=True | PASS |
 | brand_logo_blue_block | blue brand logo block, not flat black | brandBlueBlock=True | PASS |
 | brand_title_hierarchy | CN title + EN subtitle + version badge | title=True, subtitle=True, badge=True, hierarchy=True | PASS |
@@ -160,7 +165,12 @@
 | toolbar_separator_count_reasonable | strong separators <= 4 | 4 | PASS |
 | toolbar_button_width_reasonable | visible buttons width >= 56px | min=60px | PASS |
 | toolbar_no_text_touching | adjacent buttons gap >= 4px | count=10, min_gap>=4px | PASS |
-| brand_logo_exists | NFS logo square >= 40px | logo=True, size=42x42 | PASS |
+| brand_logo_exists | NFS logo square >= 40px | logo=True, size=44x44 | PASS |
+| brand_logo_widget_used | NFSLogoWidget or brandLogoWidget property | widget=True, prop=True | PASS |
+| brand_logo_not_plain_label | logo is not a plain QLabel text block | plain_label=False | PASS |
+| toolbar_custom_icons_used | all toolbar buttons use customToolIcon | custom=13/13 | PASS |
+| toolbar_no_qt_default_icon_mode | Qt standard icons not used for toolbar actions | True | PASS |
+| auth_status_lightweight | lightweight auth label, not large chip | label_hint=84x16 | PASS |
 | brand_logo_blue_enough | brandLogoBlue property on logo tile | brandLogoBlue=True | PASS |
 | brand_logo_blue_block | blue brand logo block, not flat black | brandBlueBlock=True | PASS |
 | brand_title_hierarchy | CN title + EN subtitle + version badge | title=True, subtitle=True, badge=True, hierarchy=True | PASS |

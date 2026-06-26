@@ -6,6 +6,8 @@ from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QToolButton, QWidget
 
+from .tool_icons import ToolIconFactory
+
 TOOL_BUTTON_WIDTH = 60
 TOOL_BUTTON_HEIGHT = 50
 
@@ -39,13 +41,28 @@ class NFSIconToolButton(QToolButton):
                 else ("commercialIconToolPrimary" if primary else "commercialIconToolButton")
             )
         )
-        if isinstance(icon, QIcon):
-            self.setIcon(icon)
+        resolved_icon = icon
+        if isinstance(icon, str):
+            resolved_icon = ToolIconFactory.icon_for_action(
+                icon,
+                primary=primary,
+                success=success,
+                danger=danger,
+                disabled=mock_disabled,
+            )
+            self.setProperty("customToolIcon", True)
+            self.setProperty("toolIconKind", icon)
+        elif isinstance(icon, QIcon):
+            self.setProperty("customToolIcon", False)
+
+        if isinstance(resolved_icon, QIcon):
+            self.setIcon(resolved_icon)
             self.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
             self.setText(caption.replace("\n", ""))
         else:
             self.setText(f"{icon} {caption}")
             self.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+
         self.setToolTip(tooltip or self._full_caption)
         self.setProperty("fullCaption", self._full_caption)
         self.setAutoRaise(True)
@@ -60,3 +77,6 @@ class NFSIconToolButton(QToolButton):
 
     def full_caption(self) -> str:
         return self._full_caption
+
+    def uses_custom_icon(self) -> bool:
+        return self.property("customToolIcon") is True

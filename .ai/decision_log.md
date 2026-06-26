@@ -535,3 +535,12 @@ Needs Review: yes/no
 - Impact: 145 tests + visual + QA PASS；不接真实设备。
 - Needs Review: no
 
+### 2026-06-26 - Commercial Header Asset Polish
+
+- Date: 2026-06-26
+- Task: commercial-header-asset-polish
+- Decision: 新增 `NFSLogoWidget`（QPainter 渐变/六边形/NFS 文字）与 `ToolIconFactory`（22px 线性仪器风图标）；工具栏全面替换 Qt 标准图标；不引入外部图标库或 PNG/SVG 资源。
+- Reason: 用户要求左上 logo 像品牌图标而非文字块，工具栏图标风格统一接近商业仪器软件；保持零额外依赖与可维护性。
+- Impact: 148 tests + visual + QA PASS；仅改顶部 logo/icon；QA 检测改用 `NFSLogoWidget` 类型查找。
+- Needs Review: no
+

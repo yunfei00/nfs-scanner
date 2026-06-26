@@ -4,16 +4,16 @@ Last updated: 2026-06-26
 
 ## Current Mode
 
-**COMPLETE — Top Header Target Match Final**
+**COMPLETE — Commercial Header Asset Polish**
 
-商业 UI 顶部最终收敛：宽屏无 overflow、弱分隔线、自绘 NFS logo、稳定工具栏；QA 加强 overflow/separator 检查。
+顶部品牌 Logo 与工具栏图标资产收敛：自绘 `NFSLogoWidget` + 内部 `ToolIconFactory`；QA 增加 logo/icon 检查；主体区域未改。
 
 ## Recent (2026-06-26)
 
-- >=1500px 隐藏 overflow；仅次要 mock 项可收纳
-- 工具栏 2 条内部分隔 + 透明背景；按钮 60×50
-- NFSBrandLogoFrame 蓝色渐变自绘 logo
-- QA：overflow_hidden_at_default_width、separator<=4、gap>=4
+- `NFSLogoWidget`：44×44 QPainter 蓝色渐变 + 六边形 + NFS 字样
+- `ToolIconFactory`：13 种工具栏线性图标，替换 Qt 标准图标
+- QA 修正 logo 检测类型（QWidget 非 QFrame）
+- 148 tests + visual + QA PASS
 
 ## Application Entry Points
 
@@ -35,6 +35,7 @@ Last updated: 2026-06-26
 | Top Header Final Polish | **done** |
 | Header Readability Fix | **done** |
 | Top Header Target Match Final | **done** |
+| Commercial Header Asset Polish | **done** |
 | Real Motion Control | **blocked** |
 
 ## Constraints (unchanged)

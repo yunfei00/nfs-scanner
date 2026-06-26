@@ -7,19 +7,19 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from nfs_scanner.version import APP_VERSION
 
-from .brand_logo import NFSBrandLogoFrame
+from .brand_logo import NFSLogoWidget
 
 
 class CommercialBrandArea(QWidget):
     """Logo square + hierarchical product title block matching the target header."""
 
-    BRAND_WIDTH = 220
+    BRAND_WIDTH = 238
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("commercialBrandArea")
         self.setFixedWidth(self.BRAND_WIDTH)
-        self._logo_block: NFSBrandLogoFrame | None = None
+        self._logo_block: NFSLogoWidget | None = None
         self._title_label: QLabel | None = None
         self._subtitle_label: QLabel | None = None
         self._version_badge: QLabel | None = None
@@ -30,7 +30,7 @@ class CommercialBrandArea(QWidget):
         root.setContentsMargins(0, 0, 6, 0)
         root.setSpacing(8)
 
-        self._logo_block = NFSBrandLogoFrame(self)
+        self._logo_block = NFSLogoWidget(self)
 
         text_column = QWidget(self)
         text_column.setObjectName("commercialBrandTextColumn")
@@ -64,7 +64,7 @@ class CommercialBrandArea(QWidget):
         root.addWidget(self._logo_block, 0, Qt.AlignmentFlag.AlignVCenter)
         root.addWidget(text_column, 1, Qt.AlignmentFlag.AlignVCenter)
 
-    def logo_block(self) -> NFSBrandLogoFrame | None:
+    def logo_block(self) -> NFSLogoWidget | None:
         return self._logo_block
 
     def version_badge(self) -> QLabel | None:

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QMenu, QStyle, QToolButton, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QMenu, QToolButton, QWidget
 
 from .widgets.icon_tool_button import NFSIconToolButton, TOOL_BUTTON_WIDTH
+from .widgets.tool_icons import ToolIconFactory
 
 _TOOLBAR_CHROME_WIDTH = 48
 _BUTTON_GAP = 6
@@ -76,39 +77,33 @@ class CommercialToolbar(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(_BUTTON_GAP)
 
-        style = self.style()
-        groups: list[list[tuple[str, object, object, dict]]] = [
+        groups: list[list[tuple[str, str, object, dict]]] = [
             [
-                ("新建项目", style.standardIcon(QStyle.StandardPixmap.SP_FileIcon), self.project_new_requested.emit, {}),
-                ("打开项目", style.standardIcon(QStyle.StandardPixmap.SP_DialogOpenButton), self.project_open_requested.emit, {}),
-                ("保存项目", style.standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton), self.project_save_requested.emit, {}),
+                ("新建项目", "新建项目", self.project_new_requested.emit, {}),
+                ("打开项目", "打开项目", self.project_open_requested.emit, {}),
+                ("保存项目", "保存项目", self.project_save_requested.emit, {}),
             ],
             [
-                (
-                    "连接设备",
-                    style.standardIcon(QStyle.StandardPixmap.SP_DriveNetIcon),
-                    self.connect_device_requested.emit,
-                    {"primary": True},
-                ),
-                ("开始扫描", style.standardIcon(QStyle.StandardPixmap.SP_MediaPlay), self.scan_start_requested.emit, {"success": True}),
-                ("停止扫描", style.standardIcon(QStyle.StandardPixmap.SP_MediaStop), self.scan_stop_requested.emit, {"danger": True}),
+                ("连接设备", "连接设备", self.connect_device_requested.emit, {"primary": True}),
+                ("开始扫描", "开始扫描", self.scan_start_requested.emit, {"success": True}),
+                ("停止扫描", "停止扫描", self.scan_stop_requested.emit, {"danger": True}),
             ],
             [
-                ("拍照", style.standardIcon(QStyle.StandardPixmap.SP_FileDialogContentsView), lambda: self.mock_action_requested.emit("拍照"), {"mock_disabled": True}),
-                ("区域对齐", style.standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView), lambda: self.mock_action_requested.emit("区域对齐"), {"mock_disabled": True}),
-                ("清除覆盖", style.standardIcon(QStyle.StandardPixmap.SP_TrashIcon), lambda: self.mock_action_requested.emit("清除覆盖"), {"mock_disabled": True}),
+                ("拍照", "拍照", lambda: self.mock_action_requested.emit("拍照"), {"mock_disabled": True}),
+                ("区域对齐", "区域对齐", lambda: self.mock_action_requested.emit("区域对齐"), {"mock_disabled": True}),
+                ("清除覆盖", "清除覆盖", lambda: self.mock_action_requested.emit("清除覆盖"), {"mock_disabled": True}),
             ],
             [
-                ("导出数据", style.standardIcon(QStyle.StandardPixmap.SP_ArrowUp), self.export_data_requested.emit, {}),
-                ("导出报告", style.standardIcon(QStyle.StandardPixmap.SP_FileDialogInfoView), self.report_center_requested.emit, {}),
-                ("参数模板", style.standardIcon(QStyle.StandardPixmap.SP_FileDialogListView), lambda: self.mock_action_requested.emit("参数模板"), {"mock_disabled": True}),
-                ("帮助", style.standardIcon(QStyle.StandardPixmap.SP_MessageBoxQuestion), lambda: self.mock_action_requested.emit("帮助"), {"mock_disabled": True}),
+                ("导出数据", "导出数据", self.export_data_requested.emit, {}),
+                ("导出报告", "导出报告", self.report_center_requested.emit, {}),
+                ("参数模板", "参数模板", lambda: self.mock_action_requested.emit("参数模板"), {"mock_disabled": True}),
+                ("帮助", "帮助", lambda: self.mock_action_requested.emit("帮助"), {"mock_disabled": True}),
             ],
         ]
 
         # Separators only before device/scan block and before export block.
         separator_before = {1, 3}
-        flat_items: list[tuple[str, object, object, dict]] = []
+        flat_items: list[tuple[str, str, object, dict]] = []
 
         for group_index, group in enumerate(groups):
             if group_index in separator_before:
@@ -140,7 +135,7 @@ class CommercialToolbar(QWidget):
 
         self._overflow_button = QToolButton(self)
         self._overflow_button.setObjectName("commercialToolbarOverflow")
-        self._overflow_button.setIcon(style.standardIcon(QStyle.StandardPixmap.SP_ArrowDown))
+        self._overflow_button.setIcon(ToolIconFactory.icon_for_kind("overflow", tone="default"))
         self._overflow_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         self._overflow_button.setToolTip("更多")
         self._overflow_button.setFixedSize(32, 50)

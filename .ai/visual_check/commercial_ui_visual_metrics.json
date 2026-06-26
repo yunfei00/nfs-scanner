@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-26T20:51:29",
+  "generated_at": "2026-06-26T21:08:53",
   "default": {
     "uses_custom_title_bar": true,
     "title_bar_height": 54,
@@ -416,7 +416,37 @@
       {
         "name": "brand_logo_exists",
         "expected": "NFS logo square >= 40px",
-        "actual": "logo=True, size=42x42",
+        "actual": "logo=True, size=44x44",
+        "passed": true
+      },
+      {
+        "name": "brand_logo_widget_used",
+        "expected": "NFSLogoWidget or brandLogoWidget property",
+        "actual": "widget=True, prop=True",
+        "passed": true
+      },
+      {
+        "name": "brand_logo_not_plain_label",
+        "expected": "logo is not a plain QLabel text block",
+        "actual": "plain_label=False",
+        "passed": true
+      },
+      {
+        "name": "toolbar_custom_icons_used",
+        "expected": "all toolbar buttons use customToolIcon",
+        "actual": "custom=13/13",
+        "passed": true
+      },
+      {
+        "name": "toolbar_no_qt_default_icon_mode",
+        "expected": "Qt standard icons not used for toolbar actions",
+        "actual": "True",
+        "passed": true
+      },
+      {
+        "name": "auth_status_lightweight",
+        "expected": "lightweight auth label, not large chip",
+        "actual": "label_hint=84x16",
         "passed": true
       },
       {
@@ -1018,7 +1048,37 @@
       {
         "name": "brand_logo_exists",
         "expected": "NFS logo square >= 40px",
-        "actual": "logo=True, size=42x42",
+        "actual": "logo=True, size=44x44",
+        "passed": true
+      },
+      {
+        "name": "brand_logo_widget_used",
+        "expected": "NFSLogoWidget or brandLogoWidget property",
+        "actual": "widget=True, prop=True",
+        "passed": true
+      },
+      {
+        "name": "brand_logo_not_plain_label",
+        "expected": "logo is not a plain QLabel text block",
+        "actual": "plain_label=False",
+        "passed": true
+      },
+      {
+        "name": "toolbar_custom_icons_used",
+        "expected": "all toolbar buttons use customToolIcon",
+        "actual": "custom=13/13",
+        "passed": true
+      },
+      {
+        "name": "toolbar_no_qt_default_icon_mode",
+        "expected": "Qt standard icons not used for toolbar actions",
+        "actual": "True",
+        "passed": true
+      },
+      {
+        "name": "auth_status_lightweight",
+        "expected": "lightweight auth label, not large chip",
+        "actual": "label_hint=84x16",
         "passed": true
       },
       {

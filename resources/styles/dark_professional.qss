@@ -722,7 +722,7 @@ QLabel#nfsNumericUnit {
 
 /* --- Target alignment: title bar brand --- */
 
-QFrame#commercialTitleBarLogo {
+QWidget#commercialTitleBarLogo {
     background: transparent;
     border: none;
 }
