@@ -263,7 +263,7 @@ class CommercialBottomDock(QWidget):
         log_view.setPlainText("\n".join(_LOG_SEED_LINES))
         metrics = QFontMetrics(log_view.font())
         line_height = metrics.lineSpacing()
-        log_view.setMinimumHeight(max(96, line_height * self._LOG_VISIBLE_LINES + 12))
+        log_view.setMinimumHeight(max(108, line_height * self._LOG_VISIBLE_LINES + 12))
         self._log_view = log_view
         layout.addWidget(log_view, 1)
         return panel
