@@ -234,6 +234,20 @@ QFrame#commercialTopHeader {
     border-bottom: 1px solid #243247;
 }
 
+QWidget#commercialBrandArea {
+    background-color: transparent;
+}
+
+QWidget#commercialBrandTextColumn {
+    background-color: transparent;
+}
+
+QFrame#commercialBrandSeparator,
+QFrame#commercialToolbarSeparator {
+    background-color: #243247;
+    max-width: 1px;
+}
+
 QWidget#commercialBrandRow {
     background-color: transparent;
 }
@@ -712,25 +726,27 @@ QLabel#nfsNumericUnit {
 /* --- Target alignment: title bar brand --- */
 
 QFrame#commercialTitleBarLogo {
-    background-color: #0EA5FF;
-    border-radius: 4px;
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #0EA5FF, stop:1 #0284C7);
+    border: 1px solid rgba(56, 182, 255, 0.45);
+    border-radius: 8px;
 }
 
 QLabel#commercialTitleBarLogoText {
-    color: #04111F;
-    font-size: 9px;
+    color: #F8FAFC;
+    font-size: 13px;
     font-weight: 800;
+    letter-spacing: 0.5px;
 }
 
 QLabel#commercialTitleBarTitle {
-    color: #E8EEF8;
-    font-size: 13px;
+    color: #F1F5F9;
+    font-size: 14px;
     font-weight: 700;
 }
 
 QLabel#commercialTitleBarSubtitle {
-    color: #69788D;
-    font-size: 10px;
+    color: #64748B;
+    font-size: 11px;
     font-weight: 400;
 }
 
@@ -747,13 +763,28 @@ QLabel#commercialStatusDot {
 }
 
 QLabel#commercialTitleBarBadge {
-    color: #06D6E8;
-    font-size: 9px;
-    font-weight: 700;
-    padding: 1px 5px;
-    border-radius: 3px;
-    background-color: rgba(6, 214, 232, 0.10);
-    border: 1px solid rgba(6, 214, 232, 0.25);
+    color: #38BDF8;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background-color: rgba(14, 165, 255, 0.12);
+    border: 1px solid rgba(56, 189, 255, 0.35);
+}
+
+QWidget#commercialTopStatusArea {
+    background-color: transparent;
+}
+
+QLabel#commercialTitleBarUserIcon {
+    min-width: 14px;
+    max-width: 14px;
+}
+
+QLabel#commercialTitleBarUserChevron {
+    color: #64748B;
+    font-size: 10px;
+    padding-left: 0;
 }
 
 /* --- Workflow timeline --- */
@@ -812,9 +843,9 @@ QToolButton#commercialIconToolSuccess {
     background-color: transparent;
     border: 1px solid transparent;
     border-radius: 4px;
-    color: #AAB7C8;
-    font-size: 8px;
-    padding: 0;
+    color: #94A3B8;
+    font-size: 11px;
+    padding: 2px 1px;
 }
 
 QToolButton#commercialIconToolButton:hover {
@@ -1024,8 +1055,8 @@ QLabel#commercialLogCategoryTag[logLevel="DATA"] {
 QWidget#commercialToolbar {
     background-color: transparent;
     border: none;
-    min-height: 32px;
-    max-height: 32px;
+    min-height: 48px;
+    max-height: 48px;
 }
 
 QFrame#commercialTopHeader QFrame#commercialTitleBar {

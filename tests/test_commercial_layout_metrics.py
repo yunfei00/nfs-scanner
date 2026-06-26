@@ -11,7 +11,7 @@ class CommercialLayoutMetricsTestCase(unittest.TestCase):
     def test_build_checks_passes_for_valid_default_metrics(self) -> None:
         metrics = CommercialLayoutMetrics(
             uses_custom_title_bar=True,
-            title_bar_height=34,
+            title_bar_height=52,
             bottom_dock_height=240,
             log_view_height=120,
             statistics_panel_height=130,
@@ -38,7 +38,7 @@ class CommercialLayoutMetricsTestCase(unittest.TestCase):
     def test_build_checks_fails_when_log_too_small(self) -> None:
         metrics = CommercialLayoutMetrics(
             uses_custom_title_bar=True,
-            title_bar_height=34,
+            title_bar_height=52,
             bottom_dock_height=240,
             log_view_height=80,
             statistics_panel_height=130,
@@ -65,7 +65,7 @@ class CommercialLayoutMetricsTestCase(unittest.TestCase):
     def test_center_canvas_priority_fails_when_canvas_too_narrow(self) -> None:
         metrics = CommercialLayoutMetrics(
             uses_custom_title_bar=True,
-            title_bar_height=34,
+            title_bar_height=52,
             bottom_dock_height=240,
             log_view_height=110,
             statistics_panel_height=130,

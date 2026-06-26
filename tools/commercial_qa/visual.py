@@ -18,9 +18,9 @@ def _find_demo_indicator(shell: QMainWindow) -> tuple[bool, str]:
     banner = shell.findChild(QWidget, "demoModeBanner")
     if banner is not None and banner.isVisible():
         return True, "demoModeBanner visible"
-    auth = shell.findChild(QWidget, "commercialTitleBarAuth")
+    auth = shell.findChild(QWidget, "commercialTopStatusArea")
     if auth is not None and auth.isVisible():
-        return True, "title bar auth area visible"
+        return True, "top status area visible"
     if hasattr(shell, "status_bar_widget"):
         demo_chip = shell.status_bar_widget.demo_label
         if demo_chip.isVisible() and demo_chip.text().strip():
@@ -65,7 +65,7 @@ def build_qa_visual_checks(metrics: CommercialLayoutMetrics, *, shell: QMainWind
             category="visual",
             expected="frameless custom title bar",
             actual=f"custom={metrics.uses_custom_title_bar}, height={metrics.title_bar_height}px",
-            passed=metrics.uses_custom_title_bar and _between(metrics.title_bar_height, 28, 44),
+            passed=metrics.uses_custom_title_bar and _between(metrics.title_bar_height, 48, 58),
             auto_fixable=True,
         ),
         QACheck(
@@ -81,7 +81,7 @@ def build_qa_visual_checks(metrics: CommercialLayoutMetrics, *, shell: QMainWind
             category="visual",
             expected="28–44 px",
             actual=f"{metrics.title_bar_height}px",
-            passed=_between(metrics.title_bar_height, 28, 44),
+            passed=_between(metrics.title_bar_height, 48, 58),
             auto_fixable=True,
         ),
         QACheck(

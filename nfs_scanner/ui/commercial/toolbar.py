@@ -30,8 +30,8 @@ class CommercialToolbar(QWidget):
         super().__init__(parent)
         self.setObjectName("commercialToolbar")
         self.setProperty("targetStyleMode", "true")
-        self.setMinimumHeight(32)
-        self.setMaximumHeight(32)
+        self.setMinimumHeight(48)
+        self.setMaximumHeight(48)
         self._tool_buttons: list[NFSIconToolButton] = []
         self._start_scan_button: NFSIconToolButton | None = None
         self._pause_scan_button: NFSIconToolButton | None = None
@@ -45,7 +45,7 @@ class CommercialToolbar(QWidget):
 
     def _setup_ui(self) -> None:
         root = QHBoxLayout(self)
-        root.setContentsMargins(4, 2, 4, 2)
+        root.setContentsMargins(2, 0, 2, 0)
         root.setSpacing(0)
 
         style = self.style()
@@ -72,9 +72,13 @@ class CommercialToolbar(QWidget):
 
         for index, (caption, icon, slot, options) in enumerate(items):
             if index == 3:
+                root.addSpacing(12)
                 root.addWidget(self._separator())
+                root.addSpacing(12)
             if index == 6:
+                root.addSpacing(12)
                 root.addWidget(self._separator())
+                root.addSpacing(12)
             button = self._make_button(icon, caption, slot, **options)
             if caption == "连接设备":
                 self._connect_device_button = button
@@ -111,7 +115,7 @@ class CommercialToolbar(QWidget):
         line.setObjectName("commercialToolbarSeparator")
         line.setFrameShape(QFrame.Shape.VLine)
         line.setFixedWidth(1)
-        line.setFixedHeight(24)
+        line.setFixedHeight(36)
         return line
 
     def _make_button(
@@ -165,8 +169,8 @@ class CommercialToolbar(QWidget):
         return self._layout_overflow
 
     def _measure_overflow(self, window_width: int) -> bool:
-        required = len(self._tool_buttons) * 46 + 56
-        available = max(window_width - 420, 400)
+        required = len(self._tool_buttons) * 52 + 80
+        available = max(window_width - 520, 400)
         return required > available
 
     def set_scan_controls_enabled(

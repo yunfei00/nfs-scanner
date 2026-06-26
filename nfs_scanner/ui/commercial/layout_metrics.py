@@ -120,8 +120,11 @@ def collect_layout_metrics(shell: QMainWindow) -> CommercialLayoutMetrics:
     from nfs_scanner.ui.commercial.scroll_metrics import collect_scroll_usability_metrics
     from nfs_scanner.ui.commercial.target_alignment_metrics import collect_target_alignment_checks
 
+    from nfs_scanner.ui.commercial.top_header_metrics import collect_top_header_checks
+
     metrics.checks = _build_checks(metrics)
     metrics.checks.extend(collect_target_alignment_checks(shell))
+    metrics.checks.extend(collect_top_header_checks(shell))
 
     scroll_metrics = collect_scroll_usability_metrics(shell)
     for scroll_check in scroll_metrics.checks:
@@ -149,13 +152,13 @@ def _build_checks(metrics: CommercialLayoutMetrics) -> list[LayoutMetricCheck]:
             name="custom_title_bar",
             expected="frameless + title bar visible",
             actual=f"custom={metrics.uses_custom_title_bar}, height={metrics.title_bar_height}px",
-            passed=metrics.uses_custom_title_bar and _between(metrics.title_bar_height, 28, 44),
+            passed=metrics.uses_custom_title_bar and _between(metrics.title_bar_height, 48, 58),
         ),
         LayoutMetricCheck(
             name="title_bar_height",
-            expected="28–44 px",
+            expected="48–58 px",
             actual=f"{metrics.title_bar_height}px",
-            passed=_between(metrics.title_bar_height, 28, 44),
+            passed=_between(metrics.title_bar_height, 48, 58),
         ),
         LayoutMetricCheck(
             name="bottom_dock_height",

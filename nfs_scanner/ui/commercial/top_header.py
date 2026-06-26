@@ -4,17 +4,16 @@ from __future__ import annotations
 
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QMouseEvent
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QToolButton, QVBoxLayout, QWidget
-
-from nfs_scanner.version import APP_VERSION
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QStyle, QToolButton, QWidget
 
 from .toolbar import CommercialToolbar
+from .widgets.brand_area import CommercialBrandArea
 
 
 class CommercialTopHeader(QFrame):
     """Single integrated top strip matching the target instrument layout."""
 
-    HEADER_HEIGHT = 36
+    HEADER_HEIGHT = 52
 
     def __init__(
         self,
@@ -30,96 +29,92 @@ class CommercialTopHeader(QFrame):
         self.setObjectName("commercialTopHeader")
         self.setFixedHeight(self.HEADER_HEIGHT)
         self._maximize_button: QToolButton | None = None
-        self._brand_row: QWidget | None = None
+        self.brand_area: CommercialBrandArea | None = None
         self._setup_ui()
 
     def _setup_ui(self) -> None:
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(6, 0, 2, 0)
-        layout.setSpacing(4)
+        layout.setContentsMargins(8, 0, 4, 0)
+        layout.setSpacing(0)
 
-        self._brand_row = self._build_brand_row(self)
-        layout.addWidget(self._brand_row, 0)
+        self.brand_area = CommercialBrandArea(self)
+        layout.addWidget(self.brand_area, 0)
+
+        brand_separator = QFrame(self)
+        brand_separator.setObjectName("commercialBrandSeparator")
+        brand_separator.setFrameShape(QFrame.Shape.VLine)
+        brand_separator.setFixedWidth(1)
+        brand_separator.setFixedHeight(40)
+        layout.addSpacing(10)
+        layout.addWidget(brand_separator, 0, Qt.AlignmentFlag.AlignVCenter)
+        layout.addSpacing(10)
 
         self.toolbar.setParent(self)
         self.toolbar.setObjectName("commercialToolbar")
         layout.addWidget(self.toolbar, 1)
 
-        auth_row = self._build_auth_row(self)
-        layout.addWidget(auth_row, 0)
+        toolbar_separator = QFrame(self)
+        toolbar_separator.setObjectName("commercialToolbarSeparator")
+        toolbar_separator.setFrameShape(QFrame.Shape.VLine)
+        toolbar_separator.setFixedWidth(1)
+        toolbar_separator.setFixedHeight(40)
+        layout.addSpacing(8)
+        layout.addWidget(toolbar_separator, 0, Qt.AlignmentFlag.AlignVCenter)
+        layout.addSpacing(8)
+
+        status_area = self._build_status_area(self)
+        layout.addWidget(status_area, 0)
 
         self._minimize_button = self._make_control_button("—", "最小化", self._on_minimize)
         self._maximize_button = self._make_control_button("□", "最大化", self._on_maximize)
         close_button = self._make_control_button("✕", "关闭", self._on_close, danger=True)
-        layout.addWidget(self._minimize_button, 0)
-        layout.addWidget(self._maximize_button, 0)
-        layout.addWidget(close_button, 0)
+        layout.addWidget(self._minimize_button, 0, Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(self._maximize_button, 0, Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(close_button, 0, Qt.AlignmentFlag.AlignVCenter)
 
-    def _build_brand_row(self, parent: QWidget) -> QWidget:
-        row = QWidget(parent)
-        row.setObjectName("commercialBrandRow")
-        layout = QHBoxLayout(row)
-        layout.setContentsMargins(0, 0, 0, 0)
+    def _build_status_area(self, parent: QWidget) -> QWidget:
+        status = QWidget(parent)
+        status.setObjectName("commercialTopStatusArea")
+        layout = QHBoxLayout(status)
+        layout.setContentsMargins(0, 0, 4, 0)
         layout.setSpacing(6)
 
-        logo = QFrame(row)
-        logo.setObjectName("commercialTitleBarLogo")
-        logo.setFixedSize(22, 22)
-        logo_layout = QVBoxLayout(logo)
-        logo_layout.setContentsMargins(0, 0, 0, 0)
-        logo_text = QLabel("NFS", logo)
-        logo_text.setObjectName("commercialTitleBarLogoText")
-        logo_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        logo_layout.addWidget(logo_text)
-
-        title = QLabel("近场扫描系统", row)
-        title.setObjectName("commercialTitleBarTitle")
-
-        subtitle = QLabel("Near Field Scanner", row)
-        subtitle.setObjectName("commercialTitleBarSubtitle")
-
-        version = QLabel(f"v{APP_VERSION}", row)
-        version.setObjectName("commercialTitleBarBadge")
-        version.setToolTip("Mock · Dry Run · 无硬件控制")
-
-        layout.addWidget(logo, 0, Qt.AlignmentFlag.AlignVCenter)
-        layout.addWidget(title, 0, Qt.AlignmentFlag.AlignVCenter)
-        layout.addWidget(subtitle, 0, Qt.AlignmentFlag.AlignVCenter)
-        layout.addWidget(version, 0, Qt.AlignmentFlag.AlignVCenter)
-        return row
-
-    def _build_auth_row(self, parent: QWidget) -> QWidget:
-        auth_row = QWidget(parent)
-        auth_row.setObjectName("commercialTitleBarAuth")
-        auth_layout = QHBoxLayout(auth_row)
-        auth_layout.setContentsMargins(0, 0, 0, 0)
-        auth_layout.setSpacing(4)
-        auth_dot = QLabel("●", auth_row)
+        auth_dot = QLabel("●", status)
         auth_dot.setObjectName("commercialTitleBarAuthDot")
-        auth_label = QLabel("授权状态: 正常", auth_row)
+        auth_label = QLabel("授权状态: 正常", status)
         auth_label.setObjectName("commercialTitleBarAuthLabel")
-        user_label = QLabel("Admin  ▾", auth_row)
-        user_label.setObjectName("commercialTitleBarUser")
-        auth_layout.addWidget(auth_dot)
-        auth_layout.addWidget(auth_label)
-        auth_layout.addWidget(user_label)
-        return auth_row
 
-    def brand_row_height(self) -> int:
-        if self._brand_row is None:
-            return 0
-        return self._brand_row.height()
+        user_icon = QLabel(status)
+        user_icon.setObjectName("commercialTitleBarUserIcon")
+        user_icon.setPixmap(
+            self.style()
+            .standardIcon(QStyle.StandardPixmap.SP_DesktopIcon)
+            .pixmap(14, 14)
+        )
+        user_label = QLabel("Admin", status)
+        user_label.setObjectName("commercialTitleBarUser")
+        chevron = QLabel("▾", status)
+        chevron.setObjectName("commercialTitleBarUserChevron")
+
+        layout.addWidget(auth_dot)
+        layout.addWidget(auth_label)
+        layout.addSpacing(6)
+        layout.addWidget(user_icon)
+        layout.addWidget(user_label)
+        layout.addWidget(chevron)
+        return status
 
     def is_single_line_brand(self) -> bool:
-        """Return True when brand labels are laid out on one horizontal row."""
+        """Backward-compatible: hierarchical brand is not a flat single line."""
 
-        if self._brand_row is None:
+        if self.brand_area is None:
             return False
-        titles = self._brand_row.findChildren(QLabel, "commercialTitleBarTitle")
-        subtitles = self._brand_row.findChildren(QLabel, "commercialTitleBarSubtitle")
-        if not titles or not subtitles:
+        return not self.brand_area.is_flat_text_row()
+
+    def has_brand_hierarchy(self) -> bool:
+        if self.brand_area is None:
             return False
-        return abs(titles[0].geometry().y() - subtitles[0].geometry().y()) <= 4
+        return self.brand_area.has_title_hierarchy()
 
     def _make_control_button(
         self,
@@ -133,7 +128,7 @@ class CommercialTopHeader(QFrame):
         button.setObjectName("commercialTitleBarClose" if danger else "commercialTitleBarControl")
         button.setText(text)
         button.setToolTip(tooltip)
-        button.setFixedSize(26, 22)
+        button.setFixedSize(28, 24)
         button.clicked.connect(slot)
         return button
 
@@ -205,5 +200,4 @@ class CommercialTopHeader(QFrame):
             window._reapply_splitter_sizes()
 
 
-# Backward-compatible alias for tests and QA helpers.
 CommercialTitleBar = CommercialTopHeader

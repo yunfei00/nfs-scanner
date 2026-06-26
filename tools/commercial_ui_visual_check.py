@@ -17,6 +17,7 @@ OUTPUT_DIR = REPO_ROOT / ".ai" / "visual_check"
 DEFAULT_SHOT = OUTPUT_DIR / "commercial_default.png"
 MAXIMIZED_SHOT = OUTPUT_DIR / "commercial_maximized.png"
 TOP_SHOT = OUTPUT_DIR / "commercial_top_header.png"
+QA_TOP_SHOT_NAME = "top_header.png"
 REPORT_PATH = OUTPUT_DIR / "commercial_ui_visual_report.md"
 METRICS_JSON = OUTPUT_DIR / "commercial_ui_visual_metrics.json"
 

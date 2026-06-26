@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-06-26T08:30:03",
+  "generated_at": "2026-06-26T08:41:44",
   "default": {
     "uses_custom_title_bar": true,
-    "title_bar_height": 36,
+    "title_bar_height": 52,
     "bottom_dock_height": 200,
     "log_view_height": 140,
     "statistics_panel_height": 192,
@@ -10,10 +10,10 @@
     "right_panel_width": 350,
     "workspace_width": 676,
     "canvas_width": 616,
-    "canvas_height": 366,
+    "canvas_height": 350,
     "canvas_to_right_ratio": 1.76,
     "canvas_to_left_ratio": 2.6782608695652175,
-    "canvas_view_area_ratio": 0.8158645147282333,
+    "canvas_view_area_ratio": 0.8118814863908178,
     "colorbar_gap_px": 2,
     "toolbar_overflow": false,
     "status_bar_visible": true,
@@ -74,7 +74,7 @@
         {
           "name": "property_area_scrollable",
           "expected": "property panel scrollable",
-          "actual": "range=516",
+          "actual": "range=532",
           "passed": true
         },
         {
@@ -108,13 +108,13 @@
       {
         "name": "custom_title_bar",
         "expected": "frameless + title bar visible",
-        "actual": "custom=True, height=36px",
+        "actual": "custom=True, height=52px",
         "passed": true
       },
       {
         "name": "title_bar_height",
-        "expected": "28–44 px",
-        "actual": "36px",
+        "expected": "48–58 px",
+        "actual": "52px",
         "passed": true
       },
       {
@@ -138,7 +138,7 @@
       {
         "name": "canvas_size",
         "expected": "height >= 240px",
-        "actual": "616x366px",
+        "actual": "616x350px",
         "passed": true
       },
       {
@@ -162,7 +162,7 @@
       {
         "name": "center_canvas_priority",
         "expected": "canvas >= 1.6x right, >= 2.0x left, area >= 50%",
-        "actual": "right=1.76x, left=2.68x, area=82%",
+        "actual": "right=1.76x, left=2.68x, area=81%",
         "passed": true
       },
       {
@@ -187,18 +187,6 @@
         "name": "default_window_within_screen",
         "expected": "window <= available screen",
         "actual": "1280x720 <= 1280x720",
-        "passed": true
-      },
-      {
-        "name": "top_header_integrated",
-        "expected": "toolbar embedded in unified top header",
-        "actual": "header=True, parent=commercialTopHeader",
-        "passed": true
-      },
-      {
-        "name": "brand_single_line_row",
-        "expected": "brand title/subtitle/version on one horizontal row",
-        "actual": "row=True, single_line=True",
         "passed": true
       },
       {
@@ -322,6 +310,66 @@
         "passed": true
       },
       {
+        "name": "brand_logo_exists",
+        "expected": "NFS logo square >= 40px",
+        "actual": "logo=True, size=42x42",
+        "passed": true
+      },
+      {
+        "name": "brand_title_hierarchy",
+        "expected": "CN title + EN subtitle + version badge",
+        "actual": "title=True, subtitle=True, badge=True, hierarchy=True",
+        "passed": true
+      },
+      {
+        "name": "brand_not_flat_text",
+        "expected": "brand is not a single flat text row",
+        "actual": "flat=False",
+        "passed": true
+      },
+      {
+        "name": "top_header_compact",
+        "expected": "header height 48-58px",
+        "actual": "52px",
+        "passed": true
+      },
+      {
+        "name": "toolbar_icon_mode",
+        "expected": "icon-above-text tool buttons",
+        "actual": "count=13, icon_mode=True",
+        "passed": true
+      },
+      {
+        "name": "toolbar_no_placeholder_dots",
+        "expected": "no ellipsis placeholder buttons",
+        "actual": "0",
+        "passed": true
+      },
+      {
+        "name": "toolbar_primary_actions_visible",
+        "expected": "connect/start/stop visible",
+        "actual": "True",
+        "passed": true
+      },
+      {
+        "name": "right_status_aligned",
+        "expected": "auth + window controls on top-right",
+        "actual": "auth=True, aligned=True",
+        "passed": true
+      },
+      {
+        "name": "frameless_titlebar_still_active",
+        "expected": "custom frameless shell",
+        "actual": "True",
+        "passed": true
+      },
+      {
+        "name": "top_header_integrated",
+        "expected": "toolbar embedded in top header",
+        "actual": "parent=commercialTopHeader",
+        "passed": true
+      },
+      {
         "name": "qss_scrollbar_handle_min_height",
         "expected": ">= 24px in QSS",
         "actual": "28px",
@@ -360,7 +408,7 @@
       {
         "name": "property_area_scrollable",
         "expected": "property panel scrollable",
-        "actual": "range=516",
+        "actual": "range=532",
         "passed": true
       },
       {
@@ -392,7 +440,7 @@
   },
   "maximized": {
     "uses_custom_title_bar": true,
-    "title_bar_height": 36,
+    "title_bar_height": 52,
     "bottom_dock_height": 200,
     "log_view_height": 140,
     "statistics_panel_height": 192,
@@ -400,10 +448,10 @@
     "right_panel_width": 350,
     "workspace_width": 676,
     "canvas_width": 616,
-    "canvas_height": 366,
+    "canvas_height": 350,
     "canvas_to_right_ratio": 1.76,
     "canvas_to_left_ratio": 2.6782608695652175,
-    "canvas_view_area_ratio": 0.8158645147282333,
+    "canvas_view_area_ratio": 0.8118814863908178,
     "colorbar_gap_px": 2,
     "toolbar_overflow": false,
     "status_bar_visible": true,
@@ -464,7 +512,7 @@
         {
           "name": "property_area_scrollable",
           "expected": "property panel scrollable",
-          "actual": "range=516",
+          "actual": "range=532",
           "passed": true
         },
         {
@@ -498,13 +546,13 @@
       {
         "name": "custom_title_bar",
         "expected": "frameless + title bar visible",
-        "actual": "custom=True, height=36px",
+        "actual": "custom=True, height=52px",
         "passed": true
       },
       {
         "name": "title_bar_height",
-        "expected": "28–44 px",
-        "actual": "36px",
+        "expected": "48–58 px",
+        "actual": "52px",
         "passed": true
       },
       {
@@ -528,7 +576,7 @@
       {
         "name": "canvas_size",
         "expected": "height >= 240px",
-        "actual": "616x366px",
+        "actual": "616x350px",
         "passed": true
       },
       {
@@ -552,7 +600,7 @@
       {
         "name": "center_canvas_priority",
         "expected": "canvas >= 1.6x right, >= 2.0x left, area >= 50%",
-        "actual": "right=1.76x, left=2.68x, area=82%",
+        "actual": "right=1.76x, left=2.68x, area=81%",
         "passed": true
       },
       {
@@ -577,18 +625,6 @@
         "name": "maximized_window",
         "expected": "custom maximized == True",
         "actual": "True",
-        "passed": true
-      },
-      {
-        "name": "top_header_integrated",
-        "expected": "toolbar embedded in unified top header",
-        "actual": "header=True, parent=commercialTopHeader",
-        "passed": true
-      },
-      {
-        "name": "brand_single_line_row",
-        "expected": "brand title/subtitle/version on one horizontal row",
-        "actual": "row=True, single_line=True",
         "passed": true
       },
       {
@@ -712,6 +748,66 @@
         "passed": true
       },
       {
+        "name": "brand_logo_exists",
+        "expected": "NFS logo square >= 40px",
+        "actual": "logo=True, size=42x42",
+        "passed": true
+      },
+      {
+        "name": "brand_title_hierarchy",
+        "expected": "CN title + EN subtitle + version badge",
+        "actual": "title=True, subtitle=True, badge=True, hierarchy=True",
+        "passed": true
+      },
+      {
+        "name": "brand_not_flat_text",
+        "expected": "brand is not a single flat text row",
+        "actual": "flat=False",
+        "passed": true
+      },
+      {
+        "name": "top_header_compact",
+        "expected": "header height 48-58px",
+        "actual": "52px",
+        "passed": true
+      },
+      {
+        "name": "toolbar_icon_mode",
+        "expected": "icon-above-text tool buttons",
+        "actual": "count=13, icon_mode=True",
+        "passed": true
+      },
+      {
+        "name": "toolbar_no_placeholder_dots",
+        "expected": "no ellipsis placeholder buttons",
+        "actual": "0",
+        "passed": true
+      },
+      {
+        "name": "toolbar_primary_actions_visible",
+        "expected": "connect/start/stop visible",
+        "actual": "True",
+        "passed": true
+      },
+      {
+        "name": "right_status_aligned",
+        "expected": "auth + window controls on top-right",
+        "actual": "auth=True, aligned=True",
+        "passed": true
+      },
+      {
+        "name": "frameless_titlebar_still_active",
+        "expected": "custom frameless shell",
+        "actual": "True",
+        "passed": true
+      },
+      {
+        "name": "top_header_integrated",
+        "expected": "toolbar embedded in top header",
+        "actual": "parent=commercialTopHeader",
+        "passed": true
+      },
+      {
         "name": "qss_scrollbar_handle_min_height",
         "expected": ">= 24px in QSS",
         "actual": "28px",
@@ -750,7 +846,7 @@
       {
         "name": "property_area_scrollable",
         "expected": "property panel scrollable",
-        "actual": "range=516",
+        "actual": "range=532",
         "passed": true
       },
       {

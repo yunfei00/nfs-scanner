@@ -483,6 +483,15 @@ Needs Review: yes/no
 - Impact: visual + QA PASS；145 tests；不接真实设备。
 - Needs Review: no
 
+### 2026-06-26 - Top Header Target Alignment
+
+- Date: 2026-06-26
+- Task: top-header-target-alignment
+- Decision: 重做商业 UI 顶部：新增 `CommercialBrandArea`（42×42 蓝色 NFS logo + 中文/英文/版本 badge 层级）；`CommercialTopHeader` 52px 一体化；工具栏 52×48 图标+文字；右上 `commercialTopStatusArea` 授权/Admin/窗口控制；10 项 top header QA 检查 + `top_header.png` 截图。
+- Reason: 用户反馈左上品牌区仍像平铺文字、顶部有拼接感，需只修顶部对齐目标图。
+- Impact: visual + QA PASS；145 tests；未改主体布局/真实设备。
+- Needs Review: no
+
 ### 2026-06-26 - Unified Top Header Polish
 
 - Date: 2026-06-26

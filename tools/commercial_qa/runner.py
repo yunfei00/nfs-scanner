@@ -173,11 +173,14 @@ def run_commercial_qa(*, include_external: bool = True, round_number: int = 1) -
         _save_screenshot(shell, default_path)
         result.screenshots["commercial_default"] = default_path.as_posix()
 
-        top_path = SCREENSHOT_DIR / "commercial_top_header.png"
+        top_path = SCREENSHOT_DIR / "top_header.png"
         if hasattr(shell, "top_header"):
             top_path.parent.mkdir(parents=True, exist_ok=True)
             shell.top_header.grab().save(str(top_path))
-            result.screenshots["commercial_top_header"] = top_path.as_posix()
+            result.screenshots["top_header"] = top_path.as_posix()
+            legacy_top = SCREENSHOT_DIR / "commercial_top_header.png"
+            shell.top_header.grab().save(str(legacy_top))
+            result.screenshots["commercial_top_header"] = legacy_top.as_posix()
 
         default_metrics = collect_qa_layout_metrics(shell)
         result.checks.extend(build_qa_visual_checks(default_metrics, shell=shell))
