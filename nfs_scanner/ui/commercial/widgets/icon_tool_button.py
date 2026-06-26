@@ -6,8 +6,8 @@ from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QToolButton, QWidget
 
-TOOL_BUTTON_WIDTH = 62
-TOOL_BUTTON_HEIGHT = 48
+TOOL_BUTTON_WIDTH = 60
+TOOL_BUTTON_HEIGHT = 50
 
 
 class NFSIconToolButton(QToolButton):
@@ -49,7 +49,7 @@ class NFSIconToolButton(QToolButton):
         self.setToolTip(tooltip or self._full_caption)
         self.setProperty("fullCaption", self._full_caption)
         self.setAutoRaise(True)
-        self.setIconSize(QSize(20, 20))
+        self.setIconSize(QSize(21, 21))
         font = self.font()
         font.setPixelSize(11)
         self.setFont(font)
@@ -59,6 +59,4 @@ class NFSIconToolButton(QToolButton):
         self.clicked.connect(self.clicked_action.emit)
 
     def full_caption(self) -> str:
-        """Return the full toolbar action name."""
-
         return self._full_caption

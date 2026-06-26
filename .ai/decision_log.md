@@ -483,6 +483,15 @@ Needs Review: yes/no
 - Impact: visual + QA PASS；145 tests；不接真实设备。
 - Needs Review: no
 
+### 2026-06-26 - Top Header Target Match Final
+
+- Date: 2026-06-26
+- Task: top-header-target-match-final
+- Decision: 宽屏(>=1500)禁止 overflow；工具栏减至 2 条内部分隔；NFSBrandLogoFrame 自绘 logo；按钮 60×50；QA 增加 overflow/separator/gap 检查。
+- Reason: 用户反馈默认窗口仍显示 ... overflow、分隔线过多、logo 不够品牌化。
+- Impact: visual + QA PASS；148 tests；仅改顶部。
+- Needs Review: no
+
 ### 2026-06-26 - Header Readability Fix
 
 - Date: 2026-06-26

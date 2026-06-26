@@ -1,6 +1,6 @@
 # Commercial UI Visual Report
 
-- Generated: 2026-06-26 20:08:28
+- Generated: 2026-06-26 20:51:29
 - Default screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_default.png`
 - Top header screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_top_header.png`
 - Maximized screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_maximized.png`
@@ -11,12 +11,12 @@
 
 | Check | Expected | Actual | Status |
 |-------|----------|--------|--------|
-| custom_title_bar | frameless + title bar visible | custom=True, height=52px | PASS |
-| title_bar_height | 48–58 px | 52px | PASS |
+| custom_title_bar | frameless + title bar visible | custom=True, height=54px | PASS |
+| title_bar_height | 48–58 px | 54px | PASS |
 | bottom_dock_height | >= 200 px | 200px | PASS |
 | log_view_height | >= 100 px | 140px | PASS |
 | statistics_panel_height | >= 100 px | 192px | PASS |
-| canvas_size | height >= 240px | 616x350px | PASS |
+| canvas_size | height >= 240px | 616x348px | PASS |
 | colorbar_adjacent | gap <= 12 px | 2px | PASS |
 | right_panel_width | 340–380 px | 350px | PASS |
 | left_panel_width | 220–280 px | 230px | PASS |
@@ -55,18 +55,25 @@
 | canvas_axis_legend | axis legend visible | visible=True | PASS |
 | canvas_cursor_hud | cursor HUD visible | visible=True | PASS |
 | minimap_title_visible | MiniMap title "全局视图" | 全局视图 | PASS |
+| header_matches_target_mode | targetStyleMode enabled on shell and toolbar | shell=true, toolbar=true | PASS |
+| overflow_hidden_at_default_width | overflow hidden when width >= 1500px | width=1280px, overflow=True | PASS |
+| toolbar_separator_count_reasonable | strong separators <= 4 | 4 | PASS |
+| toolbar_button_width_reasonable | visible buttons width >= 56px | min=60px | PASS |
+| toolbar_no_text_touching | adjacent buttons gap >= 4px | count=10, min_gap>=4px | PASS |
 | brand_logo_exists | NFS logo square >= 40px | logo=True, size=42x42 | PASS |
+| brand_logo_blue_enough | brandLogoBlue property on logo tile | brandLogoBlue=True | PASS |
 | brand_logo_blue_block | blue brand logo block, not flat black | brandBlueBlock=True | PASS |
 | brand_title_hierarchy | CN title + EN subtitle + version badge | title=True, subtitle=True, badge=True, hierarchy=True | PASS |
 | brand_not_flat_text | brand is not a single flat text row | flat=False | PASS |
 | version_badge_exists | v* version badge visible | v1.0.0 | PASS |
-| top_header_height_consistent | 48–58px | 52px | PASS |
-| toolbar_button_text_not_overlapping | visible toolbar buttons do not overlap | count=8, min_gap>=2px | PASS |
-| toolbar_caption_readable | short readable captions, width >= 58px | count=8, width=62px | PASS |
+| top_header_height_consistent | 48–58px | 54px | PASS |
+| toolbar_button_text_not_overlapping | visible toolbar buttons do not overlap | count=10, min_gap>=2px | PASS |
+| toolbar_caption_readable | short readable captions, width >= 56px | count=10, width=60px | PASS |
 | toolbar_icon_mode | icon-above-text tool buttons | count=13, icon_mode=True | PASS |
 | toolbar_no_placeholder_dots | no ellipsis placeholder buttons | 0 | PASS |
 | primary_actions_visible | connect/start/stop/export/report visible | True | PASS |
 | toolbar_primary_actions_visible | connect/start/stop visible | True | PASS |
+| wide_layout_primary_actions_visible | param/help visible when width >= 1366px | width=1280, ok=True | PASS |
 | auth_status_not_too_heavy | lightweight auth label, not large chip | label_hint=84x16 | PASS |
 | right_status_aligned | auth + window controls on top-right | auth=True, aligned=True | PASS |
 | frameless_titlebar_still_active | custom frameless shell | True | PASS |
@@ -86,7 +93,7 @@
 | property_scrollbar_width | >= 12px when visible | 14px | PASS |
 | log_scrollbar_width | >= 12px when scrollable | 14px | PASS |
 | log_area_scrollable | log content scrollable | range=6 | PASS |
-| property_area_scrollable | property panel scrollable | range=461 | PASS |
+| property_area_scrollable | property panel scrollable | range=463 | PASS |
 | device_status_scrollable_or_compact | device scroll visible when needed | width=0px | PASS |
 | wheel_interaction | wheel step changes scroll value | True | PASS |
 | handle_position_interaction | handle position can be set smoothly | True | PASS |
@@ -104,12 +111,12 @@
 
 | Check | Expected | Actual | Status |
 |-------|----------|--------|--------|
-| custom_title_bar | frameless + title bar visible | custom=True, height=52px | PASS |
-| title_bar_height | 48–58 px | 52px | PASS |
+| custom_title_bar | frameless + title bar visible | custom=True, height=54px | PASS |
+| title_bar_height | 48–58 px | 54px | PASS |
 | bottom_dock_height | >= 200 px | 200px | PASS |
 | log_view_height | >= 100 px | 140px | PASS |
 | statistics_panel_height | >= 100 px | 192px | PASS |
-| canvas_size | height >= 240px | 616x350px | PASS |
+| canvas_size | height >= 240px | 616x348px | PASS |
 | colorbar_adjacent | gap <= 12 px | 2px | PASS |
 | right_panel_width | 340–380 px | 350px | PASS |
 | left_panel_width | 220–280 px | 230px | PASS |
@@ -148,18 +155,25 @@
 | canvas_axis_legend | axis legend visible | visible=True | PASS |
 | canvas_cursor_hud | cursor HUD visible | visible=True | PASS |
 | minimap_title_visible | MiniMap title "全局视图" | 全局视图 | PASS |
+| header_matches_target_mode | targetStyleMode enabled on shell and toolbar | shell=true, toolbar=true | PASS |
+| overflow_hidden_at_default_width | overflow hidden when width >= 1500px | width=1280px, overflow=True | PASS |
+| toolbar_separator_count_reasonable | strong separators <= 4 | 4 | PASS |
+| toolbar_button_width_reasonable | visible buttons width >= 56px | min=60px | PASS |
+| toolbar_no_text_touching | adjacent buttons gap >= 4px | count=10, min_gap>=4px | PASS |
 | brand_logo_exists | NFS logo square >= 40px | logo=True, size=42x42 | PASS |
+| brand_logo_blue_enough | brandLogoBlue property on logo tile | brandLogoBlue=True | PASS |
 | brand_logo_blue_block | blue brand logo block, not flat black | brandBlueBlock=True | PASS |
 | brand_title_hierarchy | CN title + EN subtitle + version badge | title=True, subtitle=True, badge=True, hierarchy=True | PASS |
 | brand_not_flat_text | brand is not a single flat text row | flat=False | PASS |
 | version_badge_exists | v* version badge visible | v1.0.0 | PASS |
-| top_header_height_consistent | 48–58px | 52px | PASS |
-| toolbar_button_text_not_overlapping | visible toolbar buttons do not overlap | count=8, min_gap>=2px | PASS |
-| toolbar_caption_readable | short readable captions, width >= 58px | count=8, width=62px | PASS |
+| top_header_height_consistent | 48–58px | 54px | PASS |
+| toolbar_button_text_not_overlapping | visible toolbar buttons do not overlap | count=10, min_gap>=2px | PASS |
+| toolbar_caption_readable | short readable captions, width >= 56px | count=10, width=60px | PASS |
 | toolbar_icon_mode | icon-above-text tool buttons | count=13, icon_mode=True | PASS |
 | toolbar_no_placeholder_dots | no ellipsis placeholder buttons | 0 | PASS |
 | primary_actions_visible | connect/start/stop/export/report visible | True | PASS |
 | toolbar_primary_actions_visible | connect/start/stop visible | True | PASS |
+| wide_layout_primary_actions_visible | param/help visible when width >= 1366px | width=1280, ok=True | PASS |
 | auth_status_not_too_heavy | lightweight auth label, not large chip | label_hint=84x16 | PASS |
 | right_status_aligned | auth + window controls on top-right | auth=True, aligned=True | PASS |
 | frameless_titlebar_still_active | custom frameless shell | True | PASS |

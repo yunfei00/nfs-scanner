@@ -4,16 +4,16 @@ Last updated: 2026-06-26
 
 ## Current Mode
 
-**COMPLETE — Header Readability Fix**
+**COMPLETE — Top Header Target Match Final**
 
-商业 UI 顶部可读性修复：工具栏短标签+宽按钮、蓝色 NFS logo、轻量授权状态；QA PASS。
+商业 UI 顶部最终收敛：宽屏无 overflow、弱分隔线、自绘 NFS logo、稳定工具栏；QA 加强 overflow/separator 检查。
 
 ## Recent (2026-06-26)
 
-- 工具栏：62×48 按钮、5px 间距、短标签（新建/连接/开始…）+ 完整 tooltip
-- Logo：亮蓝渐变 + WA_StyledBackground，42×42 品牌块
-- 右上：绿点 +「授权状态：正常」轻量文本（DRY RUN 在 tooltip）
-- QA：toolbar 重叠/可读性、brand_logo_blue_block、auth_status_not_too_heavy
+- >=1500px 隐藏 overflow；仅次要 mock 项可收纳
+- 工具栏 2 条内部分隔 + 透明背景；按钮 60×50
+- NFSBrandLogoFrame 蓝色渐变自绘 logo
+- QA：overflow_hidden_at_default_width、separator<=4、gap>=4
 
 ## Application Entry Points
 
@@ -33,6 +33,8 @@ Last updated: 2026-06-26
 | Unified Top Header | **done** |
 | Top Header Target Alignment | **done** |
 | Top Header Final Polish | **done** |
+| Header Readability Fix | **done** |
+| Top Header Target Match Final | **done** |
 | Real Motion Control | **blocked** |
 
 ## Constraints (unchanged)

@@ -13,7 +13,7 @@ from .widgets.brand_area import CommercialBrandArea
 class CommercialTopHeader(QFrame):
     """Single integrated top strip matching the target instrument layout."""
 
-    HEADER_HEIGHT = 52
+    HEADER_HEIGHT = 54
 
     def __init__(
         self,
@@ -44,7 +44,7 @@ class CommercialTopHeader(QFrame):
         brand_separator.setObjectName("commercialBrandSeparator")
         brand_separator.setFrameShape(QFrame.Shape.VLine)
         brand_separator.setFixedWidth(1)
-        brand_separator.setFixedHeight(38)
+        brand_separator.setFixedHeight(32)
         layout.addSpacing(8)
         layout.addWidget(brand_separator, 0, Qt.AlignmentFlag.AlignVCenter)
         layout.addSpacing(8)
@@ -57,7 +57,7 @@ class CommercialTopHeader(QFrame):
         toolbar_separator.setObjectName("commercialToolbarSeparator")
         toolbar_separator.setFrameShape(QFrame.Shape.VLine)
         toolbar_separator.setFixedWidth(1)
-        toolbar_separator.setFixedHeight(38)
+        toolbar_separator.setFixedHeight(32)
         layout.addSpacing(8)
         layout.addWidget(toolbar_separator, 0, Qt.AlignmentFlag.AlignVCenter)
         layout.addSpacing(8)

@@ -7,10 +7,12 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QMenu, QStyle, QToolButton, Q
 
 from .widgets.icon_tool_button import NFSIconToolButton, TOOL_BUTTON_WIDTH
 
-_TOOLBAR_CHROME_WIDTH = 96
-_BUTTON_GAP = 5
+_TOOLBAR_CHROME_WIDTH = 48
+_BUTTON_GAP = 6
+_GROUP_GAP = 10
+_OVERFLOW_FORBIDDEN_WIDTH = 1500
+_OVERFLOW_NARROW_WIDTH = 1366
 
-# Short on-button labels; tooltips keep the full action names.
 _SHORT_LABELS: dict[str, str] = {
     "新建项目": "新建",
     "打开项目": "打开",
@@ -27,7 +29,8 @@ _SHORT_LABELS: dict[str, str] = {
     "帮助": "帮助",
 }
 
-_OVERFLOW_CAPTIONS = frozenset({"拍照", "区域对齐", "清除覆盖", "参数模板", "帮助"})
+# Only these mock/aux actions may move into overflow.
+_OVERFLOW_SECONDARY = frozenset({"拍照", "区域对齐", "清除覆盖"})
 
 
 class CommercialToolbar(QWidget):
@@ -51,15 +54,18 @@ class CommercialToolbar(QWidget):
         super().__init__(parent)
         self.setObjectName("commercialToolbar")
         self.setProperty("targetStyleMode", "true")
-        self.setMinimumHeight(48)
-        self.setMaximumHeight(48)
+        self.setMinimumHeight(50)
+        self.setMaximumHeight(50)
         self._tool_buttons: list[NFSIconToolButton] = []
-        self._overflow_candidates: list[NFSIconToolButton] = []
+        self._overflow_secondary_buttons: list[NFSIconToolButton] = []
+        self._separators: list[QFrame] = []
         self._start_scan_button: NFSIconToolButton | None = None
         self._pause_scan_button: NFSIconToolButton | None = None
         self._stop_scan_button: NFSIconToolButton | None = None
         self._export_button: NFSIconToolButton | None = None
         self._report_button: NFSIconToolButton | None = None
+        self._param_button: NFSIconToolButton | None = None
+        self._help_button: NFSIconToolButton | None = None
         self._connect_device_button: NFSIconToolButton | None = None
         self._overflow_button: QToolButton | None = None
         self._layout_overflow = False
@@ -84,8 +90,6 @@ class CommercialToolbar(QWidget):
                     self.connect_device_requested.emit,
                     {"primary": True},
                 ),
-            ],
-            [
                 ("开始扫描", style.standardIcon(QStyle.StandardPixmap.SP_MediaPlay), self.scan_start_requested.emit, {"success": True}),
                 ("停止扫描", style.standardIcon(QStyle.StandardPixmap.SP_MediaStop), self.scan_stop_requested.emit, {"danger": True}),
             ],
@@ -97,25 +101,27 @@ class CommercialToolbar(QWidget):
             [
                 ("导出数据", style.standardIcon(QStyle.StandardPixmap.SP_ArrowUp), self.export_data_requested.emit, {}),
                 ("导出报告", style.standardIcon(QStyle.StandardPixmap.SP_FileDialogInfoView), self.report_center_requested.emit, {}),
-            ],
-            [
                 ("参数模板", style.standardIcon(QStyle.StandardPixmap.SP_FileDialogListView), lambda: self.mock_action_requested.emit("参数模板"), {"mock_disabled": True}),
                 ("帮助", style.standardIcon(QStyle.StandardPixmap.SP_MessageBoxQuestion), lambda: self.mock_action_requested.emit("帮助"), {"mock_disabled": True}),
             ],
         ]
 
+        # Separators only before device/scan block and before export block.
+        separator_before = {1, 3}
         flat_items: list[tuple[str, object, object, dict]] = []
 
         for group_index, group in enumerate(groups):
-            if group_index > 0:
-                root.addSpacing(6)
+            if group_index in separator_before:
+                root.addSpacing(_GROUP_GAP)
                 root.addWidget(self._separator())
-                root.addSpacing(6)
+                root.addSpacing(_GROUP_GAP)
+            elif group_index > 0:
+                root.addSpacing(_GROUP_GAP)
             for caption, icon, slot, options in group:
                 flat_items.append((caption, icon, slot, options))
                 button = self._make_button(icon, caption, slot, **options)
-                if caption in _OVERFLOW_CAPTIONS:
-                    self._overflow_candidates.append(button)
+                if caption in _OVERFLOW_SECONDARY:
+                    self._overflow_secondary_buttons.append(button)
                 if caption == "连接设备":
                     self._connect_device_button = button
                 elif caption == "开始扫描":
@@ -126,26 +132,27 @@ class CommercialToolbar(QWidget):
                     self._export_button = button
                 elif caption == "导出报告":
                     self._report_button = button
+                elif caption == "参数模板":
+                    self._param_button = button
+                elif caption == "帮助":
+                    self._help_button = button
                 root.addWidget(button)
 
         self._overflow_button = QToolButton(self)
         self._overflow_button.setObjectName("commercialToolbarOverflow")
-        self._overflow_button.setText("⋯")
-        self._overflow_button.setToolTip("更多操作")
-        self._overflow_button.setFixedSize(36, 48)
+        self._overflow_button.setIcon(style.standardIcon(QStyle.StandardPixmap.SP_ArrowDown))
+        self._overflow_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self._overflow_button.setToolTip("更多")
+        self._overflow_button.setFixedSize(32, 50)
         self._overflow_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self._overflow_button.setVisible(False)
         menu = QMenu(self._overflow_button)
         for caption, _icon, slot, _options in flat_items:
-            if caption not in _OVERFLOW_CAPTIONS:
+            if caption not in _OVERFLOW_SECONDARY:
                 continue
             action = menu.addAction(caption)
             action.setToolTip("Mock 功能：点击写入反馈日志")
             action.triggered.connect(slot)
-        menu.addSeparator()
-        menu.addAction("设备中心", self.device_center_requested.emit)
-        menu.addAction("重置 Demo", self.demo_reset_requested.emit)
-        menu.addAction("Mock Self Check", self.self_check_requested.emit)
         self._overflow_button.setMenu(menu)
         root.addStretch(1)
         root.addWidget(self._overflow_button)
@@ -153,10 +160,21 @@ class CommercialToolbar(QWidget):
     def _separator(self) -> QFrame:
         line = QFrame(self)
         line.setObjectName("commercialToolbarSeparator")
+        line.setProperty("headerSeparator", True)
         line.setFrameShape(QFrame.Shape.VLine)
         line.setFixedWidth(1)
-        line.setFixedHeight(32)
+        line.setFixedHeight(30)
+        self._separators.append(line)
         return line
+
+    def separator_count(self) -> int:
+        return len(self._separators)
+
+    def overflow_button(self) -> QToolButton | None:
+        return self._overflow_button
+
+    def is_overflow_visible(self) -> bool:
+        return self._overflow_button is not None and self._overflow_button.isVisible()
 
     def _make_button(
         self,
@@ -198,29 +216,38 @@ class CommercialToolbar(QWidget):
         self.set_export_enabled(False)
 
     def update_compact_mode(self, window_width: int) -> None:
-        """Keep primary actions readable; move secondary mock actions to overflow."""
+        """Hide only secondary mock tools in overflow when space is tight."""
 
         for button in self._tool_buttons:
             button.setVisible(True)
 
-        overflow_active = window_width <= 1366 or self._measure_overflow(window_width)
-        if overflow_active:
-            for button in self._overflow_candidates:
+        show_overflow = False
+        if window_width >= _OVERFLOW_FORBIDDEN_WIDTH:
+            show_overflow = False
+        elif window_width < _OVERFLOW_NARROW_WIDTH:
+            show_overflow = True
+            for button in self._overflow_secondary_buttons:
                 button.setVisible(False)
+        elif self._measure_tight(window_width):
+            show_overflow = True
+            for button in self._overflow_secondary_buttons:
+                button.setVisible(False)
+
         if self._overflow_button is not None:
-            self._overflow_button.setVisible(overflow_active)
-        self._layout_overflow = self._measure_overflow(window_width)
+            self._overflow_button.setVisible(show_overflow)
+        self._layout_overflow = show_overflow
 
     def has_layout_overflow(self) -> bool:
         return self._layout_overflow
 
-    def _measure_overflow(self, window_width: int) -> bool:
+    def _measure_tight(self, window_width: int) -> bool:
         visible_count = sum(1 for button in self._tool_buttons if button.isVisible())
         gaps = max(visible_count - 1, 0) * _BUTTON_GAP
-        required = visible_count * TOOL_BUTTON_WIDTH + gaps + _TOOLBAR_CHROME_WIDTH
+        group_extra = _GROUP_GAP * 3 + len(self._separators) * 2
+        required = visible_count * TOOL_BUTTON_WIDTH + gaps + group_extra + _TOOLBAR_CHROME_WIDTH
         available = self.contentsRect().width()
         if available <= 32:
-            available = max(window_width - 480, 420)
+            available = max(window_width - 460, 400)
         return required > available
 
     def set_scan_controls_enabled(

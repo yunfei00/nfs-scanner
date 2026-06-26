@@ -79,6 +79,7 @@ def collect_layout_metrics(shell: QMainWindow) -> CommercialLayoutMetrics:
     from PySide6.QtWidgets import QComboBox, QScrollArea, QTabWidget, QToolButton
 
     from nfs_scanner.ui.commercial.lut_presets import COMMON_LUT_NAMES
+    from nfs_scanner.ui.commercial.top_header_metrics import OVERFLOW_FORBIDDEN_WIDTH
     from nfs_scanner.ui.commercial.main_shell import CommercialMainShell
     from nfs_scanner.ui.commercial.widgets import NFSCollapsiblePanel, NFSNumericField
 
@@ -108,7 +109,9 @@ def collect_layout_metrics(shell: QMainWindow) -> CommercialLayoutMetrics:
         canvas_to_left_ratio=canvas.width() / max(shell.left_scroll_area.width(), 1),
         canvas_view_area_ratio=canvas_area / view_area,
         colorbar_gap_px=colorbar_gap,
-        toolbar_overflow=shell.toolbar.has_layout_overflow(),
+        toolbar_overflow=(
+            shell.toolbar.is_overflow_visible() and shell.width() >= OVERFLOW_FORBIDDEN_WIDTH
+        ),
         status_bar_visible=shell.status_bar_widget.is_fully_visible(),
         window_width=shell.width(),
         window_height=shell.height(),
@@ -226,7 +229,9 @@ def collect_layout_metrics(shell: QMainWindow) -> CommercialLayoutMetrics:
         metrics.screen_available_height = available.height()
 
     shell.toolbar.update_compact_mode(shell.width())
-    metrics.toolbar_overflow = shell.toolbar.has_layout_overflow()
+    metrics.toolbar_overflow = (
+        shell.toolbar.is_overflow_visible() and shell.width() >= OVERFLOW_FORBIDDEN_WIDTH
+    )
 
     log_view = shell.bottom_dock.log_view_widget()
     shell.bottom_dock.switch_to_logs_tab()
