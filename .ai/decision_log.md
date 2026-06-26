@@ -483,7 +483,14 @@ Needs Review: yes/no
 - Impact: visual + QA PASS；145 tests；不接真实设备。
 - Needs Review: no
 
-### 2026-06-26 - Final Delta Polish
+### 2026-06-26 - Unified Top Header Polish
+
+- Date: 2026-06-26
+- Task: top-header-unified-polish
+- Decision: 用 `CommercialTopHeader` 合并 title + toolbar 为 36px 单行顶栏：横向品牌（logo/中文/英文/版本 badge）+ 居中工具组 + 授权/Admin/窗口控制；移除 content 区独立 toolbar 行。
+- Reason: 用户反馈标题栏仍像两层、品牌区松散，需更接近目标图一体化顶部。
+- Impact: visual + QA PASS；145 tests；顶部特写截图纳入 QA。
+- Needs Review: no
 
 - Date: 2026-06-26
 - Task: final-delta-polish

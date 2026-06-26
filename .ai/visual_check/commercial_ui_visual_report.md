@@ -1,7 +1,8 @@
 # Commercial UI Visual Report
 
-- Generated: 2026-06-26 08:07:17
+- Generated: 2026-06-26 08:30:03
 - Default screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_default.png`
+- Top header screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_top_header.png`
 - Maximized screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_maximized.png`
 
 ## Default Window
@@ -10,20 +11,22 @@
 
 | Check | Expected | Actual | Status |
 |-------|----------|--------|--------|
-| custom_title_bar | frameless + title bar visible | custom=True, height=32px | PASS |
-| title_bar_height | 28–44 px | 32px | PASS |
+| custom_title_bar | frameless + title bar visible | custom=True, height=36px | PASS |
+| title_bar_height | 28–44 px | 36px | PASS |
 | bottom_dock_height | >= 200 px | 200px | PASS |
 | log_view_height | >= 100 px | 140px | PASS |
 | statistics_panel_height | >= 100 px | 192px | PASS |
-| canvas_size | height >= 240px | 616x321px | PASS |
+| canvas_size | height >= 240px | 616x366px | PASS |
 | colorbar_adjacent | gap <= 12 px | 2px | PASS |
 | right_panel_width | 340–380 px | 350px | PASS |
 | left_panel_width | 220–280 px | 230px | PASS |
-| center_canvas_priority | canvas >= 1.6x right, >= 2.0x left, area >= 50% | right=1.76x, left=2.68x, area=80% | PASS |
+| center_canvas_priority | canvas >= 1.6x right, >= 2.0x left, area >= 50% | right=1.76x, left=2.68x, area=82% | PASS |
 | workspace_wider_than_right_panel | workspace > right panel | 676px > 350px | PASS |
 | toolbar_no_overflow | toolbar fits layout | overflow=False | PASS |
 | status_bar_visible | status bar visible | True | PASS |
 | default_window_within_screen | window <= available screen | 1280x720 <= 1280x720 | PASS |
+| top_header_integrated | toolbar embedded in unified top header | header=True, parent=commercialTopHeader | PASS |
+| brand_single_line_row | brand title/subtitle/version on one horizontal row | row=True, single_line=True | PASS |
 | target_style_mode | targetStyleMode enabled | true | PASS |
 | logo_area_exists | NFS logo block visible | visible=True | PASS |
 | top_toolbar_icon_mode | >= 12 toolbar actions | 13 | PASS |
@@ -57,7 +60,7 @@
 | property_scrollbar_width | >= 12px when visible | 14px | PASS |
 | log_scrollbar_width | >= 12px when scrollable | 14px | PASS |
 | log_area_scrollable | log content scrollable | range=5 | PASS |
-| property_area_scrollable | property panel scrollable | range=561 | PASS |
+| property_area_scrollable | property panel scrollable | range=516 | PASS |
 | device_status_scrollable_or_compact | device scroll visible when needed | width=14px | PASS |
 | wheel_interaction | wheel step changes scroll value | True | PASS |
 | handle_position_interaction | handle position can be set smoothly | True | PASS |
@@ -75,20 +78,22 @@
 
 | Check | Expected | Actual | Status |
 |-------|----------|--------|--------|
-| custom_title_bar | frameless + title bar visible | custom=True, height=32px | PASS |
-| title_bar_height | 28–44 px | 32px | PASS |
+| custom_title_bar | frameless + title bar visible | custom=True, height=36px | PASS |
+| title_bar_height | 28–44 px | 36px | PASS |
 | bottom_dock_height | >= 200 px | 200px | PASS |
 | log_view_height | >= 100 px | 140px | PASS |
 | statistics_panel_height | >= 100 px | 192px | PASS |
-| canvas_size | height >= 240px | 616x321px | PASS |
+| canvas_size | height >= 240px | 616x366px | PASS |
 | colorbar_adjacent | gap <= 12 px | 2px | PASS |
 | right_panel_width | 340–380 px | 350px | PASS |
 | left_panel_width | 220–280 px | 230px | PASS |
-| center_canvas_priority | canvas >= 1.6x right, >= 2.0x left, area >= 50% | right=1.76x, left=2.68x, area=80% | PASS |
+| center_canvas_priority | canvas >= 1.6x right, >= 2.0x left, area >= 50% | right=1.76x, left=2.68x, area=82% | PASS |
 | workspace_wider_than_right_panel | workspace > right panel | 676px > 350px | PASS |
 | toolbar_no_overflow | toolbar fits layout | overflow=False | PASS |
 | status_bar_visible | status bar visible | True | PASS |
 | maximized_window | custom maximized == True | True | PASS |
+| top_header_integrated | toolbar embedded in unified top header | header=True, parent=commercialTopHeader | PASS |
+| brand_single_line_row | brand title/subtitle/version on one horizontal row | row=True, single_line=True | PASS |
 | target_style_mode | targetStyleMode enabled | true | PASS |
 | logo_area_exists | NFS logo block visible | visible=True | PASS |
 | top_toolbar_icon_mode | >= 12 toolbar actions | 13 | PASS |

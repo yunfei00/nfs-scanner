@@ -4,14 +4,15 @@ Last updated: 2026-06-26
 
 ## Current Mode
 
-**COMPLETE — Final Delta Polish (Target Screenshot Alignment)**
+**COMPLETE — Unified Top Header Polish**
 
-商业 UI 已完成最后一轮 8 类差异高保真对齐；默认/最大化截图 + QA 自检 PASS。
+商业 UI 顶部已合并为单行一体化 header（品牌 + 工具栏 + 授权/窗口控制），visual/QA 自检 PASS。
 
 ## Recent (2026-06-26)
 
-- Final Delta Polish：紧凑 title/toolbar、照片感 PCB+Turbo 热图、230px workflow、仪器参数区、三栏 dock、可拖动滚动条
-- 145 tests + visual check + QA pipeline **PASS**
+- Unified `CommercialTopHeader`：单行品牌（NFS + 中文 + 英文 + v1.0.0）+ 嵌入工具栏 + 授权/Admin/窗口按钮
+- 顶部总高度 36px；工具按钮 46×32
+- 顶部特写截图 QA：`commercial_top_header.png`
 
 ## Application Entry Points
 
@@ -28,6 +29,7 @@ Last updated: 2026-06-26
 | Commercial Target Alignment | **done** |
 | Target Screenshot Replication | **done** |
 | Final Delta Polish | **done** |
+| Unified Top Header | **done** |
 | Real Motion Control | **blocked** |
 
 ## Constraints (unchanged)

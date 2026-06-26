@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-06-26T08:07:17",
+  "generated_at": "2026-06-26T08:30:03",
   "default": {
     "uses_custom_title_bar": true,
-    "title_bar_height": 32,
+    "title_bar_height": 36,
     "bottom_dock_height": 200,
     "log_view_height": 140,
     "statistics_panel_height": 192,
@@ -10,10 +10,10 @@
     "right_panel_width": 350,
     "workspace_width": 676,
     "canvas_width": 616,
-    "canvas_height": 321,
+    "canvas_height": 366,
     "canvas_to_right_ratio": 1.76,
     "canvas_to_left_ratio": 2.6782608695652175,
-    "canvas_view_area_ratio": 0.8037722043819356,
+    "canvas_view_area_ratio": 0.8158645147282333,
     "colorbar_gap_px": 2,
     "toolbar_overflow": false,
     "status_bar_visible": true,
@@ -74,7 +74,7 @@
         {
           "name": "property_area_scrollable",
           "expected": "property panel scrollable",
-          "actual": "range=561",
+          "actual": "range=516",
           "passed": true
         },
         {
@@ -108,13 +108,13 @@
       {
         "name": "custom_title_bar",
         "expected": "frameless + title bar visible",
-        "actual": "custom=True, height=32px",
+        "actual": "custom=True, height=36px",
         "passed": true
       },
       {
         "name": "title_bar_height",
         "expected": "28–44 px",
-        "actual": "32px",
+        "actual": "36px",
         "passed": true
       },
       {
@@ -138,7 +138,7 @@
       {
         "name": "canvas_size",
         "expected": "height >= 240px",
-        "actual": "616x321px",
+        "actual": "616x366px",
         "passed": true
       },
       {
@@ -162,7 +162,7 @@
       {
         "name": "center_canvas_priority",
         "expected": "canvas >= 1.6x right, >= 2.0x left, area >= 50%",
-        "actual": "right=1.76x, left=2.68x, area=80%",
+        "actual": "right=1.76x, left=2.68x, area=82%",
         "passed": true
       },
       {
@@ -187,6 +187,18 @@
         "name": "default_window_within_screen",
         "expected": "window <= available screen",
         "actual": "1280x720 <= 1280x720",
+        "passed": true
+      },
+      {
+        "name": "top_header_integrated",
+        "expected": "toolbar embedded in unified top header",
+        "actual": "header=True, parent=commercialTopHeader",
+        "passed": true
+      },
+      {
+        "name": "brand_single_line_row",
+        "expected": "brand title/subtitle/version on one horizontal row",
+        "actual": "row=True, single_line=True",
         "passed": true
       },
       {
@@ -348,7 +360,7 @@
       {
         "name": "property_area_scrollable",
         "expected": "property panel scrollable",
-        "actual": "range=561",
+        "actual": "range=516",
         "passed": true
       },
       {
@@ -380,7 +392,7 @@
   },
   "maximized": {
     "uses_custom_title_bar": true,
-    "title_bar_height": 32,
+    "title_bar_height": 36,
     "bottom_dock_height": 200,
     "log_view_height": 140,
     "statistics_panel_height": 192,
@@ -388,10 +400,10 @@
     "right_panel_width": 350,
     "workspace_width": 676,
     "canvas_width": 616,
-    "canvas_height": 321,
+    "canvas_height": 366,
     "canvas_to_right_ratio": 1.76,
     "canvas_to_left_ratio": 2.6782608695652175,
-    "canvas_view_area_ratio": 0.8037722043819356,
+    "canvas_view_area_ratio": 0.8158645147282333,
     "colorbar_gap_px": 2,
     "toolbar_overflow": false,
     "status_bar_visible": true,
@@ -452,7 +464,7 @@
         {
           "name": "property_area_scrollable",
           "expected": "property panel scrollable",
-          "actual": "range=561",
+          "actual": "range=516",
           "passed": true
         },
         {
@@ -486,13 +498,13 @@
       {
         "name": "custom_title_bar",
         "expected": "frameless + title bar visible",
-        "actual": "custom=True, height=32px",
+        "actual": "custom=True, height=36px",
         "passed": true
       },
       {
         "name": "title_bar_height",
         "expected": "28–44 px",
-        "actual": "32px",
+        "actual": "36px",
         "passed": true
       },
       {
@@ -516,7 +528,7 @@
       {
         "name": "canvas_size",
         "expected": "height >= 240px",
-        "actual": "616x321px",
+        "actual": "616x366px",
         "passed": true
       },
       {
@@ -540,7 +552,7 @@
       {
         "name": "center_canvas_priority",
         "expected": "canvas >= 1.6x right, >= 2.0x left, area >= 50%",
-        "actual": "right=1.76x, left=2.68x, area=80%",
+        "actual": "right=1.76x, left=2.68x, area=82%",
         "passed": true
       },
       {
@@ -565,6 +577,18 @@
         "name": "maximized_window",
         "expected": "custom maximized == True",
         "actual": "True",
+        "passed": true
+      },
+      {
+        "name": "top_header_integrated",
+        "expected": "toolbar embedded in unified top header",
+        "actual": "header=True, parent=commercialTopHeader",
+        "passed": true
+      },
+      {
+        "name": "brand_single_line_row",
+        "expected": "brand title/subtitle/version on one horizontal row",
+        "actual": "row=True, single_line=True",
         "passed": true
       },
       {
@@ -726,7 +750,7 @@
       {
         "name": "property_area_scrollable",
         "expected": "property panel scrollable",
-        "actual": "range=561",
+        "actual": "range=516",
         "passed": true
       },
       {
