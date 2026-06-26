@@ -1,6 +1,6 @@
 # Commercial Demo QA Report
 
-- Generated: 2026-06-26 21:56:41
+- Generated: 2026-06-26 22:26:55
 - Round: 1
 - Overall: **PASS**
 
@@ -14,6 +14,9 @@
 - `data_view`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/data_view.png`
 - `report_center`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/report_center.png`
 - `reset_demo`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/reset_demo.png`
+- `stopped_scan`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/stopped_scan.png`
+- `reset_after_report`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/reset_after_report.png`
+- `button_state_matrix`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/button_state_matrix.png`
 - `commercial_maximized`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/commercial_maximized.png`
 
 ## Startup — PASS
@@ -55,7 +58,7 @@
 | maximized_canvas_wider_than_right_panel | workspace > right panel | 676px > 350px | PASS |
 | maximized_bottom_dock_height | >= 200px | 200px | PASS |
 | maximized_log_view_height | >= 100px | 140px | PASS |
-| maximized_log_visible_lines | >= 6 visible lines | estimated=27 | PASS |
+| maximized_log_visible_lines | >= 6 visible lines | estimated=16 | PASS |
 | maximized_statistics_panel_height | >= 100px | 192px | PASS |
 | maximized_status_bar_visible | status bar visible | True | PASS |
 | maximized_maximized_window_capture | custom maximized == True | True | PASS |
@@ -71,19 +74,19 @@
 | scan_params_update_preview_stats | preview point count updates | before=91 x 71 = 6,461, after=3 x 3 = 9 | PASS |
 | start_scan_running | runtime status == running | running | PASS |
 | scan_progress_above_5_percent | progress > 5% | 11% | PASS |
-| workflow_scan_step_active | workflow step 5 active while scanning | active | PASS |
+| workflow_scan_step_active | workflow step 5 active while scanning | 4 | PASS |
 | pause_scan_paused | runtime status == paused | paused | PASS |
 | resume_scan_running | runtime status == running | running | PASS |
-| scan_progress_increases_after_resume | progress increases after resume | before=22%, after=33% | PASS |
+| scan_progress_increases_after_resume | progress increases after resume | before=11%, after=22% | PASS |
 | stop_scan_stopped | runtime status == stopped | stopped | PASS |
 | scan_completes_or_stops | runtime status completed or stopped | completed | PASS |
 | data_view_mock_task | data view lists mock scan tasks | 3 | PASS |
-| data_view_export_mock_json | data export creates mock json | C:\Users\yunfei\.nfs_scanner\mock_exports\data\mock_data_mock-f433ab79_20260626_215644.json | PASS |
+| data_view_export_mock_json | data export creates mock json | C:\Users\yunfei\.nfs_scanner\mock_exports\data\mock_data_mock-ef1e1d0d_20260626_222658.json | PASS |
 | report_center_preview | report preview populated | Demo Near Field Scan | PASS |
-| mock_report_export | markdown/txt report file created | C:\Users\yunfei\.nfs_scanner\reports\report_mock-f433ab79_20260626_215644.md | PASS |
+| mock_report_export | markdown/txt report file created | C:\Users\yunfei\.nfs_scanner\reports\report_mock-ef1e1d0d_20260626_222658.md | PASS |
 | mock_report_multi_format_export | html/pdf/png mock report files created | .html, .pdf, .png | PASS |
 | mock_self_check_report | local mock self-check report created | .ai\qa\latest\commercial_mock_self_check.json | PASS |
-| reset_demo_restores_state | runtime idle and demo reset applied | status=stopped, tasks 3->2 | PASS |
+| reset_demo_restores_state | runtime idle and demo reset applied | status=configured, tasks 3->2 | PASS |
 
 ## Interaction — PASS
 
@@ -94,7 +97,7 @@
 | left_scrollbar_width | >= 12px when visible | 14px | PASS |
 | property_scrollbar_width | >= 12px when visible | 14px | PASS |
 | log_scrollbar_width | >= 12px when scrollable | 14px | PASS |
-| log_area_scrollable | log content scrollable | range=21 | PASS |
+| log_area_scrollable | log content scrollable | range=11 | PASS |
 | property_area_scrollable | property panel scrollable | range=463 | PASS |
 | device_status_scrollable_or_compact | device scroll visible when needed | width=0px | PASS |
 | wheel_interaction | wheel step changes scroll value | True | PASS |

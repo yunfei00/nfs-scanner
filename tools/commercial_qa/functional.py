@@ -177,12 +177,12 @@ def run_functional_demo_flow(shell: CommercialMainShell) -> tuple[list[QACheck],
         )
     )
 
-    workflow_scan_active = shell.workflow_panel._step_states[4] == "active"
+    workflow_scan_active = shell.workflow_panel.active_step_index() == 4
     checks.append(
         _check(
             "workflow_scan_step_active",
             "workflow step 5 active while scanning",
-            str(shell.workflow_panel._step_states[4]),
+            str(shell.workflow_panel.active_step_index()),
             workflow_scan_active,
         )
     )

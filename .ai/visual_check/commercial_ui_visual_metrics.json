@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-26T21:57:56",
+  "generated_at": "2026-06-26T22:28:05",
   "default": {
     "uses_custom_title_bar": true,
     "title_bar_height": 54,
@@ -22,7 +22,7 @@
     "screen_available_width": 1280,
     "screen_available_height": 720,
     "is_maximized": false,
-    "workflow_panel_height": 261,
+    "workflow_panel_height": 257,
     "device_status_panel_height": 624,
     "device_status_collapsed_height": 45,
     "device_status_has_inner_scroll": false,
@@ -176,7 +176,7 @@
       {
         "name": "workflow_panel_height",
         "expected": "<= 360 px",
-        "actual": "261px",
+        "actual": "257px",
         "passed": true
       },
       {
@@ -654,7 +654,7 @@
     "screen_available_width": 1280,
     "screen_available_height": 720,
     "is_maximized": true,
-    "workflow_panel_height": 261,
+    "workflow_panel_height": 257,
     "device_status_panel_height": 624,
     "device_status_collapsed_height": 45,
     "device_status_has_inner_scroll": false,
@@ -808,7 +808,7 @@
       {
         "name": "workflow_panel_height",
         "expected": "<= 360 px",
-        "actual": "261px",
+        "actual": "257px",
         "passed": true
       },
       {

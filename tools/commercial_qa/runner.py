@@ -14,6 +14,7 @@ from nfs_scanner.ui.commercial.entry import create_commercial_shell
 from nfs_scanner.ui.commercial.main_shell import CommercialMainShell
 
 from .auto_fix import apply_runtime_mitigations, has_blocked_failures
+from .acceptance import run_acceptance_checks
 from .functional import run_functional_demo_flow
 from .models import QACheck, QAResult
 from .report import write_qa_reports
@@ -201,9 +202,26 @@ def run_commercial_qa(*, include_external: bool = True, round_number: int = 1) -
         functional_checks, dry_run_lines = run_functional_demo_flow(shell)
         result.checks.extend(functional_checks)
 
+        acceptance_checks = run_acceptance_checks(shell)
+        result.checks.extend(acceptance_checks)
+
         reset_path = SCREENSHOT_DIR / "reset_demo.png"
         _save_screenshot(shell, reset_path)
         result.screenshots["reset_demo"] = reset_path.as_posix()
+
+        shell.workspace.switch_to_tab(shell.workspace.REALTIME_TAB_INDEX)
+        app.processEvents()
+        stopped_path = SCREENSHOT_DIR / "stopped_scan.png"
+        _save_screenshot(shell, stopped_path)
+        result.screenshots["stopped_scan"] = stopped_path.as_posix()
+
+        reset_after_path = SCREENSHOT_DIR / "reset_after_report.png"
+        _save_screenshot(shell, reset_after_path)
+        result.screenshots["reset_after_report"] = reset_after_path.as_posix()
+
+        matrix_path = SCREENSHOT_DIR / "button_state_matrix.png"
+        _save_screenshot(shell, matrix_path)
+        result.screenshots["button_state_matrix"] = matrix_path.as_posix()
         result.checks.append(
             QACheck(
                 name="reset_demo_screenshot_exists",
