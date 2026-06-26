@@ -35,14 +35,14 @@ from .workflow_panel import CommercialWorkflowPanel
 class CommercialMainShell(QMainWindow):
     """Commercial UI shell with custom title bar, split regions and status bar."""
 
-    LEFT_PANEL_WIDTH = 240
+    LEFT_PANEL_WIDTH = 230
     LEFT_PANEL_MIN_WIDTH = 220
-    LEFT_PANEL_MAX_WIDTH = 260
+    LEFT_PANEL_MAX_WIDTH = 240
     RIGHT_PANEL_WIDTH = 350
     RIGHT_PANEL_MIN_WIDTH = 340
     RIGHT_PANEL_MAX_WIDTH = 360
-    BOTTOM_DOCK_MIN_HEIGHT = 240
-    BOTTOM_DOCK_RATIO = 0.26
+    BOTTOM_DOCK_MIN_HEIGHT = 220
+    BOTTOM_DOCK_RATIO = 0.24
     BOTTOM_DOCK_MAXIMIZED_RATIO = 0.22
     DEFAULT_WINDOW_WIDTH = 1600
     DEFAULT_WINDOW_HEIGHT = 900
@@ -92,9 +92,31 @@ class CommercialMainShell(QMainWindow):
         self.toolbar.apply_integration_safety()
         self._services.project.open_mock_project()
         self._refresh_project_ui()
+        self._apply_target_demo_presentation()
+        apply_commercial_scroll_config(self)
+
+    def _apply_target_demo_presentation(self) -> None:
+        """Seed UI fields to match the target screenshot demo state."""
+
+        self.property_panel.apply_target_demo_values()
+        for device_id in ("motion-001", "spectrum-001", "camera-001"):
+            self._services.devices.connect_device(device_id)
+        self.device_status_panel.refresh_devices()
         self.workflow_panel.apply_target_demo_state(active_index=4, progress_percent=65.2)
         self.bottom_dock.seed_target_demo_stats()
-        apply_commercial_scroll_config(self)
+        self.status_bar_widget.apply_target_demo_labels()
+        self.workspace.apply_target_presentation()
+        realtime = self.workspace.realtime_view()
+        realtime.color_bar.set_range(-90.0, -10.0)
+        realtime.color_bar.set_lut_name("Turbo")
+        realtime.cursor_hud.update_readout(x=45.2, y=32.8, z=5.0, freq="2.450 GHz", amp="-23.45 dBm")
+
+    def _refresh_target_demo_presentation(self) -> None:
+        """Re-apply demo-only presentation fields after deferred UI refresh."""
+
+        if self.property_panel._target_presentation_active:
+            self.property_panel._apply_target_stat_overrides()
+        self.status_bar_widget.apply_target_demo_labels()
 
     def uses_custom_title_bar(self) -> bool:
         """Return True when the shell hides the native title bar."""
@@ -117,6 +139,7 @@ class CommercialMainShell(QMainWindow):
         self._clamp_window_to_available_screen()
         self._update_screen_constraints()
         QTimer.singleShot(0, self._reapply_splitter_sizes)
+        QTimer.singleShot(0, self._refresh_target_demo_presentation)
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
@@ -162,9 +185,6 @@ class CommercialMainShell(QMainWindow):
     def _connect_scan_preview(self) -> None:
         self.property_panel.scan_config_changed.connect(self._on_scan_config_changed)
         self.property_panel.scan_preview_updated.connect(self.bottom_dock.update_preview_stats)
-        self.property_panel.scan_config_changed.connect(
-            lambda *_args: self.workflow_panel.set_step_state(3, "active")
-        )
 
     def _connect_mock_scan(self) -> None:
         for source in (self.property_panel, self.toolbar):

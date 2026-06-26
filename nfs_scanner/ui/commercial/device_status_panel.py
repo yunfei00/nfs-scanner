@@ -47,7 +47,7 @@ class CommercialDeviceStatusPanel(QWidget):
         body = QWidget(self)
         self._cards_layout = QVBoxLayout(body)
         self._cards_layout.setContentsMargins(0, 0, 0, 0)
-        self._cards_layout.setSpacing(6)
+        self._cards_layout.setSpacing(4)
 
         panel = NFSCollapsiblePanel("设备状态", body, parent=self)
         layout = QVBoxLayout(self)
@@ -68,6 +68,10 @@ class CommercialDeviceStatusPanel(QWidget):
         row_layout.addWidget(summary, 1)
         row_layout.addWidget(NFSStatusBadge(device.status_label, device.badge_status, row))
         card.body_layout.addWidget(row)
+
+        address = QLabel(device.address, card.body)
+        address.setObjectName("nfsMutedLabel")
+        card.body_layout.addWidget(address)
 
         if device.last_message:
             message = QLabel(device.last_message, card.body)

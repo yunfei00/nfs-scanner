@@ -40,8 +40,8 @@ class _TimelineStepRow(QFrame):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         root = QHBoxLayout(self)
-        root.setContentsMargins(6, 4, 6, 4)
-        root.setSpacing(8)
+        root.setContentsMargins(4, 2, 4, 2)
+        root.setSpacing(6)
 
         rail = QWidget(self)
         rail.setFixedWidth(26)
@@ -51,13 +51,14 @@ class _TimelineStepRow(QFrame):
         self._circle = QLabel(number, rail)
         self._circle.setObjectName("nfsWorkflowTimelineCircle")
         self._circle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._circle.setFixedSize(24, 24)
+        self._circle.setFixedSize(20, 20)
         rail_layout.addWidget(self._circle, 0, Qt.AlignmentFlag.AlignHCenter)
         if show_connector:
             connector = QFrame(rail)
             connector.setObjectName("nfsWorkflowTimelineConnector")
-            connector.setFixedWidth(2)
-            connector.setMinimumHeight(16)
+            connector.setFixedWidth(1)
+            connector.setMinimumHeight(10)
+            connector.setMaximumHeight(14)
             rail_layout.addWidget(connector, 0, Qt.AlignmentFlag.AlignHCenter)
         rail_layout.addStretch(1)
 
@@ -78,7 +79,7 @@ class _TimelineStepRow(QFrame):
         header_row.addWidget(self._progress)
         detail = QLabel(description, body)
         detail.setObjectName("nfsMutedLabel")
-        detail.setWordWrap(True)
+        detail.setVisible(False)
         body_layout.addLayout(header_row)
         body_layout.addWidget(detail)
 
@@ -111,8 +112,8 @@ class CommercialWorkflowPanel(QWidget):
 
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 4)
-        layout.setSpacing(2)
+        layout.setContentsMargins(6, 6, 6, 2)
+        layout.setSpacing(1)
 
         title = QLabel("扫描流程", self)
         title.setObjectName("nfsSectionTitle")

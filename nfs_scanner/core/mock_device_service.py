@@ -27,35 +27,35 @@ class MockDeviceService(DeviceServiceProtocol):
                 kind="motion",
                 display_name="运动平台",
                 model="GRBL / Serial",
-                address="COM3 @ 115200",
+                address="COM6 @ 115200",
                 connection_status="connected",
                 status_label="已连接",
                 badge_status="connected",
-                summary="X=0.00 Y=0.00 Z=5.00",
+                summary="X=45.20 Y=32.80 Z=5.00",
                 last_message="Mock motion platform ready",
             ),
             "spectrum-001": DeviceSummary(
                 device_id="spectrum-001",
                 kind="spectrum",
                 display_name="频谱仪",
-                model="TCPIP-SCPI",
+                model="ZNA67",
                 address="192.168.1.100",
                 connection_status="disconnected",
                 status_label="未连接",
                 badge_status="disconnected",
-                summary="100 MHz - 3 GHz / RBW 100 kHz",
+                summary="100 MHz - 6 GHz / RBW 100 kHz",
                 last_message="Waiting for mock connect",
             ),
             "camera-001": DeviceSummary(
                 device_id="camera-001",
                 kind="camera",
                 display_name="相机",
-                model="Mock Camera",
+                model="USB3.0",
                 address="USB-CAM-001",
                 connection_status="disconnected",
                 status_label="未连接",
                 badge_status="disconnected",
-                summary="1920x1080 / 30 fps",
+                summary="3840x2160 / 30 fps",
                 last_message="Waiting for mock connect",
             ),
         }
@@ -69,13 +69,13 @@ class MockDeviceService(DeviceServiceProtocol):
         summary = device.summary
         message = f"Mock connected: {device.display_name}"
         if device.kind == "motion":
-            summary = "X=0.00 Y=0.00 Z=5.00"
+            summary = "X=45.20 Y=32.80 Z=5.00"
             message = "Mock motion platform connected (no serial I/O)"
         elif device.kind == "spectrum":
-            summary = "100 MHz - 3 GHz / RBW 100 kHz"
+            summary = "100 MHz - 6 GHz / RBW 100 kHz"
             message = "Mock spectrum session opened (no VISA)"
         elif device.kind == "camera":
-            summary = "1920x1080 / 30 fps"
+            summary = "3840x2160 / 30 fps"
             message = "Mock camera stream started (no USB capture)"
         updated = replace(
             device,
