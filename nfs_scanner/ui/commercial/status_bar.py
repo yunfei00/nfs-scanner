@@ -15,40 +15,39 @@ from .runtime_display import format_runtime_status
 
 
 class CommercialStatusBar(QFrame):
-    """Bottom status bar with compact mock system information."""
+    """Bottom status bar with compact instrument-style information."""
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("commercialStatusBar")
-        self.setMinimumHeight(26)
-        self.setMaximumHeight(26)
+        self.setMinimumHeight(22)
+        self.setMaximumHeight(22)
         self._setup_ui()
         self._start_clock()
 
     def _setup_ui(self) -> None:
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 2, 8, 2)
-        layout.setSpacing(10)
+        layout.setContentsMargins(6, 1, 6, 1)
+        layout.setSpacing(4)
 
-        self.system_label = self._create_chip("System Ready")
-        self.demo_label = self._create_chip("Mock Runtime")
+        self.system_dot = QLabel("●", self)
+        self.system_dot.setObjectName("commercialStatusDot")
+        self.system_label = self._create_chip("系统: 正常")
+        self.demo_label = self._create_chip("Mock演示")
         self.project_label = self._create_chip("项目: 未打开")
         self.task_label = self._create_chip("任务: 未开始")
-        self.progress_label = self._create_chip("进度: 0%")
-        self.real_device_label = self._create_chip(
-            "Real Device Disabled" if not REAL_DEVICE_ENABLED else "Real Device Enabled"
-        )
-        self.license_label = self._create_chip("Trial 30d")
+        self.license_label = self._create_chip("标准版 · 365天")
+        self.storage_label = self._create_chip("存储: Mock")
         self.time_label = self._create_chip("")
 
         for widget in (
+            self.system_dot,
             self.system_label,
             self.demo_label,
             self.project_label,
             self.task_label,
-            self.progress_label,
-            self.real_device_label,
             self.license_label,
+            self.storage_label,
         ):
             layout.addWidget(widget, 0)
 
@@ -59,9 +58,10 @@ class CommercialStatusBar(QFrame):
     def _create_chip(self, text: str) -> QLabel:
         label = QLabel(text, self)
         label.setObjectName("commercialStatusChip")
-        label.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-        label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        label.setMinimumWidth(0)
+        label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+        label.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred)
+        if text:
+            label.setMinimumWidth(label.fontMetrics().horizontalAdvance(text) + 2)
         return label
 
     def _start_clock(self) -> None:
@@ -71,10 +71,34 @@ class CommercialStatusBar(QFrame):
         self._refresh_clock()
 
     def _refresh_clock(self) -> None:
-        self.time_label.setText(datetime.now().strftime("%H:%M:%S"))
+        now = datetime.now()
+        self.time_label.setText(now.strftime("%Y-%m-%d %H:%M:%S"))
+        self.time_label.setMinimumWidth(self.time_label.fontMetrics().horizontalAdvance(self.time_label.text()) + 2)
+
+    def apply_target_demo_labels(self) -> None:
+        """Show status chips similar to the target screenshot."""
+
+        self.system_label.setText("系统: 正常")
+        self.demo_label.setText("Mock演示")
+        self.project_label.setText("项目: Demo NF Scan")
+        self.task_label.setText("任务: 扫描执行中 · 65.2%")
+        self.license_label.setText("授权: 标准版 · 365天")
+        self.storage_label.setText("模式: 无硬件控制")
+        self._refresh_chip_widths()
+
+    def _refresh_chip_widths(self) -> None:
+        for label in (
+            self.system_label,
+            self.demo_label,
+            self.project_label,
+            self.task_label,
+            self.license_label,
+            self.storage_label,
+        ):
+            label.setMinimumWidth(label.fontMetrics().horizontalAdvance(label.text()) + 2)
 
     def is_fully_visible(self) -> bool:
-        return self.isVisible() and self.height() >= 24 and self.width() > 200
+        return self.isVisible() and self.height() >= 20 and self.width() > 200
 
     def update_project_session(self, session: ProjectSession | None) -> None:
         if session is None:
@@ -83,14 +107,13 @@ class CommercialStatusBar(QFrame):
         storage = "已保存" if session.storage_status == "saved" else "未保存"
         self.project_label.setText(f"项目: {session.name} ({storage})")
         self.project_label.setToolTip(session.name)
+        self._refresh_chip_widths()
 
     def update_runtime_snapshot(self, snapshot: RuntimeSnapshot) -> None:
-        self.system_label.setText(f"Ready · {format_runtime_status(snapshot.status)}")
+        self.system_label.setText(f"系统: {format_runtime_status(snapshot.status)}")
         if snapshot.status in ("idle", "configured"):
             self.task_label.setText("任务: 未开始")
         else:
-            self.task_label.setText(
-                f"任务: Mock {snapshot.completed_points}/{snapshot.total_points}"
-            )
-        percent = int(snapshot.progress * 100)
-        self.progress_label.setText(f"进度: {percent}%")
+            percent = int(snapshot.progress * 100)
+            self.task_label.setText(f"任务: 扫描执行中 · {percent}%")
+        self._refresh_chip_widths()
