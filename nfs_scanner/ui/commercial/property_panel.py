@@ -48,6 +48,13 @@ class CommercialPropertyPanel(QScrollArea):
     scan_start_requested = Signal()
     scan_stop_requested = Signal()
     scan_pause_toggle_requested = Signal()
+    scan_validity_changed = Signal(bool, str)
+    region_template_changed = Signal(str)
+    heatmap_visibility_changed = Signal(bool)
+    home_after_scan_changed = Signal(bool)
+    frequency_config_applied = Signal(dict)
+    display_lut_changed = Signal(str)
+    scan_mode_changed = Signal(str)
 
     _DEBOUNCE_MS = 250
     _COMPACT_FIELD_WIDTH = 80
@@ -73,6 +80,11 @@ class CommercialPropertyPanel(QScrollArea):
         self._action_button_row: QWidget | None = None
         self._target_presentation_active = False
         self._tabs: QTabWidget | None = None
+        self._region_combo: QComboBox | None = None
+        self._heatmap_checkbox: QCheckBox | None = None
+        self._display_heatmap_checkbox: QCheckBox | None = None
+        self._home_after_scan_checkbox: QCheckBox | None = None
+        self._last_validation_errors: list[str] = []
         self._setup_ui()
         QTimer.singleShot(0, self._emit_scan_config)
 
@@ -201,6 +213,8 @@ class CommercialPropertyPanel(QScrollArea):
         frame, frame_layout = self._section_frame(parent, "扫描区域")
         region_combo = QComboBox(frame)
         region_combo.addItems(["矩形区域", "全板区域", "自定义 ROI"])
+        region_combo.currentTextChanged.connect(self._on_region_template_changed)
+        self._region_combo = region_combo
         frame_layout.addWidget(region_combo)
         frame_layout.addWidget(self._build_region_grid(frame))
         return frame
@@ -270,7 +284,12 @@ class CommercialPropertyPanel(QScrollArea):
 
         heatmap_checkbox = QCheckBox("实时显示热力图", frame)
         heatmap_checkbox.setChecked(True)
+        heatmap_checkbox.toggled.connect(self.heatmap_visibility_changed.emit)
         home_checkbox = QCheckBox("扫描完成回零 (Mock)", frame)
+        home_checkbox.setChecked(False)
+        home_checkbox.toggled.connect(self.home_after_scan_changed.emit)
+        self._heatmap_checkbox = heatmap_checkbox
+        self._home_after_scan_checkbox = home_checkbox
         frame_layout.addWidget(heatmap_checkbox)
         frame_layout.addWidget(home_checkbox)
         return frame
@@ -310,8 +329,32 @@ class CommercialPropertyPanel(QScrollArea):
 
         apply_button = QPushButton("应用", frame)
         apply_button.setObjectName("nfsSecondaryButton")
-        apply_button.setEnabled(False)
-        apply_button.setToolTip("Mock 占位")
+        def apply_frequency_config() -> None:
+            try:
+                start_mhz = float(start_field.text().strip())
+                stop_mhz = float(stop_field.text().strip())
+                points = int(float(points_field.text().strip()))
+            except ValueError:
+                if self._validation_label is not None:
+                    self._validation_label.setText("频率配置无效：请输入数字")
+                return
+            if start_mhz <= 0 or stop_mhz <= start_mhz or points <= 1:
+                if self._validation_label is not None:
+                    self._validation_label.setText("频率配置无效：终止频率需大于起始频率，点数需大于 1")
+                return
+            self.frequency_config_applied.emit(
+                {
+                    "source": source_combo.currentText(),
+                    "trace": trace_combo.currentText(),
+                    "mode": mode_combo.currentText(),
+                    "start_mhz": start_mhz,
+                    "stop_mhz": stop_mhz,
+                    "points": points,
+                }
+            )
+
+        apply_button.setToolTip("应用 Mock 频率配置")
+        apply_button.clicked.connect(apply_frequency_config)
         frame_layout.addWidget(apply_button)
         return frame
 
@@ -344,8 +387,11 @@ class CommercialPropertyPanel(QScrollArea):
         frame, frame_layout = self._section_frame(page, "显示设置")
         heatmap_checkbox = QCheckBox("显示热力图", frame)
         heatmap_checkbox.setChecked(True)
+        heatmap_checkbox.toggled.connect(self.heatmap_visibility_changed.emit)
+        self._display_heatmap_checkbox = heatmap_checkbox
         lut_combo = QComboBox(frame)
         lut_combo.addItems(list(COMMON_LUT_NAMES))
+        lut_combo.currentTextChanged.connect(self.display_lut_changed.emit)
         frame_layout.addWidget(heatmap_checkbox)
         frame_layout.addWidget(self._labeled_row(frame, "色图", lut_combo))
         layout.addWidget(frame)
@@ -378,10 +424,60 @@ class CommercialPropertyPanel(QScrollArea):
         return row
 
     def _on_scan_mode_changed(self) -> None:
+        if self._mode_combo is not None:
+            self.scan_mode_changed.emit(str(self._mode_combo.currentText()))
+        self._emit_scan_config()
+
+    def _on_region_template_changed(self, text: str) -> None:
+        templates = {
+            "矩形区域": {
+                "x_start": "0",
+                "y_start": "0",
+                "z_height": "5",
+                "x_stop": "180",
+                "y_stop": "140",
+                "x_step": "2",
+                "y_step": "2",
+            },
+            "全板区域": {
+                "x_start": "0",
+                "y_start": "0",
+                "z_height": "5",
+                "x_stop": "220",
+                "y_stop": "160",
+                "x_step": "4",
+                "y_step": "4",
+            },
+            "自定义 ROI": {
+                "x_start": "20",
+                "y_start": "20",
+                "z_height": "5",
+                "x_stop": "120",
+                "y_stop": "90",
+                "x_step": "2.5",
+                "y_step": "2.5",
+            },
+        }
+        values = templates.get(text)
+        if values is not None:
+            for key, value in values.items():
+                field = self._field_map.get(key)
+                if field is not None:
+                    field.setText(value)
+        self.region_template_changed.emit(text)
         self._emit_scan_config()
 
     def _schedule_emit_scan_config(self) -> None:
         self._debounce_timer.start(self._DEBOUNCE_MS)
+
+    def can_start_scan(self) -> bool:
+        return not self._last_validation_errors
+
+    def validation_message(self) -> str:
+        return "；".join(self._last_validation_errors)
+
+    def home_after_scan_enabled(self) -> bool:
+        return bool(self._home_after_scan_checkbox and self._home_after_scan_checkbox.isChecked())
 
     def _parse_float(self, key: str, default: float) -> float:
         field = self._field_map[key]
@@ -431,6 +527,8 @@ class CommercialPropertyPanel(QScrollArea):
         path_config = self.current_scan_path_config()
         parse_errors = self._collect_parse_errors()
         errors = parse_errors + region.validate() + path_config.validate()
+        self._last_validation_errors = errors
+        self.scan_validity_changed.emit(not errors, "；".join(errors))
 
         if errors:
             if self._validation_label is not None:

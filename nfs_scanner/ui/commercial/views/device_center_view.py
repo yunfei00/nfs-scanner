@@ -41,6 +41,7 @@ class DeviceCenterView(QWidget):
     """Device management page with mock services and motion connection test."""
 
     devices_changed = Signal()
+    feedback_requested = Signal(str, str)
 
     def __init__(
         self,
@@ -170,12 +171,18 @@ class DeviceCenterView(QWidget):
         connect_button = NFSPrimaryButton("连接", actions)
         disconnect_button = NFSSecondaryButton("断开", actions)
         refresh_button = NFSSecondaryButton("刷新", actions)
+        reset_button = NFSSecondaryButton("Reset Mock", actions)
+        detail_button = NFSSecondaryButton("Detail", actions)
         connect_button.clicked.connect(lambda _checked=False, did=device.device_id: self._connect(did))
         disconnect_button.clicked.connect(lambda _checked=False, did=device.device_id: self._disconnect(did))
         refresh_button.clicked.connect(lambda _checked=False, did=device.device_id: self._refresh_one(did))
+        reset_button.clicked.connect(lambda _checked=False, did=device.device_id: self._reset_one(did))
+        detail_button.clicked.connect(lambda _checked=False, did=device.device_id: self._show_detail(did))
         actions_layout.addWidget(connect_button)
         actions_layout.addWidget(disconnect_button)
         actions_layout.addWidget(refresh_button)
+        actions_layout.addWidget(reset_button)
+        actions_layout.addWidget(detail_button)
         actions_layout.addStretch(1)
         card.body_layout.addWidget(actions)
         return card
@@ -217,12 +224,13 @@ class DeviceCenterView(QWidget):
             mode = QComboBox(panel)
             mode.addItem("mock", "mock")
             mode.addItem("real_connection_test", "real_connection_test")
-            mode.setCurrentIndex(0 if cfg.connection_mode == "mock" else 1)
-            if not is_real_device_control_allowed():
-                model = mode.model()
-                item = model.item(1)
-                if item is not None:
-                    item.setEnabled(False)
+            mode.setCurrentIndex(0)
+            mode.setToolTip("Mock 模式：真实设备连接已禁用")
+            model = mode.model()
+            item = model.item(1)
+            if item is not None:
+                item.setEnabled(False)
+                item.setToolTip("Mock 模式：真实设备连接已禁用")
             form.addRow("串口", port_combo)
             form.addRow("", refresh_ports)
             form.addRow("波特率", baud)
@@ -246,11 +254,12 @@ class DeviceCenterView(QWidget):
                 errors = self._config_service.set_motion(device.device_id, config)
                 validation.setText("；".join(errors) if errors else "配置已保存（内存）")
                 if not errors:
+                    self.feedback_requested.emit("DEVICE", f"Mock config applied: {device.display_name}")
                     self.refresh_devices()
 
             apply_button = NFSSecondaryButton("应用配置", panel)
             apply_button.clicked.connect(apply_motion)
-        elif device.kind == "spectrum":
+        elif device.kind in {"spectrum", "vna"}:
             cfg = self._config_service.get_spectrum(device.device_id)
             resource = QLineEdit(cfg.resource, panel)
             ip = QLineEdit(cfg.ip, panel)
@@ -273,6 +282,7 @@ class DeviceCenterView(QWidget):
                 errors = self._config_service.set_spectrum(device.device_id, config)
                 validation.setText("；".join(errors) if errors else "配置已保存（内存）")
                 if not errors:
+                    self.feedback_requested.emit("DEVICE", f"Mock config applied: {device.display_name}")
                     self.refresh_devices()
 
             apply_button = NFSSecondaryButton("应用配置", panel)
@@ -299,6 +309,7 @@ class DeviceCenterView(QWidget):
                 errors = self._config_service.set_camera(device.device_id, config)
                 validation.setText("；".join(errors) if errors else "配置已保存（内存）")
                 if not errors:
+                    self.feedback_requested.emit("DEVICE", f"Mock config applied: {device.display_name}")
                     self.refresh_devices()
 
             apply_button = NFSSecondaryButton("应用配置", panel)
@@ -312,6 +323,15 @@ class DeviceCenterView(QWidget):
     def _populate_serial_ports(self, combo: QComboBox, selected: str) -> None:
         current = selected.strip()
         combo.clear()
+        names = list(dict.fromkeys([current or "COM6", "MOCK://motion", "DRY-RUN://motion"]))
+        for name in names:
+            combo.addItem(name, name)
+        combo.setToolTip("Mock 模式：不枚举真实串口")
+        if current:
+            index = combo.findData(current)
+            if index >= 0:
+                combo.setCurrentIndex(index)
+        return
         ports = list_serial_ports()
         if not ports:
             combo.addItem(current or "")
@@ -343,6 +363,7 @@ class DeviceCenterView(QWidget):
                 self.devices_changed.emit()
                 return
         self._device_service.connect_device(device_id)
+        self.feedback_requested.emit("DEVICE", f"Mock connect requested: {device.display_name}")
         self.refresh_devices()
         self.devices_changed.emit()
 
@@ -358,6 +379,7 @@ class DeviceCenterView(QWidget):
                 self.devices_changed.emit()
                 return
         self._device_service.disconnect_device(device_id)
+        self.feedback_requested.emit("DEVICE", f"Mock disconnect requested: {device.display_name}")
         self.refresh_devices()
         self.devices_changed.emit()
 
@@ -433,10 +455,32 @@ class DeviceCenterView(QWidget):
 
     def _refresh_one(self, device_id: str) -> None:
         self._device_service.refresh_status()
+        device = self._find_device(device_id)
+        name = device.display_name if device is not None else device_id
+        self.feedback_requested.emit("DEVICE", f"Mock status refreshed: {name}")
         self.refresh_devices()
         self.devices_changed.emit()
 
     def _refresh_all(self) -> None:
         self._device_service.refresh_status()
+        self.feedback_requested.emit("DEVICE", "Mock status refreshed: all devices")
         self.refresh_devices()
         self.devices_changed.emit()
+
+    def _reset_one(self, device_id: str) -> None:
+        if isinstance(self._device_service, MockDeviceService):
+            device = self._device_service.reset_device(device_id)
+            self.feedback_requested.emit("DEVICE", f"Mock reset: {device.display_name}")
+        else:
+            self.feedback_requested.emit("DEVICE", f"Mock reset unavailable: {device_id}")
+        self.refresh_devices()
+        self.devices_changed.emit()
+
+    def _show_detail(self, device_id: str) -> None:
+        device = self._find_device(device_id)
+        if device is None:
+            return
+        self.feedback_requested.emit(
+            "DEVICE",
+            f"Mock detail: {device.display_name} | {device.model} | {device.address} | {device.connection_status}",
+        )
