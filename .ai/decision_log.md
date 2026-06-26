@@ -553,3 +553,12 @@ Needs Review: yes/no
 - Impact: unittest + visual + QA PASS；未接真实设备；旧 UI 默认入口不变。
 - Needs Review: no
 
+### 2026-06-26 - Commercial Demo v0.3 Functional Hardening
+
+- Date: 2026-06-26
+- Task: commercial-demo-v0.3-functional-hardening
+- Decision: 新增 `demo_state_sync` 统一 workflow/status bar；移除启动伪造 65% 进度；日志节流与去重；扫描前校验项目+设备；停止不注册 partial task；QA 增加 progress/stop/reset 截图检查。
+- Reason: 用户要求一次性稳定化可验收 Demo，不再交互式修小问题。
+- Impact: visual + QA PASS；Header 未改。
+- Needs Review: no
+

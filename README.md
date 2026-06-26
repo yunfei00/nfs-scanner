@@ -73,12 +73,14 @@ NFS_SCANNER_UI=commercial
 
 ## 当前状态
 
-当前主线已经具备 **商业版 Mock Demo 闭环 v0.2**：
+当前主线已经具备 **商业版 Mock Demo 闭环 v0.3**（功能稳定化）：
 
 ```text
-新建/打开/保存项目 → Mock 设备中心 → 扫描参数与路径预览 → Mock 扫描(开始/暂停/继续/停止/完成)
-→ 实时画布反馈 → Data View 任务与导出 → Report Center 预览与导出 → Reset Demo
+新建/打开/保存 → 连接设备 → 扫描参数 → Mock 扫描(开始/暂停/继续/停止/完成)
+→ 状态/workflow 同步 → Data View → Report 导出 → Reset Demo
 ```
+
+手动验收清单：`.ai/reviews/commercial_demo_v0_3_manual_acceptance.md`
 
 安全边界：
 
