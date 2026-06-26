@@ -76,25 +76,60 @@ class CommercialTopHeader(QFrame):
     def _build_status_area(self, parent: QWidget) -> QWidget:
         status = QWidget(parent)
         status.setObjectName("commercialTopStatusArea")
+        status.setStyleSheet("QWidget#commercialTopStatusArea { background-color: transparent; }")
         layout = QHBoxLayout(status)
         layout.setContentsMargins(0, 0, 4, 0)
         layout.setSpacing(6)
 
         auth_chip = QWidget(status)
         auth_chip.setObjectName("commercialTitleBarAuthChip")
+        auth_chip.setStyleSheet(
+            "QWidget#commercialTitleBarAuthChip {"
+            "background-color: rgba(34, 197, 94, 0.11);"
+            "border: 1px solid rgba(34, 197, 94, 0.38);"
+            "border-radius: 8px;"
+            "}"
+        )
         auth_layout = QHBoxLayout(auth_chip)
         auth_layout.setContentsMargins(8, 2, 8, 2)
         auth_layout.setSpacing(5)
         auth_dot = QLabel("●", auth_chip)
         auth_dot.setObjectName("commercialTitleBarAuthDot")
+        auth_dot.setStyleSheet(
+            "QLabel#commercialTitleBarAuthDot {"
+            "background-color: transparent;"
+            "color: #22C55E;"
+            "font-size: 10px;"
+            "}"
+        )
         auth_label = QLabel("授权: Mock 有效", auth_chip)
         auth_label.setObjectName("commercialTitleBarAuthLabel")
+        auth_label.setStyleSheet(
+            "QLabel#commercialTitleBarAuthLabel {"
+            "background-color: transparent;"
+            "color: #BFF7D0;"
+            "font-size: 11px;"
+            "font-weight: 600;"
+            "}"
+        )
         auth_layout.addWidget(auth_dot)
         auth_layout.addWidget(auth_label)
 
         safety_chip = QLabel("DRY RUN", status)
         safety_chip.setObjectName("commercialTitleBarSafetyChip")
         safety_chip.setToolTip("No Hardware Control · Real Device Disabled")
+        safety_chip.setStyleSheet(
+            "QLabel#commercialTitleBarSafetyChip {"
+            "background-color: rgba(6, 214, 232, 0.11);"
+            "border: 1px solid rgba(6, 214, 232, 0.36);"
+            "border-radius: 8px;"
+            "color: #06D6E8;"
+            "font-size: 10px;"
+            "font-weight: 800;"
+            "padding: 3px 8px;"
+            "letter-spacing: 1px;"
+            "}"
+        )
 
         user_icon = QLabel(status)
         user_icon.setObjectName("commercialTitleBarUserIcon")
@@ -105,8 +140,23 @@ class CommercialTopHeader(QFrame):
         )
         user_label = QLabel("Admin", status)
         user_label.setObjectName("commercialTitleBarUser")
+        user_label.setStyleSheet(
+            "QLabel#commercialTitleBarUser {"
+            "background-color: transparent;"
+            "color: #D8E3F3;"
+            "font-size: 11px;"
+            "font-weight: 600;"
+            "}"
+        )
         chevron = QLabel("▾", status)
         chevron.setObjectName("commercialTitleBarUserChevron")
+        chevron.setStyleSheet(
+            "QLabel#commercialTitleBarUserChevron {"
+            "background-color: transparent;"
+            "color: #8FA0B8;"
+            "font-size: 11px;"
+            "}"
+        )
 
         layout.addWidget(auth_chip)
         layout.addWidget(safety_chip)
