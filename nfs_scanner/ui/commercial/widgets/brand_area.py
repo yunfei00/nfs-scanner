@@ -11,7 +11,7 @@ from nfs_scanner.version import APP_VERSION
 class CommercialBrandArea(QWidget):
     """Logo square + hierarchical product title block matching the target header."""
 
-    BRAND_WIDTH = 210
+    BRAND_WIDTH = 248
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -25,14 +25,15 @@ class CommercialBrandArea(QWidget):
 
     def _setup_ui(self) -> None:
         root = QHBoxLayout(self)
-        root.setContentsMargins(0, 0, 8, 0)
-        root.setSpacing(8)
+        root.setContentsMargins(0, 0, 10, 0)
+        root.setSpacing(10)
 
         self._logo_block = QFrame(self)
         self._logo_block.setObjectName("commercialTitleBarLogo")
-        self._logo_block.setFixedSize(42, 42)
+        self._logo_block.setFixedSize(44, 44)
         logo_layout = QVBoxLayout(self._logo_block)
         logo_layout.setContentsMargins(0, 0, 0, 0)
+        logo_layout.setSpacing(0)
         logo_text = QLabel("NFS", self._logo_block)
         logo_text.setObjectName("commercialTitleBarLogoText")
         logo_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -41,30 +42,31 @@ class CommercialBrandArea(QWidget):
         text_column = QWidget(self)
         text_column.setObjectName("commercialBrandTextColumn")
         text_layout = QVBoxLayout(text_column)
-        text_layout.setContentsMargins(0, 2, 0, 2)
-        text_layout.setSpacing(2)
+        text_layout.setContentsMargins(0, 1, 0, 1)
+        text_layout.setSpacing(1)
 
-        self._title_label = QLabel("近场扫描系统", text_column)
+        title_row = QWidget(text_column)
+        title_row.setObjectName("commercialBrandTitleRow")
+        title_layout = QHBoxLayout(title_row)
+        title_layout.setContentsMargins(0, 0, 0, 0)
+        title_layout.setSpacing(8)
+
+        self._title_label = QLabel("近场扫描系统", title_row)
         self._title_label.setObjectName("commercialTitleBarTitle")
 
-        subtitle_row = QWidget(text_column)
-        subtitle_layout = QHBoxLayout(subtitle_row)
-        subtitle_layout.setContentsMargins(0, 0, 0, 0)
-        subtitle_layout.setSpacing(6)
-
-        self._subtitle_label = QLabel("Near Field Scanner", subtitle_row)
-        self._subtitle_label.setObjectName("commercialTitleBarSubtitle")
-
-        self._version_badge = QLabel(f"v{APP_VERSION}", subtitle_row)
+        self._version_badge = QLabel(f"v{APP_VERSION}", title_row)
         self._version_badge.setObjectName("commercialTitleBarBadge")
         self._version_badge.setToolTip("Mock · Dry Run · 无硬件控制")
 
-        subtitle_layout.addWidget(self._subtitle_label, 0)
-        subtitle_layout.addWidget(self._version_badge, 0)
-        subtitle_layout.addStretch(1)
+        title_layout.addWidget(self._title_label, 0, Qt.AlignmentFlag.AlignVCenter)
+        title_layout.addWidget(self._version_badge, 0, Qt.AlignmentFlag.AlignVCenter)
+        title_layout.addStretch(1)
 
-        text_layout.addWidget(self._title_label)
-        text_layout.addWidget(subtitle_row)
+        self._subtitle_label = QLabel("Near Field Scanner · Commercial Demo", text_column)
+        self._subtitle_label.setObjectName("commercialTitleBarSubtitle")
+
+        text_layout.addWidget(title_row)
+        text_layout.addWidget(self._subtitle_label)
 
         root.addWidget(self._logo_block, 0, Qt.AlignmentFlag.AlignVCenter)
         root.addWidget(text_column, 1, Qt.AlignmentFlag.AlignVCenter)
