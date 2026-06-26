@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget
 
 from .nfs_buttons import NFSToolButton
 
@@ -25,6 +25,7 @@ class NFSCollapsiblePanel(QFrame):
         self.setObjectName("nfsCollapsiblePanel")
         self._expanded = expanded
         self._body_widget = body_widget
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
         self._setup_ui(title)
         self.set_expanded(expanded)
 
@@ -51,4 +52,19 @@ class NFSCollapsiblePanel(QFrame):
         self._expanded = expanded
         self._body_widget.setVisible(expanded)
         self.toggle_button.setText("▾" if expanded else "▸")
+        layout = self.layout()
+        if layout is not None:
+            layout.invalidate()
+            layout.activate()
+        self.adjustSize()
+        self.updateGeometry()
+        parent = self.parentWidget()
+        if parent is not None:
+            parent.adjustSize()
+            parent.updateGeometry()
         self.toggled.emit(expanded)
+
+    def is_expanded(self) -> bool:
+        """Return whether the panel body is currently visible."""
+
+        return self._expanded

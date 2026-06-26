@@ -1,6 +1,6 @@
 # Commercial UI Visual Report
 
-- Generated: 2026-06-26 16:06:22
+- Generated: 2026-06-26 16:29:57
 - Default screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_default.png`
 - Top header screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_top_header.png`
 - Maximized screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_maximized.png`
@@ -21,11 +21,12 @@
 | right_panel_width | 340–380 px | 350px | PASS |
 | left_panel_width | 220–280 px | 230px | PASS |
 | workflow_panel_height | <= 360 px | 257px | PASS |
-| device_status_panel_height | >= 220 px on default desktop layout | 341px | PASS |
+| device_status_panel_height | expanded height 180-320 px | 300px | PASS |
+| device_status_collapsed_height | collapsed height <= 100 px | 47px | PASS |
 | property_tab_bar_fixed | tab bar visible after content scroll | True | PASS |
 | numeric_field_line_edit_width | >= 48 px | 52px | PASS |
 | numeric_field_total_width | >= 88 px | 88px | PASS |
-| scan_action_buttons_layout | start/pause/stop present with no overlap | count=3, overlap=False | PASS |
+| scan_action_buttons_layout | start/pause/stop present with no overlap or clipping | count=3, overlap=False, clipped=False | PASS |
 | realtime_toolbar_button_text | no "..." labels and width >= 44 px | min_width=52px, ellipsis=False | PASS |
 | center_canvas_priority | canvas >= 1.6x right, >= 2.0x left, area >= 50% | right=1.76x, left=2.68x, area=81% | PASS |
 | workspace_wider_than_right_panel | workspace > right panel | 676px > 350px | PASS |
@@ -104,11 +105,12 @@
 | right_panel_width | 340–380 px | 350px | PASS |
 | left_panel_width | 220–280 px | 230px | PASS |
 | workflow_panel_height | <= 360 px | 257px | PASS |
-| device_status_panel_height | >= 220 px on default desktop layout | 341px | PASS |
+| device_status_panel_height | expanded height 180-320 px | 300px | PASS |
+| device_status_collapsed_height | collapsed height <= 100 px | 47px | PASS |
 | property_tab_bar_fixed | tab bar visible after content scroll | True | PASS |
 | numeric_field_line_edit_width | >= 48 px | 52px | PASS |
 | numeric_field_total_width | >= 88 px | 88px | PASS |
-| scan_action_buttons_layout | start/pause/stop present with no overlap | count=3, overlap=False | PASS |
+| scan_action_buttons_layout | start/pause/stop present with no overlap or clipping | count=3, overlap=False, clipped=False | PASS |
 | realtime_toolbar_button_text | no "..." labels and width >= 44 px | min_width=52px, ellipsis=False | PASS |
 | center_canvas_priority | canvas >= 1.6x right, >= 2.0x left, area >= 50% | right=1.76x, left=2.68x, area=81% | PASS |
 | workspace_wider_than_right_panel | workspace > right panel | 676px > 350px | PASS |

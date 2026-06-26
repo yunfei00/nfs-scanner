@@ -104,7 +104,7 @@ class CommercialWorkflowPanel(QWidget):
         super().__init__(parent)
         self.setObjectName("commercialWorkflowPanel")
         self.setProperty("targetStyleMode", "true")
-        self.setMaximumHeight(340)
+        self.setMaximumHeight(330)
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
         self._step_states: list[StepState] = ["pending"] * len(WORKFLOW_STEPS)
         self._step_states[0] = "active"

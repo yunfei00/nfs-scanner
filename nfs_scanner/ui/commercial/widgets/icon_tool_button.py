@@ -8,14 +8,9 @@ from PySide6.QtWidgets import QToolButton, QWidget
 
 
 def _toolbar_caption_lines(caption: str) -> str:
-    """Split a short Chinese caption into two lines for compact toolbar buttons."""
+    """Return the full one-line toolbar caption."""
 
-    if "\n" in caption or len(caption) <= 2:
-        return caption
-    if len(caption) in (3, 4):
-        return f"{caption[:2]}\n{caption[2:]}"
-    midpoint = len(caption) // 2
-    return f"{caption[:midpoint]}\n{caption[midpoint:]}"
+    return caption.replace("\n", "")
 
 
 class NFSIconToolButton(QToolButton):
@@ -48,15 +43,15 @@ class NFSIconToolButton(QToolButton):
             self.setIcon(icon)
             self.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
         else:
-            self.setText(f"{icon}\n{caption}")
+            self.setText(f"{icon} {caption}")
             self.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
         if isinstance(icon, QIcon):
             self.setText(_toolbar_caption_lines(caption))
         self.setToolTip(tooltip or caption)
         self.setAutoRaise(True)
-        self.setIconSize(QSize(20, 20))
+        self.setIconSize(QSize(16, 16))
         font = self.font()
-        font.setPixelSize(11)
+        font.setPixelSize(10)
         self.setFont(font)
-        self.setFixedSize(68, 52)
+        self.setFixedSize(68, 48)
         self.clicked.connect(self.clicked_action.emit)

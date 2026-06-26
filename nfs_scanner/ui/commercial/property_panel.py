@@ -49,7 +49,7 @@ class CommercialPropertyPanel(QScrollArea):
     scan_pause_toggle_requested = Signal()
 
     _DEBOUNCE_MS = 250
-    _COMPACT_FIELD_WIDTH = 104
+    _COMPACT_FIELD_WIDTH = 92
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -69,6 +69,7 @@ class CommercialPropertyPanel(QScrollArea):
         self._start_scan_button: NFSPrimaryButton | None = None
         self._stop_scan_button: NFSDangerButton | None = None
         self._pause_scan_button: NFSSecondaryButton | None = None
+        self._action_button_row: QWidget | None = None
         self._target_presentation_active = False
         self._tabs: QTabWidget | None = None
         self._setup_ui()
@@ -107,7 +108,7 @@ class CommercialPropertyPanel(QScrollArea):
     def _build_scan_tab(self, parent: QWidget) -> QWidget:
         page = QWidget(parent)
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setContentsMargins(8, 8, 16, 8)
         layout.setSpacing(8)
 
         layout.addWidget(self._build_region_section(page))
@@ -323,9 +324,11 @@ class CommercialPropertyPanel(QScrollArea):
 
     def _build_action_buttons(self, parent: QWidget) -> QWidget:
         row = QWidget(parent)
+        row.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self._action_button_row = row
         layout = QHBoxLayout(row)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(6)
+        layout.setSpacing(8)
         self._start_scan_button = NFSPrimaryButton("开始扫描", row)
         self._stop_scan_button = NFSDangerButton("停止扫描", row)
         self._start_scan_button.clicked.connect(self.scan_start_requested.emit)
@@ -334,7 +337,7 @@ class CommercialPropertyPanel(QScrollArea):
         self._pause_scan_button.clicked.connect(self.scan_pause_toggle_requested.emit)
         self._pause_scan_button.setVisible(False)
         for button in (self._start_scan_button, self._pause_scan_button, self._stop_scan_button):
-            button.setMinimumWidth(70)
+            button.setMinimumWidth(72)
             button.setMinimumHeight(32)
         layout.addWidget(self._start_scan_button, 1)
         layout.addWidget(self._pause_scan_button, 1)
@@ -344,7 +347,7 @@ class CommercialPropertyPanel(QScrollArea):
     def _build_display_tab(self, parent: QWidget) -> QWidget:
         page = QWidget(parent)
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setContentsMargins(8, 8, 16, 8)
         frame, frame_layout = self._section_frame(page, "显示设置")
         heatmap_checkbox = QCheckBox("显示热力图", frame)
         heatmap_checkbox.setChecked(True)
@@ -359,7 +362,7 @@ class CommercialPropertyPanel(QScrollArea):
     def _build_instrument_tab(self, parent: QWidget) -> QWidget:
         page = QWidget(parent)
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setContentsMargins(8, 8, 16, 8)
         frame, frame_layout = self._section_frame(page, "仪表设置")
         device_combo = QComboBox(frame)
         device_combo.addItems(["TCPIP-SCPI", "USB-TMC", "Mock-Spectrum"])
@@ -505,6 +508,23 @@ class CommercialPropertyPanel(QScrollArea):
         self._pause_scan_button.setVisible(visible)
         self._pause_scan_button.setText("继续" if paused else "暂停")
         self._pause_scan_button.setEnabled(enabled)
+        self._refresh_action_button_layout()
+
+    def _refresh_action_button_layout(self) -> None:
+        """Recalculate scan action button geometry after visibility changes."""
+
+        if self._action_button_row is None:
+            return
+        layout = self._action_button_row.layout()
+        if layout is not None:
+            layout.invalidate()
+            layout.activate()
+        self._action_button_row.adjustSize()
+        self._action_button_row.updateGeometry()
+        parent = self._action_button_row.parentWidget()
+        if parent is not None:
+            parent.updateGeometry()
+        self.updateGeometry()
 
     def apply_target_demo_values(self) -> None:
         """Load scan fields matching the reference target screenshot."""
@@ -532,4 +552,12 @@ class CommercialPropertyPanel(QScrollArea):
     def has_horizontal_clipping(self) -> bool:
         """Return True when horizontal clipping or scroll is required."""
 
+        if self._tabs is None:
+            return self.horizontalScrollBar().isVisible()
+        current = self._tabs.currentWidget()
+        if isinstance(current, QScrollArea):
+            content = current.widget()
+            if content is not None and content.minimumSizeHint().width() > current.viewport().width():
+                return True
+            return current.horizontalScrollBar().isVisible()
         return self.horizontalScrollBar().isVisible()

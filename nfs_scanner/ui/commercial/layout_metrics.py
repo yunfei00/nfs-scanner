@@ -44,11 +44,13 @@ class CommercialLayoutMetrics:
     is_maximized: bool = False
     workflow_panel_height: int = 0
     device_status_panel_height: int = 0
+    device_status_collapsed_height: int = 0
     property_tab_bar_visible_after_scroll: bool = False
     numeric_field_line_edit_min_width: int = 0
     numeric_field_total_min_width: int = 0
     action_buttons_count: int = 0
     action_buttons_overlap: bool = False
+    action_buttons_clipped: bool = False
     realtime_toolbar_min_button_width: int = 0
     realtime_toolbar_has_ellipsis: bool = False
     scroll_usability: dict = field(default_factory=dict)
@@ -74,7 +76,7 @@ def collect_layout_metrics(shell: QMainWindow) -> CommercialLayoutMetrics:
     from PySide6.QtWidgets import QScrollArea, QTabWidget, QToolButton
 
     from nfs_scanner.ui.commercial.main_shell import CommercialMainShell
-    from nfs_scanner.ui.commercial.widgets import NFSNumericField
+    from nfs_scanner.ui.commercial.widgets import NFSCollapsiblePanel, NFSNumericField
 
     if not isinstance(shell, CommercialMainShell):
         raise TypeError("Expected CommercialMainShell instance")
@@ -113,6 +115,18 @@ def collect_layout_metrics(shell: QMainWindow) -> CommercialLayoutMetrics:
     device_area = shell.findChild(QScrollArea, "commercialDeviceScroll")
     if device_area is not None:
         metrics.device_status_panel_height = device_area.height()
+        device_panel = shell.device_status_panel.findChild(NFSCollapsiblePanel)
+        if device_panel is not None:
+            was_expanded = device_panel.is_expanded()
+            device_panel.set_expanded(False)
+            if hasattr(shell, "_sync_device_status_scroll_height"):
+                shell._sync_device_status_scroll_height()
+            QApplication.processEvents()
+            metrics.device_status_collapsed_height = device_area.height()
+            device_panel.set_expanded(was_expanded)
+            if hasattr(shell, "_sync_device_status_scroll_height"):
+                shell._sync_device_status_scroll_height()
+            QApplication.processEvents()
 
     property_tabs = shell.property_panel.findChild(QTabWidget, "commercialPropertyTabs")
     if property_tabs is not None:
@@ -148,6 +162,7 @@ def collect_layout_metrics(shell: QMainWindow) -> CommercialLayoutMetrics:
     pause_button = shell.property_panel._pause_scan_button
     previous_pause_visible = pause_button.isVisible() if pause_button is not None else False
     previous_pause_text = pause_button.text() if pause_button is not None else ""
+    previous_pause_enabled = pause_button.isEnabled() if pause_button is not None else True
     if pause_button is not None:
         shell.property_panel.set_pause_button_state(visible=True, paused=False)
         QApplication.processEvents()
@@ -157,9 +172,21 @@ def collect_layout_metrics(shell: QMainWindow) -> CommercialLayoutMetrics:
         for index, left in enumerate(visible_action_buttons)
         for right in visible_action_buttons[index + 1 :]
     )
+    action_row = getattr(shell.property_panel, "_action_button_row", None)
+    if action_row is not None:
+        metrics.action_buttons_clipped = any(
+            button.geometry().left() < 0
+            or button.geometry().right() > action_row.contentsRect().right()
+            or button.geometry().top() < 0
+            or button.geometry().bottom() > action_row.contentsRect().bottom()
+            for button in visible_action_buttons
+        )
     if pause_button is not None:
         pause_button.setVisible(previous_pause_visible)
         pause_button.setText(previous_pause_text)
+        pause_button.setEnabled(previous_pause_enabled)
+        if hasattr(shell.property_panel, "_refresh_action_button_layout"):
+            shell.property_panel._refresh_action_button_layout()
         QApplication.processEvents()
 
     realtime_buttons = shell.workspace.realtime_view().findChildren(QToolButton, "realtimeCanvasToolButton")
@@ -284,13 +311,15 @@ def _build_checks(metrics: CommercialLayoutMetrics) -> list[LayoutMetricCheck]:
         ),
         LayoutMetricCheck(
             name="device_status_panel_height",
-            expected=">= 220 px on default desktop layout",
+            expected="expanded height 180-320 px",
             actual=f"{metrics.device_status_panel_height}px",
-            passed=(
-                metrics.device_status_panel_height >= 220
-                if metrics.window_width >= 1500 and metrics.window_height >= 850
-                else metrics.device_status_panel_height >= 180
-            ),
+            passed=180 <= metrics.device_status_panel_height <= 320,
+        ),
+        LayoutMetricCheck(
+            name="device_status_collapsed_height",
+            expected="collapsed height <= 100 px",
+            actual=f"{metrics.device_status_collapsed_height}px",
+            passed=0 < metrics.device_status_collapsed_height <= 100,
         ),
         LayoutMetricCheck(
             name="property_tab_bar_fixed",
@@ -312,9 +341,17 @@ def _build_checks(metrics: CommercialLayoutMetrics) -> list[LayoutMetricCheck]:
         ),
         LayoutMetricCheck(
             name="scan_action_buttons_layout",
-            expected="start/pause/stop present with no overlap",
-            actual=f"count={metrics.action_buttons_count}, overlap={metrics.action_buttons_overlap}",
-            passed=metrics.action_buttons_count == 3 and not metrics.action_buttons_overlap,
+            expected="start/pause/stop present with no overlap or clipping",
+            actual=(
+                f"count={metrics.action_buttons_count}, "
+                f"overlap={metrics.action_buttons_overlap}, "
+                f"clipped={metrics.action_buttons_clipped}"
+            ),
+            passed=(
+                metrics.action_buttons_count == 3
+                and not metrics.action_buttons_overlap
+                and not metrics.action_buttons_clipped
+            ),
         ),
         LayoutMetricCheck(
             name="realtime_toolbar_button_text",

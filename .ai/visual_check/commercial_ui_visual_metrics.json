@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-26T16:06:22",
+  "generated_at": "2026-06-26T16:29:57",
   "default": {
     "uses_custom_title_bar": true,
     "title_bar_height": 56,
@@ -23,12 +23,14 @@
     "screen_available_height": 720,
     "is_maximized": false,
     "workflow_panel_height": 257,
-    "device_status_panel_height": 341,
+    "device_status_panel_height": 300,
+    "device_status_collapsed_height": 47,
     "property_tab_bar_visible_after_scroll": true,
     "numeric_field_line_edit_min_width": 52,
     "numeric_field_total_min_width": 88,
     "action_buttons_count": 3,
     "action_buttons_overlap": false,
+    "action_buttons_clipped": false,
     "realtime_toolbar_min_button_width": 52,
     "realtime_toolbar_has_ellipsis": false,
     "scroll_usability": {
@@ -176,8 +178,14 @@
       },
       {
         "name": "device_status_panel_height",
-        "expected": ">= 220 px on default desktop layout",
-        "actual": "341px",
+        "expected": "expanded height 180-320 px",
+        "actual": "300px",
+        "passed": true
+      },
+      {
+        "name": "device_status_collapsed_height",
+        "expected": "collapsed height <= 100 px",
+        "actual": "47px",
         "passed": true
       },
       {
@@ -200,8 +208,8 @@
       },
       {
         "name": "scan_action_buttons_layout",
-        "expected": "start/pause/stop present with no overlap",
-        "actual": "count=3, overlap=False",
+        "expected": "start/pause/stop present with no overlap or clipping",
+        "actual": "count=3, overlap=False, clipped=False",
         "passed": true
       },
       {
@@ -518,12 +526,14 @@
     "screen_available_height": 720,
     "is_maximized": true,
     "workflow_panel_height": 257,
-    "device_status_panel_height": 341,
+    "device_status_panel_height": 300,
+    "device_status_collapsed_height": 47,
     "property_tab_bar_visible_after_scroll": true,
     "numeric_field_line_edit_min_width": 52,
     "numeric_field_total_min_width": 88,
     "action_buttons_count": 3,
     "action_buttons_overlap": false,
+    "action_buttons_clipped": false,
     "realtime_toolbar_min_button_width": 52,
     "realtime_toolbar_has_ellipsis": false,
     "scroll_usability": {
@@ -671,8 +681,14 @@
       },
       {
         "name": "device_status_panel_height",
-        "expected": ">= 220 px on default desktop layout",
-        "actual": "341px",
+        "expected": "expanded height 180-320 px",
+        "actual": "300px",
+        "passed": true
+      },
+      {
+        "name": "device_status_collapsed_height",
+        "expected": "collapsed height <= 100 px",
+        "actual": "47px",
         "passed": true
       },
       {
@@ -695,8 +711,8 @@
       },
       {
         "name": "scan_action_buttons_layout",
-        "expected": "start/pause/stop present with no overlap",
-        "actual": "count=3, overlap=False",
+        "expected": "start/pause/stop present with no overlap or clipping",
+        "actual": "count=3, overlap=False, clipped=False",
         "passed": true
       },
       {

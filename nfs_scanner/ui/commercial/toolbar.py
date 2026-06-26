@@ -9,7 +9,7 @@ from .widgets.icon_tool_button import NFSIconToolButton
 
 _COMPACT_WIDTH_THRESHOLD = 1120
 _TOOL_BUTTON_WIDTH = 68
-_TOOLBAR_CHROME_WIDTH = 96
+_TOOLBAR_CHROME_WIDTH = 64
 
 
 class CommercialToolbar(QWidget):
@@ -32,8 +32,8 @@ class CommercialToolbar(QWidget):
         super().__init__(parent)
         self.setObjectName("commercialToolbar")
         self.setProperty("targetStyleMode", "true")
-        self.setMinimumHeight(52)
-        self.setMaximumHeight(52)
+        self.setMinimumHeight(48)
+        self.setMaximumHeight(48)
         self._tool_buttons: list[NFSIconToolButton] = []
         self._overflow_candidates: list[NFSIconToolButton] = []
         self._start_scan_button: NFSIconToolButton | None = None
@@ -75,13 +75,13 @@ class CommercialToolbar(QWidget):
 
         for index, (caption, icon, slot, options) in enumerate(items):
             if index == 3:
-                root.addSpacing(12)
+                root.addSpacing(8)
                 root.addWidget(self._separator())
-                root.addSpacing(12)
+                root.addSpacing(8)
             if index == 6:
-                root.addSpacing(12)
+                root.addSpacing(8)
                 root.addWidget(self._separator())
-                root.addSpacing(12)
+                root.addSpacing(8)
             button = self._make_button(icon, caption, slot, **options)
             if index in (6, 7, 8, 11, 12):
                 self._overflow_candidates.append(button)
@@ -180,7 +180,9 @@ class CommercialToolbar(QWidget):
     def _measure_overflow(self, window_width: int) -> bool:
         visible_count = sum(1 for button in self._tool_buttons if button.isVisible())
         required = visible_count * _TOOL_BUTTON_WIDTH + _TOOLBAR_CHROME_WIDTH
-        available = max(window_width - 520, 400)
+        available = self.contentsRect().width()
+        if available <= 32:
+            available = max(window_width - 520, 400)
         return required > available
 
     def set_scan_controls_enabled(

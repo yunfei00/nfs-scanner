@@ -71,6 +71,7 @@ class CommercialMainShell(QMainWindow):
         self.bottom_dock = CommercialBottomDock(self)
         self.status_bar_widget = CommercialStatusBar(self)
         self.left_scroll_area: QScrollArea | None = None
+        self._device_scroll_area: QScrollArea | None = None
         self.mock_scan = MockScanController(self._services.runtime, self)
         self._last_dry_run_point = 0
         self._body_splitter: QSplitter | None = None
@@ -456,9 +457,14 @@ class CommercialMainShell(QMainWindow):
         device_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         device_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         device_scroll.setWidget(self.device_status_panel)
-        device_scroll.setMinimumHeight(220)
-        device_scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        left_layout.addWidget(device_scroll, 1)
+        device_scroll.setMinimumHeight(0)
+        device_scroll.setMaximumHeight(300)
+        device_scroll.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+        self._device_scroll_area = device_scroll
+        self.device_status_panel.content_height_changed.connect(self._sync_device_status_scroll_height)
+        left_layout.addWidget(device_scroll, 0)
+        left_layout.addStretch(1)
+        QTimer.singleShot(0, self._sync_device_status_scroll_height)
 
         scroll_area = QScrollArea(self)
         scroll_area.setObjectName("commercialLeftScroll")
@@ -471,6 +477,28 @@ class CommercialMainShell(QMainWindow):
         scroll_area.setWidget(left_container)
         self.left_scroll_area = scroll_area
         return scroll_area
+
+    def _sync_device_status_scroll_height(self) -> None:
+        """Keep the left device status area compact as its cards expand/collapse."""
+
+        if self._device_scroll_area is None:
+            return
+        content_hint = self.device_status_panel.sizeHint().height()
+        if self.device_status_panel.is_collapsed():
+            target_height = max(44, min(100, content_hint + 2))
+            self._device_scroll_area.setMinimumHeight(0)
+        else:
+            target_height = max(260, min(300, content_hint + 2))
+            self._device_scroll_area.setMinimumHeight(target_height)
+        self._device_scroll_area.setMaximumHeight(target_height)
+        self._device_scroll_area.updateGeometry()
+        parent = self._device_scroll_area.parentWidget()
+        if parent is not None:
+            layout = parent.layout()
+            if layout is not None:
+                layout.invalidate()
+                layout.activate()
+            parent.updateGeometry()
 
     def _build_center_column(self) -> QSplitter:
         center_splitter = QSplitter(Qt.Orientation.Vertical, self)
