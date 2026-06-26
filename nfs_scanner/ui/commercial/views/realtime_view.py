@@ -30,6 +30,8 @@ from ..widgets import NFSSecondaryButton
 
 _REGION_CHANGE_AREA_RATIO = 0.35
 _REGION_CHANGE_CENTER_RATIO = 0.35
+_CANVAS_TOOL_BUTTON_WIDTH = 44
+_CANVAS_TOOL_BUTTON_HEIGHT = 24
 
 
 class RealtimeView(QWidget):
@@ -81,16 +83,18 @@ class RealtimeView(QWidget):
         for tip, enabled in canvas_tools:
             button = QToolButton(toolbar)
             button.setObjectName("realtimeCanvasToolButton")
-            button.setText(tip[:2] if len(tip) > 2 else tip)
+            button.setText(tip)
             button.setToolTip(f"{tip}（Mock）")
             button.setEnabled(enabled)
-            button.setFixedSize(26, 22)
+            button.setFixedSize(_CANVAS_TOOL_BUTTON_WIDTH, _CANVAS_TOOL_BUTTON_HEIGHT)
             toolbar_layout.addWidget(button)
 
         toolbar_layout.addWidget(self._separator(toolbar))
 
         fit_button = NFSSecondaryButton("适应", toolbar)
         reset_button = NFSSecondaryButton("重置", toolbar)
+        fit_button.setMinimumWidth(48)
+        reset_button.setMinimumWidth(48)
         fit_button.clicked.connect(self.canvas.fit_view)
         reset_button.clicked.connect(self.canvas.reset_view)
         toolbar_layout.addWidget(fit_button)
