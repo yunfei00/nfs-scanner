@@ -562,3 +562,12 @@ Needs Review: yes/no
 - Impact: visual + QA PASS；Header 未改。
 - Needs Review: no
 
+### 2026-06-26 - Commercial Demo v0.4 Acceptance Blocking Fix
+
+- Date: 2026-06-26
+- Task: commercial-demo-v0.4-acceptance-blocking-fix
+- Decision: 引入 `DemoState` 单一状态源；修复 idle+has_tasks 误激活 workflow 第 7 步；Reset 清空 current_task/report_exported；历史任务不污染当前 workflow；QA 新增 reset/stop/log/button acceptance 检查。
+- Reason: 用户验收截图显示状态栏与 workflow 矛盾，QA 未能卡住。
+- Impact: 151 tests + QA PASS；未接真实设备。
+- Needs Review: no
+
