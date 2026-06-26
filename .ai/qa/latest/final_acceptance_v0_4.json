@@ -1,0 +1,114 @@
+{
+  "all_passed": true,
+  "steps": [
+    {
+      "step": 1,
+      "name": "启动商业 UI",
+      "passed": true,
+      "detail": "visible=True, custom_title=True"
+    },
+    {
+      "step": 2,
+      "name": "新建项目",
+      "passed": true,
+      "detail": "项目: Demo Near Field Scan (未保存)"
+    },
+    {
+      "step": 3,
+      "name": "保存项目",
+      "passed": true,
+      "detail": "项目: Demo Near Field Scan (已保存)"
+    },
+    {
+      "step": 4,
+      "name": "打开 Demo 项目",
+      "passed": true,
+      "detail": "项目: Demo Near Field Scan (未保存)"
+    },
+    {
+      "step": 5,
+      "name": "连接 Mock 设备",
+      "passed": true,
+      "detail": "相机, 运动平台, 频谱仪, VNA / Trace Source"
+    },
+    {
+      "step": 6,
+      "name": "设备中心状态同步",
+      "passed": true,
+      "detail": "connected=['camera', 'motion', 'spectrum', 'vna']"
+    },
+    {
+      "step": 7,
+      "name": "回到实时视图",
+      "passed": true,
+      "detail": "tab=0"
+    },
+    {
+      "step": 8,
+      "name": "修改扫描参数同步",
+      "passed": true,
+      "detail": "before=91 x 71 = 6,461, after=3 x 3 = 9"
+    },
+    {
+      "step": 9,
+      "name": "开始扫描",
+      "passed": true,
+      "detail": "running"
+    },
+    {
+      "step": 10,
+      "name": "进度 > 5%",
+      "passed": true,
+      "detail": "11%"
+    },
+    {
+      "step": 11,
+      "name": "暂停扫描",
+      "passed": true,
+      "detail": "paused"
+    },
+    {
+      "step": 12,
+      "name": "继续扫描",
+      "passed": true,
+      "detail": "running"
+    },
+    {
+      "step": 13,
+      "name": "停止扫描无 completed task",
+      "passed": true,
+      "detail": "tasks 2->2, status=stopped"
+    },
+    {
+      "step": 14,
+      "name": "再次扫描至完成",
+      "passed": true,
+      "detail": "completed"
+    },
+    {
+      "step": 15,
+      "name": "Data View 任务与结果",
+      "passed": true,
+      "detail": "tasks=3"
+    },
+    {
+      "step": 16,
+      "name": "Report Center 预览与导出",
+      "passed": true,
+      "detail": "preview=Demo Near Field Scan, export=C:\\Users\\yunfei\\.nfs_scanner\\reports\\report_mock-1846f762_20260626_233656.md"
+    },
+    {
+      "step": 17,
+      "name": "Reset Demo 状态一致",
+      "passed": true,
+      "detail": "step7=pending, active=1, task=任务: 未开始, progress=0%, report_polluted=False"
+    }
+  ],
+  "export_paths": {
+    "mock_data": "C:\\Users\\yunfei\\.nfs_scanner\\mock_exports\\data\\mock_data_mock-1846f762_20260626_233656.json",
+    "data_view_screenshot": "D:\\code_2026\\nfs-scanner\\.ai\\qa\\latest\\screenshots\\data_view_final.png",
+    "mock_report": "C:\\Users\\yunfei\\.nfs_scanner\\reports\\report_mock-1846f762_20260626_233656.md",
+    "report_center_screenshot": "D:\\code_2026\\nfs-scanner\\.ai\\qa\\latest\\screenshots\\report_center_final.png",
+    "reset_demo_screenshot": "D:\\code_2026\\nfs-scanner\\.ai\\qa\\latest\\screenshots\\reset_demo_final.png"
+  }
+}
