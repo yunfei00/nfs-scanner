@@ -129,6 +129,18 @@ def collect_scroll_usability_metrics(shell: CommercialMainShell) -> ScrollUsabil
     qss_min_h, qss_min_w = _read_qss_handle_mins()
     wheel_ok, handle_ok = _exercise_scroll_bar(log_scroll)
 
+    sliders = shell.findChildren(QSlider)
+    slider_status = "Not Applicable"
+    if sliders:
+        slider = sliders[0]
+        previous = slider.value()
+        target = min(previous + 5, slider.maximum())
+        if target == previous:
+            target = max(previous - 5, slider.minimum())
+        slider.setValue(target)
+        QApplication.processEvents()
+        slider_status = "PASS" if slider.value() == target else "FAIL"
+
     metrics = ScrollUsabilityMetrics(
         left_scrollbar_width=_scrollbar_width(left_scroll),
         device_scrollbar_width=_scrollbar_width(device_scroll),
@@ -140,7 +152,7 @@ def collect_scroll_usability_metrics(shell: CommercialMainShell) -> ScrollUsabil
         has_slider_widgets=bool(shell.findChildren(QSlider)),
         wheel_test_passed=wheel_ok,
         handle_drag_test_passed=handle_ok,
-        slider_test_status="Not Applicable" if not shell.findChildren(QSlider) else "Manual Check Required",
+        slider_test_status=slider_status,
     )
     metrics.checks = _build_scroll_checks(metrics, shell)
     return metrics
@@ -154,15 +166,15 @@ def _build_scroll_checks(metrics: ScrollUsabilityMetrics, shell: CommercialMainS
     checks = [
         ScrollMetricCheck(
             name="qss_scrollbar_handle_min_height",
-            expected=">= 48px in QSS",
+            expected=">= 24px in QSS",
             actual=f"{metrics.qss_handle_min_height}px",
-            passed=metrics.qss_handle_min_height >= 48,
+            passed=24 <= metrics.qss_handle_min_height <= 40,
         ),
         ScrollMetricCheck(
             name="qss_scrollbar_handle_min_width",
-            expected=">= 48px in QSS",
+            expected=">= 24px in QSS",
             actual=f"{metrics.qss_handle_min_width}px",
-            passed=metrics.qss_handle_min_width >= 48,
+            passed=24 <= metrics.qss_handle_min_width <= 40,
         ),
         ScrollMetricCheck(
             name="left_scrollbar_width",

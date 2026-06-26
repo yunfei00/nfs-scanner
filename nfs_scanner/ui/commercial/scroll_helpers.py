@@ -16,12 +16,13 @@ COMMERCIAL_SCROLLBAR_WIDTH = 14
 def tune_scroll_bar(scroll_bar: QScrollBar) -> None:
     """Apply consistent step sizes so dragging feels smooth, not jumpy."""
 
+    scroll_bar.setTracking(True)
     if scroll_bar.orientation() == Qt.Orientation.Vertical:
-        scroll_bar.setSingleStep(20)
-        scroll_bar.setPageStep(120)
+        scroll_bar.setSingleStep(8)
+        scroll_bar.setPageStep(80)
     else:
-        scroll_bar.setSingleStep(24)
-        scroll_bar.setPageStep(160)
+        scroll_bar.setSingleStep(12)
+        scroll_bar.setPageStep(100)
 
 
 def configure_scroll_area(
