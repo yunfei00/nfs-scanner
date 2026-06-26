@@ -483,3 +483,12 @@ Needs Review: yes/no
 - Impact: visual + QA PASS；145 tests；不接真实设备。
 - Needs Review: no
 
+### 2026-06-26 - Final Delta Polish
+
+- Date: 2026-06-26
+- Task: final-delta-polish
+- Decision: 8 类差异收敛：32px title + 50×34 toolbar；照片感 PCB/Turbo 热图；230px workflow；滚动条 handle 28px + tracking；状态栏绿点+日期时间；Demo 安全标识移至 title 条（克制文案）。
+- Reason: 用户要求以目标截图为唯一视觉参考做最后一轮高保真对齐，AI 自检闭环。
+- Impact: 145 tests + visual + QA PASS；不接真实设备。
+- Needs Review: no
+

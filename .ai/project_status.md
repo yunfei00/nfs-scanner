@@ -4,17 +4,14 @@ Last updated: 2026-06-26
 
 ## Current Mode
 
-**COMPLETE — Target Screenshot Layout Replication**
+**COMPLETE — Final Delta Polish (Target Screenshot Alignment)**
 
-商业 UI 已按目标图结构重构：顶部工具栏、左侧 timeline、中央 PCB+heatmap、右侧紧凑参数 Tab、底部三栏 dock。
+商业 UI 已完成最后一轮 8 类差异高保真对齐；默认/最大化截图 + QA 自检 PASS。
 
 ## Recent (2026-06-26)
 
-- 目标图对齐：title bar + 13 项工具栏 + 授权区
-- 画布：PCB mock 满幅、白路径、ROI、MiniMap 绿框
-- 参数面板 350px 三 Tab + XYZ 网格
-- 底部频谱/统计/日志三栏 + QA 15+ 检查项
-- visual check + QA pipeline **PASS**
+- Final Delta Polish：紧凑 title/toolbar、照片感 PCB+Turbo 热图、230px workflow、仪器参数区、三栏 dock、可拖动滚动条
+- 145 tests + visual check + QA pipeline **PASS**
 
 ## Application Entry Points
 
@@ -30,6 +27,7 @@ Last updated: 2026-06-26
 | 001–022 | done — Demo 闭环 v0.1 |
 | Commercial Target Alignment | **done** |
 | Target Screenshot Replication | **done** |
+| Final Delta Polish | **done** |
 | Real Motion Control | **blocked** |
 
 ## Constraints (unchanged)

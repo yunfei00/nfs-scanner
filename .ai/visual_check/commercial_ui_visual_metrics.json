@@ -1,19 +1,19 @@
 {
-  "generated_at": "2026-06-26T07:41:24",
+  "generated_at": "2026-06-26T08:07:17",
   "default": {
     "uses_custom_title_bar": true,
-    "title_bar_height": 36,
+    "title_bar_height": 32,
     "bottom_dock_height": 200,
     "log_view_height": 140,
     "statistics_panel_height": 192,
-    "left_panel_width": 240,
+    "left_panel_width": 230,
     "right_panel_width": 350,
-    "workspace_width": 666,
-    "canvas_width": 606,
-    "canvas_height": 317,
-    "canvas_to_right_ratio": 1.7314285714285715,
-    "canvas_to_left_ratio": 2.525,
-    "canvas_view_area_ratio": 0.8103928318315278,
+    "workspace_width": 676,
+    "canvas_width": 616,
+    "canvas_height": 321,
+    "canvas_to_right_ratio": 1.76,
+    "canvas_to_left_ratio": 2.6782608695652175,
+    "canvas_view_area_ratio": 0.8037722043819356,
     "colorbar_gap_px": 2,
     "toolbar_overflow": false,
     "status_bar_visible": true,
@@ -23,34 +23,34 @@
     "screen_available_height": 720,
     "is_maximized": false,
     "scroll_usability": {
-      "left_scrollbar_width": 14,
+      "left_scrollbar_width": 0,
       "device_scrollbar_width": 14,
       "property_scrollbar_width": 14,
       "log_scrollbar_width": 14,
       "data_task_list_scrollbar_width": 0,
-      "qss_handle_min_height": 48,
-      "qss_handle_min_width": 48,
-      "has_slider_widgets": false,
+      "qss_handle_min_height": 28,
+      "qss_handle_min_width": 28,
+      "has_slider_widgets": true,
       "wheel_test_passed": true,
       "handle_drag_test_passed": true,
-      "slider_test_status": "Not Applicable",
+      "slider_test_status": "PASS",
       "checks": [
         {
           "name": "qss_scrollbar_handle_min_height",
-          "expected": ">= 48px in QSS",
-          "actual": "48px",
+          "expected": ">= 24px in QSS",
+          "actual": "28px",
           "passed": true
         },
         {
           "name": "qss_scrollbar_handle_min_width",
-          "expected": ">= 48px in QSS",
-          "actual": "48px",
+          "expected": ">= 24px in QSS",
+          "actual": "28px",
           "passed": true
         },
         {
           "name": "left_scrollbar_width",
           "expected": ">= 12px when visible",
-          "actual": "14px",
+          "actual": "0px",
           "passed": true
         },
         {
@@ -74,7 +74,7 @@
         {
           "name": "property_area_scrollable",
           "expected": "property panel scrollable",
-          "actual": "range=569",
+          "actual": "range=561",
           "passed": true
         },
         {
@@ -94,6 +94,12 @@
           "expected": "handle position can be set smoothly",
           "actual": "True",
           "passed": true
+        },
+        {
+          "name": "slider_widgets_present",
+          "expected": "slider handle style configured",
+          "actual": "QSlider found",
+          "passed": true
         }
       ],
       "all_passed": true
@@ -102,13 +108,13 @@
       {
         "name": "custom_title_bar",
         "expected": "frameless + title bar visible",
-        "actual": "custom=True, height=36px",
+        "actual": "custom=True, height=32px",
         "passed": true
       },
       {
         "name": "title_bar_height",
         "expected": "28–44 px",
-        "actual": "36px",
+        "actual": "32px",
         "passed": true
       },
       {
@@ -132,7 +138,7 @@
       {
         "name": "canvas_size",
         "expected": "height >= 240px",
-        "actual": "606x317px",
+        "actual": "616x321px",
         "passed": true
       },
       {
@@ -150,19 +156,19 @@
       {
         "name": "left_panel_width",
         "expected": "220–280 px",
-        "actual": "240px",
+        "actual": "230px",
         "passed": true
       },
       {
         "name": "center_canvas_priority",
         "expected": "canvas >= 1.6x right, >= 2.0x left, area >= 50%",
-        "actual": "right=1.73x, left=2.52x, area=81%",
+        "actual": "right=1.76x, left=2.68x, area=80%",
         "passed": true
       },
       {
         "name": "workspace_wider_than_right_panel",
         "expected": "workspace > right panel",
-        "actual": "666px > 350px",
+        "actual": "676px > 350px",
         "passed": true
       },
       {
@@ -305,20 +311,20 @@
       },
       {
         "name": "qss_scrollbar_handle_min_height",
-        "expected": ">= 48px in QSS",
-        "actual": "48px",
+        "expected": ">= 24px in QSS",
+        "actual": "28px",
         "passed": true
       },
       {
         "name": "qss_scrollbar_handle_min_width",
-        "expected": ">= 48px in QSS",
-        "actual": "48px",
+        "expected": ">= 24px in QSS",
+        "actual": "28px",
         "passed": true
       },
       {
         "name": "left_scrollbar_width",
         "expected": ">= 12px when visible",
-        "actual": "14px",
+        "actual": "0px",
         "passed": true
       },
       {
@@ -342,7 +348,7 @@
       {
         "name": "property_area_scrollable",
         "expected": "property panel scrollable",
-        "actual": "range=569",
+        "actual": "range=561",
         "passed": true
       },
       {
@@ -362,24 +368,30 @@
         "expected": "handle position can be set smoothly",
         "actual": "True",
         "passed": true
+      },
+      {
+        "name": "slider_widgets_present",
+        "expected": "slider handle style configured",
+        "actual": "QSlider found",
+        "passed": true
       }
     ],
     "all_passed": true
   },
   "maximized": {
     "uses_custom_title_bar": true,
-    "title_bar_height": 36,
+    "title_bar_height": 32,
     "bottom_dock_height": 200,
     "log_view_height": 140,
     "statistics_panel_height": 192,
-    "left_panel_width": 240,
+    "left_panel_width": 230,
     "right_panel_width": 350,
-    "workspace_width": 666,
-    "canvas_width": 606,
-    "canvas_height": 317,
-    "canvas_to_right_ratio": 1.7314285714285715,
-    "canvas_to_left_ratio": 2.525,
-    "canvas_view_area_ratio": 0.8103928318315278,
+    "workspace_width": 676,
+    "canvas_width": 616,
+    "canvas_height": 321,
+    "canvas_to_right_ratio": 1.76,
+    "canvas_to_left_ratio": 2.6782608695652175,
+    "canvas_view_area_ratio": 0.8037722043819356,
     "colorbar_gap_px": 2,
     "toolbar_overflow": false,
     "status_bar_visible": true,
@@ -389,34 +401,34 @@
     "screen_available_height": 720,
     "is_maximized": true,
     "scroll_usability": {
-      "left_scrollbar_width": 14,
+      "left_scrollbar_width": 0,
       "device_scrollbar_width": 14,
       "property_scrollbar_width": 14,
       "log_scrollbar_width": 14,
       "data_task_list_scrollbar_width": 0,
-      "qss_handle_min_height": 48,
-      "qss_handle_min_width": 48,
-      "has_slider_widgets": false,
+      "qss_handle_min_height": 28,
+      "qss_handle_min_width": 28,
+      "has_slider_widgets": true,
       "wheel_test_passed": true,
       "handle_drag_test_passed": true,
-      "slider_test_status": "Not Applicable",
+      "slider_test_status": "PASS",
       "checks": [
         {
           "name": "qss_scrollbar_handle_min_height",
-          "expected": ">= 48px in QSS",
-          "actual": "48px",
+          "expected": ">= 24px in QSS",
+          "actual": "28px",
           "passed": true
         },
         {
           "name": "qss_scrollbar_handle_min_width",
-          "expected": ">= 48px in QSS",
-          "actual": "48px",
+          "expected": ">= 24px in QSS",
+          "actual": "28px",
           "passed": true
         },
         {
           "name": "left_scrollbar_width",
           "expected": ">= 12px when visible",
-          "actual": "14px",
+          "actual": "0px",
           "passed": true
         },
         {
@@ -440,7 +452,7 @@
         {
           "name": "property_area_scrollable",
           "expected": "property panel scrollable",
-          "actual": "range=569",
+          "actual": "range=561",
           "passed": true
         },
         {
@@ -460,6 +472,12 @@
           "expected": "handle position can be set smoothly",
           "actual": "True",
           "passed": true
+        },
+        {
+          "name": "slider_widgets_present",
+          "expected": "slider handle style configured",
+          "actual": "QSlider found",
+          "passed": true
         }
       ],
       "all_passed": true
@@ -468,13 +486,13 @@
       {
         "name": "custom_title_bar",
         "expected": "frameless + title bar visible",
-        "actual": "custom=True, height=36px",
+        "actual": "custom=True, height=32px",
         "passed": true
       },
       {
         "name": "title_bar_height",
         "expected": "28–44 px",
-        "actual": "36px",
+        "actual": "32px",
         "passed": true
       },
       {
@@ -498,7 +516,7 @@
       {
         "name": "canvas_size",
         "expected": "height >= 240px",
-        "actual": "606x317px",
+        "actual": "616x321px",
         "passed": true
       },
       {
@@ -516,19 +534,19 @@
       {
         "name": "left_panel_width",
         "expected": "220–280 px",
-        "actual": "240px",
+        "actual": "230px",
         "passed": true
       },
       {
         "name": "center_canvas_priority",
         "expected": "canvas >= 1.6x right, >= 2.0x left, area >= 50%",
-        "actual": "right=1.73x, left=2.52x, area=81%",
+        "actual": "right=1.76x, left=2.68x, area=80%",
         "passed": true
       },
       {
         "name": "workspace_wider_than_right_panel",
         "expected": "workspace > right panel",
-        "actual": "666px > 350px",
+        "actual": "676px > 350px",
         "passed": true
       },
       {
@@ -671,20 +689,20 @@
       },
       {
         "name": "qss_scrollbar_handle_min_height",
-        "expected": ">= 48px in QSS",
-        "actual": "48px",
+        "expected": ">= 24px in QSS",
+        "actual": "28px",
         "passed": true
       },
       {
         "name": "qss_scrollbar_handle_min_width",
-        "expected": ">= 48px in QSS",
-        "actual": "48px",
+        "expected": ">= 24px in QSS",
+        "actual": "28px",
         "passed": true
       },
       {
         "name": "left_scrollbar_width",
         "expected": ">= 12px when visible",
-        "actual": "14px",
+        "actual": "0px",
         "passed": true
       },
       {
@@ -708,7 +726,7 @@
       {
         "name": "property_area_scrollable",
         "expected": "property panel scrollable",
-        "actual": "range=569",
+        "actual": "range=561",
         "passed": true
       },
       {
@@ -727,6 +745,12 @@
         "name": "handle_position_interaction",
         "expected": "handle position can be set smoothly",
         "actual": "True",
+        "passed": true
+      },
+      {
+        "name": "slider_widgets_present",
+        "expected": "slider handle style configured",
+        "actual": "QSlider found",
         "passed": true
       }
     ],

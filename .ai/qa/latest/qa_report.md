@@ -1,6 +1,6 @@
 # Commercial Demo QA Report
 
-- Generated: 2026-06-26 07:41:13
+- Generated: 2026-06-26 08:07:03
 - Round: 1
 - Overall: **PASS**
 
@@ -24,30 +24,30 @@
 
 | Check | Expected | Actual | Status |
 |-------|----------|--------|--------|
-| custom_title_bar | frameless custom title bar | custom=True, height=36px | PASS |
+| custom_title_bar | frameless custom title bar | custom=True, height=32px | PASS |
 | no_native_title_bar | FramelessWindowHint enabled | custom=True | PASS |
-| title_bar_height | 28–44 px | 36px | PASS |
+| title_bar_height | 28–44 px | 32px | PASS |
 | demo_indicator_visible | demo banner or DEMO MODE label visible | title bar auth area visible | PASS |
 | toolbar_no_overflow | toolbar fits layout | overflow=False | PASS |
-| left_panel_width | 220–280 px | 240px | PASS |
+| left_panel_width | 220–280 px | 230px | PASS |
 | right_panel_width | 340–380 px | 350px | PASS |
-| center_canvas_priority | canvas >= 1.6x right, >= 2.0x left, area >= 50% | right=1.73x, left=2.52x, area=81% | PASS |
-| canvas_wider_than_right_panel | workspace > right panel | 666px > 350px | PASS |
+| center_canvas_priority | canvas >= 1.6x right, >= 2.0x left, area >= 50% | right=1.76x, left=2.68x, area=80% | PASS |
+| canvas_wider_than_right_panel | workspace > right panel | 676px > 350px | PASS |
 | bottom_dock_height | >= 200px | 200px | PASS |
 | log_view_height | >= 100px | 140px | PASS |
 | log_visible_lines | >= 6 visible lines | estimated=12 | PASS |
 | statistics_panel_height | >= 100px | 192px | PASS |
 | status_bar_visible | status bar visible | True | PASS |
 | default_window_within_screen | window <= available screen | 1280x720 <= 1280x720 | PASS |
-| maximized_custom_title_bar | frameless custom title bar | custom=True, height=36px | PASS |
+| maximized_custom_title_bar | frameless custom title bar | custom=True, height=32px | PASS |
 | maximized_no_native_title_bar | FramelessWindowHint enabled | custom=True | PASS |
-| maximized_title_bar_height | 28–44 px | 36px | PASS |
+| maximized_title_bar_height | 28–44 px | 32px | PASS |
 | maximized_demo_indicator_visible | demo banner or DEMO MODE label visible | title bar auth area visible | PASS |
 | maximized_toolbar_no_overflow | toolbar fits layout | overflow=False | PASS |
-| maximized_left_panel_width | 220–280 px | 240px | PASS |
+| maximized_left_panel_width | 220–280 px | 230px | PASS |
 | maximized_right_panel_width | 340–380 px | 350px | PASS |
-| maximized_center_canvas_priority | canvas >= 1.6x right, >= 2.0x left, area >= 50% | right=1.73x, left=2.52x, area=81% | PASS |
-| maximized_canvas_wider_than_right_panel | workspace > right panel | 666px > 350px | PASS |
+| maximized_center_canvas_priority | canvas >= 1.6x right, >= 2.0x left, area >= 50% | right=1.76x, left=2.68x, area=80% | PASS |
+| maximized_canvas_wider_than_right_panel | workspace > right panel | 676px > 350px | PASS |
 | maximized_bottom_dock_height | >= 200px | 200px | PASS |
 | maximized_log_view_height | >= 100px | 140px | PASS |
 | maximized_log_visible_lines | >= 6 visible lines | estimated=26 | PASS |
@@ -63,33 +63,34 @@
 | open_mock_project_updates_status | project label reflects mock project | 项目: Demo Near Field Scan (未保存) | PASS |
 | save_project_updates_storage | storage status shows saved | 项目: Demo Near Field Scan (已保存) | PASS |
 | mock_connect_devices | all mock devices connected | 相机, 运动平台, 频谱仪 | PASS |
-| scan_params_update_preview_stats | preview point count updates | before=441, after=9 | PASS |
+| scan_params_update_preview_stats | preview point count updates | before=91 x 71 = 6,461, after=3 x 3 = 9 | PASS |
 | start_scan_running | runtime status == running | running | PASS |
 | pause_scan_paused | runtime status == paused | paused | PASS |
 | resume_scan_running | runtime status == running | running | PASS |
 | scan_completes_or_stops | runtime status completed or stopped | completed | PASS |
 | data_view_mock_task | data view lists mock scan tasks | 4 | PASS |
 | report_center_preview | report preview populated | Demo Near Field Scan | PASS |
-| mock_report_export | markdown/txt report file created | C:\Users\yunfei\.nfs_scanner\reports\report_mock-4ecbd8c6_20260626_074115.md | PASS |
+| mock_report_export | markdown/txt report file created | C:\Users\yunfei\.nfs_scanner\reports\report_mock-b9974755_20260626_080706.md | PASS |
 | reset_demo_restores_state | runtime idle and demo reset applied | status=stopped, tasks 4->2 | PASS |
 
 ## Interaction — PASS
 
 | Check | Expected | Actual | Status |
 |-------|----------|--------|--------|
-| qss_scrollbar_handle_min_height | >= 48px in QSS | 48px | PASS |
-| qss_scrollbar_handle_min_width | >= 48px in QSS | 48px | PASS |
-| left_scrollbar_width | >= 12px when visible | 14px | PASS |
+| qss_scrollbar_handle_min_height | >= 24px in QSS | 28px | PASS |
+| qss_scrollbar_handle_min_width | >= 24px in QSS | 28px | PASS |
+| left_scrollbar_width | >= 12px when visible | 0px | PASS |
 | property_scrollbar_width | >= 12px when visible | 14px | PASS |
 | log_scrollbar_width | >= 12px when scrollable | 14px | PASS |
 | log_area_scrollable | log content scrollable | range=19 | PASS |
-| property_area_scrollable | property panel scrollable | range=569 | PASS |
+| property_area_scrollable | property panel scrollable | range=561 | PASS |
 | device_status_scrollable_or_compact | device scroll visible when needed | width=14px | PASS |
 | wheel_interaction | wheel step changes scroll value | True | PASS |
 | handle_position_interaction | handle position can be set smoothly | True | PASS |
+| slider_widgets_present | slider handle style configured | QSlider found | PASS |
 | wheel_test | wheel step changes scroll value | PASS | PASS |
 | scrollbar_handle_drag | handle position adjustable (programmatic) | PASS | PASS |
-| slider_drag | slider interaction | Not Applicable | PASS |
+| slider_drag | slider interaction | PASS | PASS |
 
 ## Safety — PASS
 
@@ -126,4 +127,4 @@
 
 - 滚轮测试: PASS
 - Scrollbar handle 拖动测试: PASS
-- Slider 拖动测试: Not Applicable
+- Slider 拖动测试: PASS
