@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QLinearGradient, QPainter
+from PySide6.QtGui import QColor, QLinearGradient, QPainter
 from PySide6.QtWidgets import QLabel, QSizePolicy, QVBoxLayout, QWidget
+
+from nfs_scanner.ui.commercial.lut_presets import lut_gradient_stops, normalize_lut_name
 
 
 class ColorBar(QWidget):
@@ -17,7 +19,7 @@ class ColorBar(QWidget):
         self.setObjectName("nfsColorBar")
         self._min_db = -80.0
         self._max_db = -20.0
-        self._lut_name = "viridis"
+        self._lut_name = "Turbo"
         self.setFixedWidth(56)
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
         self._setup_ui()
@@ -56,8 +58,9 @@ class ColorBar(QWidget):
         self.gradient_widget.update()
 
     def set_lut_name(self, lut_name: str) -> None:
-        self._lut_name = lut_name.strip() or "viridis"
+        self._lut_name = normalize_lut_name(lut_name)
         self.lut_label.setText(self._lut_name)
+        self.gradient_widget.set_lut_name(self._lut_name)
 
 
 class _GradientBar(QWidget):
@@ -65,14 +68,18 @@ class _GradientBar(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self._lut_name = "Turbo"
         self.setMinimumHeight(120)
+
+    def set_lut_name(self, lut_name: str) -> None:
+        self._lut_name = normalize_lut_name(lut_name)
+        self.update()
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
         gradient = QLinearGradient(0, 0, 0, self.height())
-        gradient.setColorAt(0.0, Qt.GlobalColor.yellow)
-        gradient.setColorAt(0.5, Qt.GlobalColor.cyan)
-        gradient.setColorAt(1.0, Qt.GlobalColor.blue)
+        for position, color in lut_gradient_stops(self._lut_name):
+            gradient.setColorAt(position, QColor(color))
         painter.fillRect(self.rect(), gradient)
         painter.end()
         super().paintEvent(event)

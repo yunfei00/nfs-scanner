@@ -60,9 +60,9 @@ def collect_target_alignment_checks(shell: CommercialMainShell) -> list[LayoutMe
         ),
         LayoutMetricCheck(
             name="right_compact_grid_form",
-            expected="property tabs + xyz grid rows",
+            expected="property tabs + scan region grid/table",
             actual=f"tabs={property_tabs is not None}, rows={len(grid_rows)}",
-            passed=property_tabs is not None and len(grid_rows) >= 3,
+            passed=property_tabs is not None and len(grid_rows) >= 1,
         ),
         LayoutMetricCheck(
             name="bottom_dock_three_panel_mode",

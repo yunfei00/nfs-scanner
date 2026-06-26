@@ -34,6 +34,7 @@ class CommercialLayoutMetricsTestCase(unittest.TestCase):
             workflow_panel_height=320,
             device_status_panel_height=280,
             device_status_collapsed_height=72,
+            device_status_has_inner_scroll=False,
             property_tab_bar_visible_after_scroll=True,
             numeric_field_line_edit_min_width=52,
             numeric_field_total_min_width=88,
@@ -42,6 +43,8 @@ class CommercialLayoutMetricsTestCase(unittest.TestCase):
             action_buttons_clipped=False,
             realtime_toolbar_min_button_width=52,
             realtime_toolbar_has_ellipsis=False,
+            lut_combo_count=2,
+            lut_combos_include_common=True,
         )
         metrics.checks = _build_checks(metrics)
         self.assertTrue(metrics.all_passed())
@@ -72,6 +75,7 @@ class CommercialLayoutMetricsTestCase(unittest.TestCase):
             workflow_panel_height=320,
             device_status_panel_height=280,
             device_status_collapsed_height=72,
+            device_status_has_inner_scroll=False,
             property_tab_bar_visible_after_scroll=True,
             numeric_field_line_edit_min_width=52,
             numeric_field_total_min_width=88,
@@ -80,6 +84,8 @@ class CommercialLayoutMetricsTestCase(unittest.TestCase):
             action_buttons_clipped=False,
             realtime_toolbar_min_button_width=52,
             realtime_toolbar_has_ellipsis=False,
+            lut_combo_count=2,
+            lut_combos_include_common=True,
         )
         metrics.checks = _build_checks(metrics)
         self.assertFalse(metrics.all_passed())
@@ -110,6 +116,7 @@ class CommercialLayoutMetricsTestCase(unittest.TestCase):
             workflow_panel_height=320,
             device_status_panel_height=220,
             device_status_collapsed_height=72,
+            device_status_has_inner_scroll=False,
             property_tab_bar_visible_after_scroll=True,
             numeric_field_line_edit_min_width=52,
             numeric_field_total_min_width=88,
@@ -118,6 +125,8 @@ class CommercialLayoutMetricsTestCase(unittest.TestCase):
             action_buttons_clipped=False,
             realtime_toolbar_min_button_width=52,
             realtime_toolbar_has_ellipsis=False,
+            lut_combo_count=2,
+            lut_combos_include_common=True,
         )
         metrics.checks = _build_checks(metrics)
         priority = next(item for item in metrics.checks if item.name == "center_canvas_priority")

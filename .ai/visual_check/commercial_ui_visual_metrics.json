@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-26T16:29:57",
+  "generated_at": "2026-06-26T16:53:26",
   "default": {
     "uses_custom_title_bar": true,
     "title_bar_height": 56,
@@ -23,19 +23,22 @@
     "screen_available_height": 720,
     "is_maximized": false,
     "workflow_panel_height": 257,
-    "device_status_panel_height": 300,
-    "device_status_collapsed_height": 47,
+    "device_status_panel_height": 493,
+    "device_status_collapsed_height": 45,
+    "device_status_has_inner_scroll": false,
     "property_tab_bar_visible_after_scroll": true,
     "numeric_field_line_edit_min_width": 52,
-    "numeric_field_total_min_width": 88,
+    "numeric_field_total_min_width": 80,
     "action_buttons_count": 3,
     "action_buttons_overlap": false,
     "action_buttons_clipped": false,
     "realtime_toolbar_min_button_width": 52,
     "realtime_toolbar_has_ellipsis": false,
+    "lut_combo_count": 2,
+    "lut_combos_include_common": true,
     "scroll_usability": {
-      "left_scrollbar_width": 0,
-      "device_scrollbar_width": 14,
+      "left_scrollbar_width": 14,
+      "device_scrollbar_width": 0,
       "property_scrollbar_width": 14,
       "log_scrollbar_width": 14,
       "data_task_list_scrollbar_width": 0,
@@ -61,7 +64,7 @@
         {
           "name": "left_scrollbar_width",
           "expected": ">= 12px when visible",
-          "actual": "0px",
+          "actual": "14px",
           "passed": true
         },
         {
@@ -85,13 +88,13 @@
         {
           "name": "property_area_scrollable",
           "expected": "property panel scrollable",
-          "actual": "range=544",
+          "actual": "range=465",
           "passed": true
         },
         {
           "name": "device_status_scrollable_or_compact",
           "expected": "device scroll visible when needed",
-          "actual": "width=14px",
+          "actual": "width=0px",
           "passed": true
         },
         {
@@ -178,14 +181,20 @@
       },
       {
         "name": "device_status_panel_height",
-        "expected": "expanded height 180-320 px",
-        "actual": "300px",
+        "expected": "expanded content height 120-520 px in left scroll",
+        "actual": "493px",
+        "passed": true
+      },
+      {
+        "name": "left_no_nested_device_scroll",
+        "expected": "no isolated device-status scroll area",
+        "actual": "inner_scroll=False",
         "passed": true
       },
       {
         "name": "device_status_collapsed_height",
         "expected": "collapsed height <= 100 px",
-        "actual": "47px",
+        "actual": "45px",
         "passed": true
       },
       {
@@ -202,8 +211,8 @@
       },
       {
         "name": "numeric_field_total_width",
-        "expected": ">= 88 px",
-        "actual": "88px",
+        "expected": ">= 80 px",
+        "actual": "80px",
         "passed": true
       },
       {
@@ -216,6 +225,12 @@
         "name": "realtime_toolbar_button_text",
         "expected": "no \"...\" labels and width >= 44 px",
         "actual": "min_width=52px, ellipsis=False",
+        "passed": true
+      },
+      {
+        "name": "lut_combo_common_presets",
+        "expected": "realtime and display LUT combos include Jet/common presets",
+        "actual": "count=2, include_common=True",
         "passed": true
       },
       {
@@ -274,8 +289,8 @@
       },
       {
         "name": "right_compact_grid_form",
-        "expected": "property tabs + xyz grid rows",
-        "actual": "tabs=True, rows=3",
+        "expected": "property tabs + scan region grid/table",
+        "actual": "tabs=True, rows=1",
         "passed": true
       },
       {
@@ -449,7 +464,7 @@
       {
         "name": "left_scrollbar_width",
         "expected": ">= 12px when visible",
-        "actual": "0px",
+        "actual": "14px",
         "passed": true
       },
       {
@@ -473,13 +488,13 @@
       {
         "name": "property_area_scrollable",
         "expected": "property panel scrollable",
-        "actual": "range=544",
+        "actual": "range=465",
         "passed": true
       },
       {
         "name": "device_status_scrollable_or_compact",
         "expected": "device scroll visible when needed",
-        "actual": "width=14px",
+        "actual": "width=0px",
         "passed": true
       },
       {
@@ -526,19 +541,22 @@
     "screen_available_height": 720,
     "is_maximized": true,
     "workflow_panel_height": 257,
-    "device_status_panel_height": 300,
-    "device_status_collapsed_height": 47,
+    "device_status_panel_height": 493,
+    "device_status_collapsed_height": 45,
+    "device_status_has_inner_scroll": false,
     "property_tab_bar_visible_after_scroll": true,
     "numeric_field_line_edit_min_width": 52,
-    "numeric_field_total_min_width": 88,
+    "numeric_field_total_min_width": 80,
     "action_buttons_count": 3,
     "action_buttons_overlap": false,
     "action_buttons_clipped": false,
     "realtime_toolbar_min_button_width": 52,
     "realtime_toolbar_has_ellipsis": false,
+    "lut_combo_count": 2,
+    "lut_combos_include_common": true,
     "scroll_usability": {
-      "left_scrollbar_width": 0,
-      "device_scrollbar_width": 14,
+      "left_scrollbar_width": 14,
+      "device_scrollbar_width": 0,
       "property_scrollbar_width": 14,
       "log_scrollbar_width": 14,
       "data_task_list_scrollbar_width": 0,
@@ -564,7 +582,7 @@
         {
           "name": "left_scrollbar_width",
           "expected": ">= 12px when visible",
-          "actual": "0px",
+          "actual": "14px",
           "passed": true
         },
         {
@@ -588,13 +606,13 @@
         {
           "name": "property_area_scrollable",
           "expected": "property panel scrollable",
-          "actual": "range=544",
+          "actual": "range=465",
           "passed": true
         },
         {
           "name": "device_status_scrollable_or_compact",
           "expected": "device scroll visible when needed",
-          "actual": "width=14px",
+          "actual": "width=0px",
           "passed": true
         },
         {
@@ -681,14 +699,20 @@
       },
       {
         "name": "device_status_panel_height",
-        "expected": "expanded height 180-320 px",
-        "actual": "300px",
+        "expected": "expanded content height 120-520 px in left scroll",
+        "actual": "493px",
+        "passed": true
+      },
+      {
+        "name": "left_no_nested_device_scroll",
+        "expected": "no isolated device-status scroll area",
+        "actual": "inner_scroll=False",
         "passed": true
       },
       {
         "name": "device_status_collapsed_height",
         "expected": "collapsed height <= 100 px",
-        "actual": "47px",
+        "actual": "45px",
         "passed": true
       },
       {
@@ -705,8 +729,8 @@
       },
       {
         "name": "numeric_field_total_width",
-        "expected": ">= 88 px",
-        "actual": "88px",
+        "expected": ">= 80 px",
+        "actual": "80px",
         "passed": true
       },
       {
@@ -719,6 +743,12 @@
         "name": "realtime_toolbar_button_text",
         "expected": "no \"...\" labels and width >= 44 px",
         "actual": "min_width=52px, ellipsis=False",
+        "passed": true
+      },
+      {
+        "name": "lut_combo_common_presets",
+        "expected": "realtime and display LUT combos include Jet/common presets",
+        "actual": "count=2, include_common=True",
         "passed": true
       },
       {
@@ -777,8 +807,8 @@
       },
       {
         "name": "right_compact_grid_form",
-        "expected": "property tabs + xyz grid rows",
-        "actual": "tabs=True, rows=3",
+        "expected": "property tabs + scan region grid/table",
+        "actual": "tabs=True, rows=1",
         "passed": true
       },
       {
@@ -952,7 +982,7 @@
       {
         "name": "left_scrollbar_width",
         "expected": ">= 12px when visible",
-        "actual": "0px",
+        "actual": "14px",
         "passed": true
       },
       {
@@ -976,13 +1006,13 @@
       {
         "name": "property_area_scrollable",
         "expected": "property panel scrollable",
-        "actual": "range=544",
+        "actual": "range=465",
         "passed": true
       },
       {
         "name": "device_status_scrollable_or_compact",
         "expected": "device scroll visible when needed",
-        "actual": "width=14px",
+        "actual": "width=0px",
         "passed": true
       },
       {

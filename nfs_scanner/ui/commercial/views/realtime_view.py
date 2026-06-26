@@ -25,6 +25,7 @@ from nfs_scanner.core.scan_config import ScanPathConfig, ScanRegion
 from ..graphics import ColorBar, LayerKind, LayerManager, MiniMapPanel, RealtimeCanvas
 from ..graphics.mock_assets import create_mock_board_qimage
 from ..graphics.canvas_hud import CanvasAxisLegend, CanvasCursorHud
+from ..lut_presets import COMMON_LUT_NAMES
 from ..scan_scene_mapper import map_points_to_scene
 from ..widgets import NFSSecondaryButton
 
@@ -123,9 +124,9 @@ class RealtimeView(QWidget):
         lut_label = QLabel("LUT", toolbar)
         lut_label.setObjectName("nfsMutedLabel")
         lut_combo = QComboBox(toolbar)
-        lut_combo.addItems(["Turbo", "Viridis", "Plasma"])
+        lut_combo.addItems(list(COMMON_LUT_NAMES))
         lut_combo.setCurrentText("Turbo")
-        lut_combo.currentTextChanged.connect(self.color_bar.set_lut_name)
+        lut_combo.currentTextChanged.connect(self._on_lut_changed)
         toolbar_layout.addWidget(lut_label)
         toolbar_layout.addWidget(lut_combo)
         toolbar_layout.addStretch(1)
@@ -168,6 +169,12 @@ class RealtimeView(QWidget):
             self._opacity_value_label.setText(f"{value}%")
         heatmap_layer = self.layer_manager.ensure_layer(LayerKind.HEATMAP)
         heatmap_layer.set_opacity(self._heatmap_opacity)
+
+    def _on_lut_changed(self, lut_name: str) -> None:
+        self.color_bar.set_lut_name(lut_name)
+        heatmap_layer = self.layer_manager.ensure_layer(LayerKind.HEATMAP)
+        if hasattr(heatmap_layer, "set_lut_name"):
+            heatmap_layer.set_lut_name(lut_name)
 
     def eventFilter(self, watched, event) -> bool:
         if watched is self.canvas.viewport():
@@ -213,6 +220,7 @@ class RealtimeView(QWidget):
         heatmap_layer = self.layer_manager.ensure_layer(LayerKind.HEATMAP)
         heatmap_layer.build_mock()
         heatmap_layer.set_opacity(self._heatmap_opacity)
+        heatmap_layer.set_lut_name("Turbo")
         self.color_bar.set_lut_name("Turbo")
 
         annotation_layer = self.layer_manager.ensure_layer(LayerKind.ANNOTATION)

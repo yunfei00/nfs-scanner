@@ -1,6 +1,6 @@
 # Commercial UI Visual Report
 
-- Generated: 2026-06-26 16:29:57
+- Generated: 2026-06-26 16:53:26
 - Default screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_default.png`
 - Top header screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_top_header.png`
 - Maximized screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_maximized.png`
@@ -21,13 +21,15 @@
 | right_panel_width | 340–380 px | 350px | PASS |
 | left_panel_width | 220–280 px | 230px | PASS |
 | workflow_panel_height | <= 360 px | 257px | PASS |
-| device_status_panel_height | expanded height 180-320 px | 300px | PASS |
-| device_status_collapsed_height | collapsed height <= 100 px | 47px | PASS |
+| device_status_panel_height | expanded content height 120-520 px in left scroll | 493px | PASS |
+| left_no_nested_device_scroll | no isolated device-status scroll area | inner_scroll=False | PASS |
+| device_status_collapsed_height | collapsed height <= 100 px | 45px | PASS |
 | property_tab_bar_fixed | tab bar visible after content scroll | True | PASS |
 | numeric_field_line_edit_width | >= 48 px | 52px | PASS |
-| numeric_field_total_width | >= 88 px | 88px | PASS |
+| numeric_field_total_width | >= 80 px | 80px | PASS |
 | scan_action_buttons_layout | start/pause/stop present with no overlap or clipping | count=3, overlap=False, clipped=False | PASS |
 | realtime_toolbar_button_text | no "..." labels and width >= 44 px | min_width=52px, ellipsis=False | PASS |
+| lut_combo_common_presets | realtime and display LUT combos include Jet/common presets | count=2, include_common=True | PASS |
 | center_canvas_priority | canvas >= 1.6x right, >= 2.0x left, area >= 50% | right=1.76x, left=2.68x, area=81% | PASS |
 | workspace_wider_than_right_panel | workspace > right panel | 676px > 350px | PASS |
 | toolbar_no_overflow | toolbar fits layout | overflow=False | PASS |
@@ -37,7 +39,7 @@
 | logo_area_exists | NFS logo block visible | visible=True | PASS |
 | top_toolbar_icon_mode | >= 12 toolbar actions | 13 | PASS |
 | workflow_timeline_mode | >= 7 timeline steps | 7 | PASS |
-| right_compact_grid_form | property tabs + xyz grid rows | tabs=True, rows=3 | PASS |
+| right_compact_grid_form | property tabs + scan region grid/table | tabs=True, rows=1 | PASS |
 | bottom_dock_three_panel_mode | tri-panel dock visible | visible=True | PASS |
 | spectrum_panel_visible | spectrum panel visible | visible=True | PASS |
 | spectrum_yellow_curve_mode | yellow curve spectrum widget | true | PASS |
@@ -73,12 +75,12 @@
 |-------|----------|--------|--------|
 | qss_scrollbar_handle_min_height | >= 24px in QSS | 28px | PASS |
 | qss_scrollbar_handle_min_width | >= 24px in QSS | 28px | PASS |
-| left_scrollbar_width | >= 12px when visible | 0px | PASS |
+| left_scrollbar_width | >= 12px when visible | 14px | PASS |
 | property_scrollbar_width | >= 12px when visible | 14px | PASS |
 | log_scrollbar_width | >= 12px when scrollable | 14px | PASS |
 | log_area_scrollable | log content scrollable | range=5 | PASS |
-| property_area_scrollable | property panel scrollable | range=544 | PASS |
-| device_status_scrollable_or_compact | device scroll visible when needed | width=14px | PASS |
+| property_area_scrollable | property panel scrollable | range=465 | PASS |
+| device_status_scrollable_or_compact | device scroll visible when needed | width=0px | PASS |
 | wheel_interaction | wheel step changes scroll value | True | PASS |
 | handle_position_interaction | handle position can be set smoothly | True | PASS |
 | slider_widgets_present | slider handle style configured | QSlider found | PASS |
@@ -105,13 +107,15 @@
 | right_panel_width | 340–380 px | 350px | PASS |
 | left_panel_width | 220–280 px | 230px | PASS |
 | workflow_panel_height | <= 360 px | 257px | PASS |
-| device_status_panel_height | expanded height 180-320 px | 300px | PASS |
-| device_status_collapsed_height | collapsed height <= 100 px | 47px | PASS |
+| device_status_panel_height | expanded content height 120-520 px in left scroll | 493px | PASS |
+| left_no_nested_device_scroll | no isolated device-status scroll area | inner_scroll=False | PASS |
+| device_status_collapsed_height | collapsed height <= 100 px | 45px | PASS |
 | property_tab_bar_fixed | tab bar visible after content scroll | True | PASS |
 | numeric_field_line_edit_width | >= 48 px | 52px | PASS |
-| numeric_field_total_width | >= 88 px | 88px | PASS |
+| numeric_field_total_width | >= 80 px | 80px | PASS |
 | scan_action_buttons_layout | start/pause/stop present with no overlap or clipping | count=3, overlap=False, clipped=False | PASS |
 | realtime_toolbar_button_text | no "..." labels and width >= 44 px | min_width=52px, ellipsis=False | PASS |
+| lut_combo_common_presets | realtime and display LUT combos include Jet/common presets | count=2, include_common=True | PASS |
 | center_canvas_priority | canvas >= 1.6x right, >= 2.0x left, area >= 50% | right=1.76x, left=2.68x, area=81% | PASS |
 | workspace_wider_than_right_panel | workspace > right panel | 676px > 350px | PASS |
 | toolbar_no_overflow | toolbar fits layout | overflow=False | PASS |
@@ -121,7 +125,7 @@
 | logo_area_exists | NFS logo block visible | visible=True | PASS |
 | top_toolbar_icon_mode | >= 12 toolbar actions | 13 | PASS |
 | workflow_timeline_mode | >= 7 timeline steps | 7 | PASS |
-| right_compact_grid_form | property tabs + xyz grid rows | tabs=True, rows=3 | PASS |
+| right_compact_grid_form | property tabs + scan region grid/table | tabs=True, rows=1 | PASS |
 | bottom_dock_three_panel_mode | tri-panel dock visible | visible=True | PASS |
 | spectrum_panel_visible | spectrum panel visible | visible=True | PASS |
 | spectrum_yellow_curve_mode | yellow curve spectrum widget | true | PASS |

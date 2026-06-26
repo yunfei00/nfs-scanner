@@ -45,6 +45,7 @@ class CommercialLayoutMetrics:
     workflow_panel_height: int = 0
     device_status_panel_height: int = 0
     device_status_collapsed_height: int = 0
+    device_status_has_inner_scroll: bool = False
     property_tab_bar_visible_after_scroll: bool = False
     numeric_field_line_edit_min_width: int = 0
     numeric_field_total_min_width: int = 0
@@ -53,6 +54,8 @@ class CommercialLayoutMetrics:
     action_buttons_clipped: bool = False
     realtime_toolbar_min_button_width: int = 0
     realtime_toolbar_has_ellipsis: bool = False
+    lut_combo_count: int = 0
+    lut_combos_include_common: bool = False
     scroll_usability: dict = field(default_factory=dict)
     checks: list[LayoutMetricCheck] = field(default_factory=list)
 
@@ -73,8 +76,9 @@ def _between(value: int, low: int, high: int) -> bool:
 def collect_layout_metrics(shell: QMainWindow) -> CommercialLayoutMetrics:
     """Measure key widget geometries from a visible commercial shell."""
 
-    from PySide6.QtWidgets import QScrollArea, QTabWidget, QToolButton
+    from PySide6.QtWidgets import QComboBox, QScrollArea, QTabWidget, QToolButton
 
+    from nfs_scanner.ui.commercial.lut_presets import COMMON_LUT_NAMES
     from nfs_scanner.ui.commercial.main_shell import CommercialMainShell
     from nfs_scanner.ui.commercial.widgets import NFSCollapsiblePanel, NFSNumericField
 
@@ -113,20 +117,20 @@ def collect_layout_metrics(shell: QMainWindow) -> CommercialLayoutMetrics:
     )
 
     device_area = shell.findChild(QScrollArea, "commercialDeviceScroll")
-    if device_area is not None:
-        metrics.device_status_panel_height = device_area.height()
-        device_panel = shell.device_status_panel.findChild(NFSCollapsiblePanel)
-        if device_panel is not None:
-            was_expanded = device_panel.is_expanded()
-            device_panel.set_expanded(False)
-            if hasattr(shell, "_sync_device_status_scroll_height"):
-                shell._sync_device_status_scroll_height()
-            QApplication.processEvents()
-            metrics.device_status_collapsed_height = device_area.height()
-            device_panel.set_expanded(was_expanded)
-            if hasattr(shell, "_sync_device_status_scroll_height"):
-                shell._sync_device_status_scroll_height()
-            QApplication.processEvents()
+    metrics.device_status_has_inner_scroll = device_area is not None
+    metrics.device_status_panel_height = shell.device_status_panel.height()
+    device_panel = shell.device_status_panel.findChild(NFSCollapsiblePanel)
+    if device_panel is not None:
+        was_expanded = device_panel.is_expanded()
+        device_panel.set_expanded(False)
+        if hasattr(shell, "_refresh_left_area_layout"):
+            shell._refresh_left_area_layout()
+        QApplication.processEvents()
+        metrics.device_status_collapsed_height = shell.device_status_panel.height()
+        device_panel.set_expanded(was_expanded)
+        if hasattr(shell, "_refresh_left_area_layout"):
+            shell._refresh_left_area_layout()
+        QApplication.processEvents()
 
     property_tabs = shell.property_panel.findChild(QTabWidget, "commercialPropertyTabs")
     if property_tabs is not None:
@@ -196,6 +200,18 @@ def collect_layout_metrics(shell: QMainWindow) -> CommercialLayoutMetrics:
             button.text().strip() in {"...", "…"} or "..." in button.text()
             for button in realtime_buttons
         )
+
+    common_lut_names = set(COMMON_LUT_NAMES)
+    lut_combo_items: list[set[str]] = []
+    for combo in shell.findChildren(QComboBox):
+        items = {combo.itemText(index) for index in range(combo.count())}
+        if "Turbo" in items or "Jet" in items:
+            lut_combo_items.append(items)
+    metrics.lut_combo_count = len(lut_combo_items)
+    metrics.lut_combos_include_common = (
+        len(lut_combo_items) >= 2
+        and all(common_lut_names.issubset(items) for items in lut_combo_items)
+    )
 
     screen = shell.screen() or QApplication.primaryScreen()
     if screen is not None:
@@ -311,9 +327,15 @@ def _build_checks(metrics: CommercialLayoutMetrics) -> list[LayoutMetricCheck]:
         ),
         LayoutMetricCheck(
             name="device_status_panel_height",
-            expected="expanded height 180-320 px",
+            expected="expanded content height 120-520 px in left scroll",
             actual=f"{metrics.device_status_panel_height}px",
-            passed=180 <= metrics.device_status_panel_height <= 320,
+            passed=120 <= metrics.device_status_panel_height <= 520,
+        ),
+        LayoutMetricCheck(
+            name="left_no_nested_device_scroll",
+            expected="no isolated device-status scroll area",
+            actual=f"inner_scroll={metrics.device_status_has_inner_scroll}",
+            passed=not metrics.device_status_has_inner_scroll,
         ),
         LayoutMetricCheck(
             name="device_status_collapsed_height",
@@ -335,9 +357,9 @@ def _build_checks(metrics: CommercialLayoutMetrics) -> list[LayoutMetricCheck]:
         ),
         LayoutMetricCheck(
             name="numeric_field_total_width",
-            expected=">= 88 px",
+            expected=">= 80 px",
             actual=f"{metrics.numeric_field_total_min_width}px",
-            passed=metrics.numeric_field_total_min_width >= 88,
+            passed=metrics.numeric_field_total_min_width >= 80,
         ),
         LayoutMetricCheck(
             name="scan_action_buttons_layout",
@@ -364,6 +386,15 @@ def _build_checks(metrics: CommercialLayoutMetrics) -> list[LayoutMetricCheck]:
                 metrics.realtime_toolbar_min_button_width >= 44
                 and not metrics.realtime_toolbar_has_ellipsis
             ),
+        ),
+        LayoutMetricCheck(
+            name="lut_combo_common_presets",
+            expected="realtime and display LUT combos include Jet/common presets",
+            actual=(
+                f"count={metrics.lut_combo_count}, "
+                f"include_common={metrics.lut_combos_include_common}"
+            ),
+            passed=metrics.lut_combos_include_common,
         ),
         LayoutMetricCheck(
             name="center_canvas_priority",

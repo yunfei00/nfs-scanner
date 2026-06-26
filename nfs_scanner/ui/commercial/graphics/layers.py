@@ -10,6 +10,8 @@ from PySide6.QtCore import QPointF, Qt
 from PySide6.QtGui import QImage, QPolygonF
 from PySide6.QtWidgets import QGraphicsItem, QGraphicsPixmapItem, QGraphicsScene
 
+from nfs_scanner.ui.commercial.lut_presets import normalize_lut_name
+
 from .mock_assets import CANVAS_HEIGHT, CANVAS_WIDTH, create_mock_board_qimage
 
 
@@ -143,7 +145,7 @@ class HeatmapLayer(BaseLayer):
         super().__init__(scene)
         self._pixmap_item: QGraphicsPixmapItem | None = None
         self._opacity = 0.52
-        self._lut_name = "viridis"
+        self._lut_name = "Turbo"
 
     def build_mock(self) -> None:
         from .mock_assets import create_mock_heatmap_qimage
@@ -172,7 +174,7 @@ class HeatmapLayer(BaseLayer):
     def set_lut_name(self, lut_name: str) -> None:
         """Placeholder LUT selector for future visualization settings."""
 
-        self._lut_name = lut_name.strip() or "viridis"
+        self._lut_name = normalize_lut_name(lut_name)
 
     @property
     def lut_name(self) -> str:

@@ -35,6 +35,7 @@ from nfs_scanner.core.scan_config import (
 )
 
 from .preview_stats_display import update_preview_stat_labels
+from .lut_presets import COMMON_LUT_NAMES
 from .scroll_helpers import configure_scroll_area
 from .widgets import NFSDangerButton, NFSNumericField, NFSPrimaryButton, NFSSecondaryButton
 
@@ -49,7 +50,7 @@ class CommercialPropertyPanel(QScrollArea):
     scan_pause_toggle_requested = Signal()
 
     _DEBOUNCE_MS = 250
-    _COMPACT_FIELD_WIDTH = 92
+    _COMPACT_FIELD_WIDTH = 80
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -138,78 +139,70 @@ class CommercialPropertyPanel(QScrollArea):
     def _compact_field(self, parent: QWidget, key: str, default: float, unit: str = "mm") -> NFSNumericField:
         field = NFSNumericField(unit, parent)
         field.setText(f"{default:g}")
+        if not unit:
+            field.line_edit().setMinimumWidth(72)
         field.setMinimumWidth(self._COMPACT_FIELD_WIDTH)
         field.setMaximumWidth(self._COMPACT_FIELD_WIDTH)
         field.valueChanged.connect(self._schedule_emit_scan_config)
         self._field_map[key] = field
         return field
 
-    def _build_xyz_row(
-        self,
-        parent: QWidget,
-        row_label: str,
-        specs: tuple[tuple[str, float], ...],
-    ) -> QWidget:
-        row = QWidget(parent)
-        row.setObjectName("commercialPropertyGridRow")
-        layout = QVBoxLayout(row)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(3)
-        caption = QLabel(row_label, row)
-        caption.setObjectName("nfsMutedLabel")
-        layout.addWidget(caption)
-
-        grid = QGridLayout()
+    def _build_region_grid(self, parent: QWidget) -> QWidget:
+        table = QWidget(parent)
+        table.setObjectName("commercialPropertyGridRow")
+        grid = QGridLayout(table)
         grid.setContentsMargins(0, 0, 0, 0)
         grid.setHorizontalSpacing(6)
-        grid.setVerticalSpacing(2)
-        axis_names = {
-            "x_start": "X",
-            "y_start": "Y",
-            "z_height": "Z",
-            "x_stop": "X",
-            "y_stop": "Y",
-            "z_stop": "Z",
-            "x_step": "X",
-            "y_step": "Y",
-            "z_step": "Z",
-        }
-        for column, (key, default) in enumerate(specs):
-            axis = QLabel(axis_names[key], row)
-            axis.setObjectName("nfsMutedLabel")
-            axis.setAlignment(Qt.AlignmentFlag.AlignLeft)
-            grid.addWidget(axis, 0, column)
-            grid.addWidget(self._compact_field(row, key, default), 1, column)
+        grid.setVerticalSpacing(6)
+
+        headers = ("参数", "X(mm)", "Y(mm)", "Z(mm)")
+        for column, caption in enumerate(headers):
+            label = QLabel(caption, table)
+            label.setObjectName("nfsMutedLabel")
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter if column else Qt.AlignmentFlag.AlignLeft)
+            grid.addWidget(label, 0, column)
+
+        rows: tuple[tuple[str, tuple[tuple[str, float] | None, ...]], ...] = (
+            (
+                "起点",
+                (("x_start", DEFAULT_X_START), ("y_start", DEFAULT_Y_START), ("z_height", DEFAULT_Z_HEIGHT)),
+            ),
+            (
+                "终点",
+                (("x_stop", DEFAULT_X_STOP), ("y_stop", DEFAULT_Y_STOP), None),
+            ),
+            (
+                "步长",
+                (("x_step", DEFAULT_X_STEP), ("y_step", DEFAULT_Y_STEP), None),
+            ),
+        )
+        for row_index, (caption, specs) in enumerate(rows, start=1):
+            row_label = QLabel(caption, table)
+            row_label.setObjectName("nfsMutedLabel")
+            row_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            grid.addWidget(row_label, row_index, 0)
+            for column, spec in enumerate(specs, start=1):
+                if spec is None:
+                    empty_label = QLabel("-", table)
+                    empty_label.setObjectName("nfsMutedLabel")
+                    empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                    grid.addWidget(empty_label, row_index, column)
+                    continue
+                key, default = spec
+                grid.addWidget(self._compact_field(table, key, default, ""), row_index, column)
+
+        grid.setColumnMinimumWidth(0, 34)
+        for column in (1, 2, 3):
+            grid.setColumnMinimumWidth(column, self._COMPACT_FIELD_WIDTH)
             grid.setColumnStretch(column, 1)
-        layout.addLayout(grid)
-        return row
+        return table
 
     def _build_region_section(self, parent: QWidget) -> QWidget:
         frame, frame_layout = self._section_frame(parent, "扫描区域")
         region_combo = QComboBox(frame)
         region_combo.addItems(["矩形区域", "全板区域", "自定义 ROI"])
         frame_layout.addWidget(region_combo)
-        frame_layout.addWidget(
-            self._build_xyz_row(
-                frame,
-                "起点",
-                (("x_start", DEFAULT_X_START), ("y_start", DEFAULT_Y_START), ("z_height", DEFAULT_Z_HEIGHT)),
-            )
-        )
-        frame_layout.addWidget(
-            self._build_xyz_row(
-                frame,
-                "终点",
-                (("x_stop", DEFAULT_X_STOP), ("y_stop", DEFAULT_Y_STOP)),
-            )
-        )
-        frame_layout.addWidget(
-            self._build_xyz_row(
-                frame,
-                "步长",
-                (("x_step", DEFAULT_X_STEP), ("y_step", DEFAULT_Y_STEP)),
-            )
-        )
+        frame_layout.addWidget(self._build_region_grid(frame))
         return frame
 
     def _build_stats_grid(self, parent: QWidget) -> QWidget:
@@ -352,7 +345,7 @@ class CommercialPropertyPanel(QScrollArea):
         heatmap_checkbox = QCheckBox("显示热力图", frame)
         heatmap_checkbox.setChecked(True)
         lut_combo = QComboBox(frame)
-        lut_combo.addItems(["Turbo", "Viridis", "Plasma"])
+        lut_combo.addItems(list(COMMON_LUT_NAMES))
         frame_layout.addWidget(heatmap_checkbox)
         frame_layout.addWidget(self._labeled_row(frame, "色图", lut_combo))
         layout.addWidget(frame)
