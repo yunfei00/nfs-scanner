@@ -6,6 +6,71 @@
 
 ---
 
+## 先看这里：如何启动商业版 UI
+
+**商业版 UI 不是默认入口。** 直接运行 `python -m nfs_scanner.main` 会启动旧版 UI。
+
+商业版 Demo UI 必须显式设置：
+
+```text
+NFS_SCANNER_UI=commercial
+```
+
+### Windows PowerShell（推荐）
+
+在仓库根目录执行：
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+$env:NFS_SCANNER_UI="commercial"; python -m nfs_scanner.main
+```
+
+### Windows CMD
+
+```cmd
+python -m venv .venv
+.venv\Scripts\activate.bat
+pip install -r requirements.txt
+set NFS_SCANNER_UI=commercial && python -m nfs_scanner.main
+```
+
+### macOS / Linux
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+NFS_SCANNER_UI=commercial python -m nfs_scanner.main
+```
+
+商业版 UI 启动后，顶部应显示类似安全标识：
+
+```text
+Mock / Dry Run / No Hardware Control / Real Device Disabled
+```
+
+这表示当前处于安全演示模式，不会控制真实硬件。
+
+---
+
+## 默认旧版 UI
+
+旧版 UI 仍然保留，并且仍是默认入口：
+
+```bash
+python -m nfs_scanner.main
+```
+
+如果你看到的是旧界面，不是商业版界面，通常是因为没有设置：
+
+```text
+NFS_SCANNER_UI=commercial
+```
+
+---
+
 ## 当前状态
 
 当前主线已经具备 **商业版 Mock Demo 闭环 v0.1**：
@@ -23,52 +88,6 @@
 - 默认不调用真实 `ScanManager`。
 - 默认不修改真实 CSV / 历史数据格式。
 - 旧 UI 仍然保留，并且仍是默认入口。
-
----
-
-## 快速启动
-
-### 1. 安装依赖
-
-```bash
-pip install -r requirements.txt
-```
-
-### 2. 启动旧版 UI（默认入口）
-
-```bash
-python -m nfs_scanner.main
-```
-
-### 3. 启动商业版 Demo UI（推荐验收入口）
-
-#### Windows PowerShell
-
-```powershell
-$env:NFS_SCANNER_UI="commercial"
-python -m nfs_scanner.main
-```
-
-#### Windows CMD
-
-```cmd
-set NFS_SCANNER_UI=commercial
-python -m nfs_scanner.main
-```
-
-#### macOS / Linux
-
-```bash
-NFS_SCANNER_UI=commercial python -m nfs_scanner.main
-```
-
-商业版 UI 启动后，顶部应显示类似：
-
-```text
-Mock / Dry Run / No Hardware Control / Real Device Disabled
-```
-
-这表示当前处于安全演示模式，不会控制真实硬件。
 
 ---
 
@@ -119,15 +138,56 @@ QA 结果输出位置：
 ### Windows PowerShell
 
 ```powershell
-$env:NFS_SCANNER_AUTOCLOSE_MS="1500"
-$env:NFS_SCANNER_UI="commercial"
-python -m nfs_scanner.main
+$env:NFS_SCANNER_AUTOCLOSE_MS="1500"; $env:NFS_SCANNER_UI="commercial"; python -m nfs_scanner.main
+```
+
+### Windows CMD
+
+```cmd
+set NFS_SCANNER_AUTOCLOSE_MS=1500 && set NFS_SCANNER_UI=commercial && python -m nfs_scanner.main
 ```
 
 ### macOS / Linux
 
 ```bash
 NFS_SCANNER_AUTOCLOSE_MS=1500 NFS_SCANNER_UI=commercial python -m nfs_scanner.main
+```
+
+---
+
+## 常见启动问题
+
+### 1. 启动后还是旧 UI
+
+原因：没有设置商业版环境变量。
+
+解决：
+
+```powershell
+$env:NFS_SCANNER_UI="commercial"; python -m nfs_scanner.main
+```
+
+### 2. PowerShell 提示无法运行脚本
+
+如果激活虚拟环境时报执行策略问题，可以临时使用：
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+```
+
+### 3. 缺少 PySide6 / numpy 等依赖
+
+确认已经在虚拟环境中执行：
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. 只想快速验证商业 UI 能否启动
+
+```powershell
+$env:NFS_SCANNER_AUTOCLOSE_MS="1500"; $env:NFS_SCANNER_UI="commercial"; python -m nfs_scanner.main
 ```
 
 ---
@@ -259,40 +319,6 @@ CommercialServiceBundle
 
 推荐 AI 开发流程：
 
-1. 先读取 `.ai/constitution.md`。
-2. 再读取 `.ai/cursor_workflow.md` 和 `.ai/project_status.md`。
-3. 按当前 Sprint / Review Gate 执行。
-4. 每个 task 小步提交。
-5. 跑完整 QA：`python tools/qa_run_commercial_demo.py`。
-6. 涉及真实设备、CSV、旧 UI 删除、真实扫描前必须停在 Major Review。
-
----
-
-## Roadmap
-
-### 当前
-
-- 商业版 Mock Demo 闭环 v0.1；
-- AI QA 自检闭环；
-- 真实设备仍处于安全阻塞状态。
-
-### 下一步候选
-
-- 商业 UI 目标页面继续微调；
-- 真实运动平台只读/连接层 review；
-- 工具栏 overflow；
-- Data View 图表增强；
-- Report Center PDF 导出（需依赖评审）。
-
-### Future
-
-- Qt/C++ 高性能版本；
-- 插件化设备生态；
-- AI 辅助异常分析；
-- 云端测试管理平台。
-
----
-
-## License
-
-For Research and Engineering Use.
+```text
+Product Spec → Architecture → Design System → Sprint Backlog → Cursor/Codex → QA Pipeline → Review Gate
+```
