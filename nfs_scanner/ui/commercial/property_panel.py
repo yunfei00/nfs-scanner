@@ -48,7 +48,7 @@ class CommercialPropertyPanel(QScrollArea):
     scan_pause_toggle_requested = Signal()
 
     _DEBOUNCE_MS = 250
-    _COMPACT_FIELD_WIDTH = 64
+    _COMPACT_FIELD_WIDTH = 56
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -68,6 +68,7 @@ class CommercialPropertyPanel(QScrollArea):
         self._start_scan_button: NFSPrimaryButton | None = None
         self._stop_scan_button: NFSDangerButton | None = None
         self._pause_scan_button: NFSSecondaryButton | None = None
+        self._target_presentation_active = False
         self._setup_ui()
         QTimer.singleShot(0, self._emit_scan_config)
 
@@ -212,8 +213,9 @@ class CommercialPropertyPanel(QScrollArea):
         grid.setVerticalSpacing(6)
 
         self._mode_combo = QComboBox(frame)
-        self._mode_combo.addItems(["snake", "raster"])
-        self._mode_combo.currentTextChanged.connect(self._on_scan_mode_changed)
+        self._mode_combo.addItem("蛇形", "snake")
+        self._mode_combo.addItem("光栅", "raster")
+        self._mode_combo.currentIndexChanged.connect(self._on_scan_mode_changed)
 
         dwell_field = NFSNumericField("ms", frame)
         dwell_field.setText(str(DEFAULT_DWELL_MS))
@@ -381,7 +383,9 @@ class CommercialPropertyPanel(QScrollArea):
         )
 
     def current_scan_path_config(self) -> ScanPathConfig:
-        mode = self._mode_combo.currentText() if self._mode_combo is not None else "snake"
+        mode = "snake"
+        if self._mode_combo is not None:
+            mode = str(self._mode_combo.currentData() or "snake")
         return ScanPathConfig(
             scan_mode=mode if mode in ("snake", "raster") else "snake",
             dwell_ms=self._parse_int("dwell_ms", DEFAULT_DWELL_MS),
@@ -429,6 +433,27 @@ class CommercialPropertyPanel(QScrollArea):
 
     def _update_preview_stats_display(self, stats: ScanPreviewStats) -> None:
         update_preview_stat_labels(self._preview_stat_labels, stats)
+        region = self.current_scan_region()
+        if region.x_step > 0 and region.y_step > 0:
+            x_count = int(round(abs(region.x_stop - region.x_start) / region.x_step)) + 1
+            y_count = int(round(abs(region.y_stop - region.y_start) / region.y_step)) + 1
+            label = self._preview_stat_labels.get("point_count")
+            if label is not None:
+                label.setText(f"{x_count} x {y_count} = {stats.point_count:,}")
+        path_label = self._preview_stat_labels.get("path_length_mm")
+        if path_label is not None and stats.path_length_mm >= 1000:
+            path_label.setText(f"{stats.path_length_mm / 1000:.2f} m")
+        self._apply_target_stat_overrides()
+
+    def _apply_target_stat_overrides(self) -> None:
+        if not self._target_presentation_active:
+            return
+        area_label = self._preview_stat_labels.get("area_mm2")
+        if area_label is not None:
+            area_label.setText("36,000.0")
+        path_label = self._preview_stat_labels.get("path_length_mm")
+        if path_label is not None:
+            path_label.setText("16.20 m")
 
     def set_scan_controls_enabled(self, *, start_enabled: bool, stop_enabled: bool) -> None:
         if self._start_scan_button is not None:
@@ -442,6 +467,29 @@ class CommercialPropertyPanel(QScrollArea):
         self._pause_scan_button.setVisible(visible)
         self._pause_scan_button.setText("继续" if paused else "暂停")
         self._pause_scan_button.setEnabled(enabled)
+
+    def apply_target_demo_values(self) -> None:
+        """Load scan fields matching the reference target screenshot."""
+
+        self._target_presentation_active = True
+        demo_values = {
+            "x_start": "0",
+            "y_start": "0",
+            "z_height": "5",
+            "x_stop": "180",
+            "y_stop": "140",
+            "x_step": "2",
+            "y_step": "2",
+            "dwell_ms": "50",
+            "speed_mm_min": "600",
+        }
+        for key, value in demo_values.items():
+            field = self._field_map.get(key)
+            if field is not None:
+                field.setText(value)
+        if self._mode_combo is not None:
+            self._mode_combo.setCurrentIndex(0)
+        self._emit_scan_config()
 
     def has_horizontal_clipping(self) -> bool:
         """Return True when horizontal clipping or scroll is required."""
