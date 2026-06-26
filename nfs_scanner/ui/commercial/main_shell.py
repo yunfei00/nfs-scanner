@@ -26,7 +26,7 @@ from .runtime import MockScanController
 from .services import CommercialServiceBundle, create_commercial_services
 from .scroll_helpers import apply_commercial_scroll_config, configure_scroll_area
 from .status_bar import CommercialStatusBar
-from .title_bar import CommercialTitleBar
+from .top_header import CommercialTopHeader
 from .toolbar import CommercialToolbar
 from .workspace import CommercialWorkspace
 from .workflow_panel import CommercialWorkflowPanel
@@ -62,8 +62,8 @@ class CommercialMainShell(QMainWindow):
         self.setMinimumSize(960, 480)
         self._services = services or create_commercial_services()
         self._demo_controller = DemoSessionController()
-        self.title_bar = CommercialTitleBar(self)
         self.toolbar = CommercialToolbar(self)
+        self.top_header = CommercialTopHeader(self, self.toolbar, self)
         self.workflow_panel = CommercialWorkflowPanel(self)
         self.device_status_panel = CommercialDeviceStatusPanel(self._services.devices, parent=self)
         self.workspace = CommercialWorkspace(self, services=self._services)
@@ -117,6 +117,12 @@ class CommercialMainShell(QMainWindow):
         if self.property_panel._target_presentation_active:
             self.property_panel._apply_target_stat_overrides()
         self.status_bar_widget.apply_target_demo_labels()
+
+    @property
+    def title_bar(self) -> CommercialTopHeader:
+        """Backward-compatible accessor for the unified top header."""
+
+        return self.top_header
 
     def uses_custom_title_bar(self) -> bool:
         """Return True when the shell hides the native title bar."""
@@ -395,15 +401,14 @@ class CommercialMainShell(QMainWindow):
         outer_layout.setContentsMargins(0, 0, 0, 0)
         outer_layout.setSpacing(0)
 
-        outer_layout.addWidget(self.title_bar, 0)
+        outer_layout.addWidget(self.top_header, 0)
 
         content = QWidget(outer)
         content.setObjectName("commercialContent")
         content_layout = QVBoxLayout(content)
-        content_layout.setContentsMargins(8, 6, 8, 8)
+        content_layout.setContentsMargins(8, 4, 8, 8)
         content_layout.setSpacing(6)
 
-        content_layout.addWidget(self.toolbar, 0)
         content_layout.addWidget(self._build_body_splitter(), 1)
 
         status_row = QHBoxLayout()
@@ -584,10 +589,9 @@ class CommercialMainShell(QMainWindow):
             self.bottom_dock.setMinimumHeight(dock_min)
 
             chrome_height = (
-                self.title_bar.height()
-                + self.toolbar.height()
+                self.top_header.height()
                 + self.status_bar_widget.height()
-                + 44
+                + 36
             )
             body_height = max(height - chrome_height, 360 if compact else 420)
             bottom_ratio = (

@@ -104,6 +104,7 @@ class RealtimeView(QWidget):
         opacity_label.setObjectName("nfsMutedLabel")
         opacity_slider = QSlider(Qt.Orientation.Horizontal, toolbar)
         opacity_slider.setObjectName("realtimeHeatmapOpacitySlider")
+        opacity_slider.setTracking(True)
         opacity_slider.setRange(20, 90)
         opacity_slider.setValue(60)
         opacity_slider.setFixedWidth(72)

@@ -30,8 +30,8 @@ class CommercialToolbar(QWidget):
         super().__init__(parent)
         self.setObjectName("commercialToolbar")
         self.setProperty("targetStyleMode", "true")
-        self.setMinimumHeight(34)
-        self.setMaximumHeight(34)
+        self.setMinimumHeight(32)
+        self.setMaximumHeight(32)
         self._tool_buttons: list[NFSIconToolButton] = []
         self._start_scan_button: NFSIconToolButton | None = None
         self._pause_scan_button: NFSIconToolButton | None = None
@@ -111,7 +111,7 @@ class CommercialToolbar(QWidget):
         line.setObjectName("commercialToolbarSeparator")
         line.setFrameShape(QFrame.Shape.VLine)
         line.setFixedWidth(1)
-        line.setFixedHeight(28)
+        line.setFixedHeight(24)
         return line
 
     def _make_button(
@@ -165,7 +165,7 @@ class CommercialToolbar(QWidget):
         return self._layout_overflow
 
     def _measure_overflow(self, window_width: int) -> bool:
-        required = len(self._tool_buttons) * 50 + 64
+        required = len(self._tool_buttons) * 46 + 56
         available = max(window_width - 420, 400)
         return required > available
 

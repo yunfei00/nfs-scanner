@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QFrame, QLabel, QProgressBar, QTabWidget, QWidget
+from PySide6.QtWidgets import QApplication, QFrame, QLabel, QProgressBar, QTabWidget, QWidget
 
 from nfs_scanner.ui.commercial.graphics.layers import LayerKind
 from nfs_scanner.ui.commercial.layout_metrics import LayoutMetricCheck
@@ -33,7 +33,25 @@ def collect_target_alignment_checks(shell: CommercialMainShell) -> list[LayoutMe
         log_lines = len(log_view.toPlainText().splitlines())
 
     target_style = shell.property("targetStyleMode") == "true"
+    top_header = shell.findChild(QFrame, "commercialTopHeader")
+    brand_row = shell.findChild(QWidget, "commercialBrandRow")
+    toolbar_parent = shell.toolbar.parent()
+    if hasattr(shell, "top_header"):
+        QApplication.processEvents()
+        single_line_brand = shell.top_header.is_single_line_brand()
     checks = [
+        LayoutMetricCheck(
+            name="top_header_integrated",
+            expected="toolbar embedded in unified top header",
+            actual=f"header={top_header is not None}, parent={getattr(toolbar_parent, 'objectName', lambda: '')()}",
+            passed=top_header is not None and toolbar_parent is top_header,
+        ),
+        LayoutMetricCheck(
+            name="brand_single_line_row",
+            expected="brand title/subtitle/version on one horizontal row",
+            actual=f"row={brand_row is not None}, single_line={single_line_brand}",
+            passed=brand_row is not None and single_line_brand,
+        ),
         LayoutMetricCheck(
             name="target_style_mode",
             expected="targetStyleMode enabled",

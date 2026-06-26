@@ -16,6 +16,7 @@ if str(REPO_ROOT) not in sys.path:
 OUTPUT_DIR = REPO_ROOT / ".ai" / "visual_check"
 DEFAULT_SHOT = OUTPUT_DIR / "commercial_default.png"
 MAXIMIZED_SHOT = OUTPUT_DIR / "commercial_maximized.png"
+TOP_SHOT = OUTPUT_DIR / "commercial_top_header.png"
 REPORT_PATH = OUTPUT_DIR / "commercial_ui_visual_report.md"
 METRICS_JSON = OUTPUT_DIR / "commercial_ui_visual_metrics.json"
 
@@ -54,6 +55,7 @@ def _write_report(
         "",
         f"- Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         f"- Default screenshot: `{default_shot.as_posix()}`",
+        f"- Top header screenshot: `{TOP_SHOT.as_posix()}`",
         f"- Maximized screenshot: `{maximized_shot.as_posix()}`",
         "",
         "## Default Window",
@@ -149,6 +151,8 @@ def run_visual_check() -> int:
 
     default_pixmap = shell.grab()
     default_pixmap.save(str(DEFAULT_SHOT))
+    if hasattr(shell, "top_header"):
+        shell.top_header.grab().save(str(TOP_SHOT))
     default_metrics = collect_layout_metrics(shell)
 
     shell.title_bar._toggle_maximize()

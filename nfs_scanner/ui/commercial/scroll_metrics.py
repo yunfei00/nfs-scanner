@@ -139,7 +139,7 @@ def collect_scroll_usability_metrics(shell: CommercialMainShell) -> ScrollUsabil
             target = max(previous - 5, slider.minimum())
         slider.setValue(target)
         QApplication.processEvents()
-        slider_status = "PASS" if slider.value() == target else "FAIL"
+        slider_status = "PASS" if slider.value() == target and slider.hasTracking() else "FAIL"
 
     metrics = ScrollUsabilityMetrics(
         left_scrollbar_width=_scrollbar_width(left_scroll),
