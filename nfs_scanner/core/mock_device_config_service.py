@@ -16,6 +16,7 @@ class MockDeviceConfigService:
         }
         self._spectrum: dict[str, SpectrumDeviceConfig] = {
             "spectrum-001": SpectrumDeviceConfig(),
+            "vna-001": SpectrumDeviceConfig(model="ZNA67", resource="TCPIP0::MOCK-VNA::INSTR"),
         }
         self._camera: dict[str, CameraDeviceConfig] = {
             "camera-001": CameraDeviceConfig(),
@@ -53,7 +54,7 @@ class MockDeviceConfigService:
             cfg = self.get_motion(device_id)
             mode_label = "mock" if cfg.connection_mode == "mock" else "real_connection_test"
             return f"{cfg.port} @ {cfg.baudrate} / {cfg.protocol} [{mode_label}]"
-        if kind == "spectrum":
+        if kind in {"spectrum", "vna"}:
             cfg = self.get_spectrum(device_id)
             return f"{cfg.model} @ {cfg.ip}:{cfg.port}"
         if kind == "camera":

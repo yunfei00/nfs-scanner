@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, Protocol, runtime_checkable
 
-DeviceKind = Literal["motion", "spectrum", "camera"]
+DeviceKind = Literal["motion", "spectrum", "camera", "vna"]
 
 DeviceConnectionStatus = Literal["disconnected", "connecting", "connected", "error"]
 

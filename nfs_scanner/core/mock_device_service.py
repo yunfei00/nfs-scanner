@@ -58,6 +58,18 @@ class MockDeviceService(DeviceServiceProtocol):
                 summary="3840x2160 / 30 fps",
                 last_message="Waiting for mock connect",
             ),
+            "vna-001": DeviceSummary(
+                device_id="vna-001",
+                kind="vna",
+                display_name="VNA / Trace Source",
+                model="ZNA67 / Trace",
+                address="TCPIP0::MOCK-VNA::INSTR",
+                connection_status="disconnected",
+                status_label="未连接",
+                badge_status="disconnected",
+                summary="S11 / S21 mock trace source",
+                last_message="Waiting for mock connect",
+            ),
         }
 
     def list_devices(self) -> list[DeviceSummary]:
@@ -77,6 +89,9 @@ class MockDeviceService(DeviceServiceProtocol):
         elif device.kind == "camera":
             summary = "3840x2160 / 30 fps"
             message = "Mock camera stream started (no USB capture)"
+        elif device.kind == "vna":
+            summary = "S11 / S21 / 100 MHz - 6 GHz"
+            message = "Mock VNA trace source connected (no VISA)"
         updated = replace(
             device,
             connection_status="connected",
@@ -97,6 +112,31 @@ class MockDeviceService(DeviceServiceProtocol):
             status_label=label,
             badge_status=badge,
             last_message=f"Mock disconnected: {device.display_name}",
+        )
+        self._devices[device_id] = updated
+        return updated
+
+    def reset_device(self, device_id: str) -> DeviceSummary:
+        """Reset one mock device to a safe disconnected baseline."""
+
+        device = self._require_device(device_id)
+        label, badge = _badge_for_status("disconnected")
+        summary = device.summary
+        if device.kind == "motion":
+            summary = "X=0.00 Y=0.00 Z=0.00"
+        elif device.kind == "spectrum":
+            summary = "100 MHz - 6 GHz / RBW 100 kHz"
+        elif device.kind == "camera":
+            summary = "3840x2160 / 30 fps"
+        elif device.kind == "vna":
+            summary = "S11 / S21 mock trace source"
+        updated = replace(
+            device,
+            connection_status="disconnected",
+            status_label=label,
+            badge_status=badge,
+            summary=summary,
+            last_message=f"Mock reset: {device.display_name}",
         )
         self._devices[device_id] = updated
         return updated

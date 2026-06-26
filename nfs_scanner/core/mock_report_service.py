@@ -63,6 +63,41 @@ class MockReportService:
         report_path.write_text(self._render_markdown(preview), encoding="utf-8")
         return report_path
 
+    def export_mock_report(
+        self,
+        task_id: str,
+        *,
+        file_format: str,
+        output_dir: Path | str | None = None,
+    ) -> Path:
+        """Write a lightweight mock report artifact in the requested format."""
+
+        normalized = file_format.lower().lstrip(".")
+        if normalized not in {"md", "html", "pdf", "png"}:
+            raise ValueError(f"Unsupported mock report format: {file_format}")
+        if normalized == "md":
+            return self.export_markdown_report(task_id, output_dir)
+
+        preview = self.build_preview(task_id)
+        target_dir = Path(output_dir) if output_dir is not None else _DEFAULT_REPORT_DIR
+        target_dir.mkdir(parents=True, exist_ok=True)
+        safe_id = task_id.replace("/", "-")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report_path = target_dir / f"report_{safe_id}_{timestamp}.{normalized}"
+        markdown = self._render_markdown(preview)
+        if normalized == "html":
+            report_path.write_text(
+                "<!doctype html><meta charset=\"utf-8\"><pre>"
+                + markdown.replace("&", "&amp;").replace("<", "&lt;")
+                + "</pre>\n",
+                encoding="utf-8",
+            )
+        elif normalized == "pdf":
+            report_path.write_bytes(("%PDF-1.4\n% Mock PDF report\n" + markdown).encode("utf-8"))
+        else:
+            report_path.write_bytes(b"\x89PNG\r\n\x1a\nMock PNG report preview\n")
+        return report_path
+
     def _project_info(self) -> dict[str, str | int]:
         session = self._project.current_session() if self._project is not None else None
         if session is None:

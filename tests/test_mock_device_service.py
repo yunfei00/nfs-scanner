@@ -15,10 +15,10 @@ class MockDeviceServiceTestCase(unittest.TestCase):
     def test_implements_protocol(self) -> None:
         self.assertIsInstance(self.service, DeviceServiceProtocol)
 
-    def test_lists_three_device_kinds(self) -> None:
+    def test_lists_mock_device_kinds(self) -> None:
         devices = self.service.list_devices()
         kinds = {device.kind for device in devices}
-        self.assertEqual(kinds, {"motion", "spectrum", "camera"})
+        self.assertEqual(kinds, {"motion", "spectrum", "camera", "vna"})
 
     def test_connect_and_disconnect(self) -> None:
         device = self.service.connect_device("spectrum-001")
@@ -26,6 +26,12 @@ class MockDeviceServiceTestCase(unittest.TestCase):
         self.assertTrue(device.last_message)
         disconnected = self.service.disconnect_device("spectrum-001")
         self.assertEqual(disconnected.connection_status, "disconnected")
+
+    def test_reset_device(self) -> None:
+        self.service.connect_device("vna-001")
+        reset = self.service.reset_device("vna-001")
+        self.assertEqual(reset.connection_status, "disconnected")
+        self.assertIn("Mock reset", reset.last_message)
 
     def test_refresh_returns_current_state(self) -> None:
         self.service.connect_device("camera-001")
