@@ -483,6 +483,15 @@ Needs Review: yes/no
 - Impact: visual + QA PASS；145 tests；不接真实设备。
 - Needs Review: no
 
+### 2026-06-26 - Top Header Final Polish
+
+- Date: 2026-06-26
+- Task: top-header-final-polish
+- Decision: 最后一轮顶部 polish：品牌区 42×42 渐变 logo + 标题/badge 层级；工具栏 54×48 六组密度；右上「授权状态：正常」；QA 修正 title_bar_height 期望 48–58px；新增 version_badge / screenshot 检查。
+- Reason: 用户要求收敛接近目标商业软件截图，并消除 QA 报告期望/判定矛盾。
+- Impact: visual + QA PASS；148 tests；未改主体布局/真实设备。
+- Needs Review: no
+
 ### 2026-06-26 - Top Header Target Alignment
 
 - Date: 2026-06-26

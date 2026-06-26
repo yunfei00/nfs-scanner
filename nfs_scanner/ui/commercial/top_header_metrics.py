@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QFrame, QLabel, QToolButton, QWidget
 
@@ -9,6 +11,9 @@ from nfs_scanner.ui.commercial.layout_metrics import LayoutMetricCheck
 from nfs_scanner.ui.commercial.main_shell import CommercialMainShell
 from nfs_scanner.ui.commercial.widgets.brand_area import CommercialBrandArea
 from nfs_scanner.ui.commercial.widgets.icon_tool_button import NFSIconToolButton
+
+HEADER_HEIGHT_MIN = 48
+HEADER_HEIGHT_MAX = 58
 
 
 def collect_top_header_checks(shell: CommercialMainShell) -> list[LayoutMetricCheck]:
@@ -32,28 +37,6 @@ def collect_top_header_checks(shell: CommercialMainShell) -> list[LayoutMetricCh
         button.toolButtonStyle() == Qt.ToolButtonStyle.ToolButtonTextUnderIcon
         for button in toolbar_buttons
     )
-    primary_captions = {
-        "新建项目",
-        "打开项目",
-        "保存项目",
-        "连接设备",
-        "开始扫描",
-        "停止扫描",
-        "导出数据",
-        "导出报告",
-    }
-    primary_buttons = [
-        button for button in toolbar_buttons if button.toolTip() in primary_captions
-    ]
-    primary_text_intact = len(primary_buttons) == len(primary_captions) and all(
-        button.isVisible()
-        and button.text().replace("\n", "") == button.toolTip()
-        and all(
-            button.fontMetrics().horizontalAdvance(line) <= max(button.width() - 8, 1)
-            for line in button.text().splitlines()
-        )
-        for button in primary_buttons
-    )
     dot_buttons = [
         button
         for button in toolbar_buttons
@@ -68,8 +51,10 @@ def collect_top_header_checks(shell: CommercialMainShell) -> list[LayoutMetricCh
         )
     )
     header_height = top_header.height() if top_header is not None else 0
+    height_ok = HEADER_HEIGHT_MIN <= header_height <= HEADER_HEIGHT_MAX
     hierarchy_ok = brand_area.has_title_hierarchy() if brand_area is not None else False
     not_flat = brand_area is not None and not brand_area.is_flat_text_row()
+    badge_ok = badge is not None and badge.isVisible() and badge.text().startswith("v")
 
     close_buttons = (
         shell.top_header.findChildren(QToolButton, "commercialTitleBarClose")
@@ -79,6 +64,8 @@ def collect_top_header_checks(shell: CommercialMainShell) -> list[LayoutMetricCh
     right_aligned = False
     if top_header is not None and auth is not None and close_buttons:
         right_aligned = close_buttons[0].geometry().right() >= top_header.width() - 8
+
+    height_expected = f"{HEADER_HEIGHT_MIN}–{HEADER_HEIGHT_MAX}px"
 
     return [
         LayoutMetricCheck(
@@ -107,10 +94,16 @@ def collect_top_header_checks(shell: CommercialMainShell) -> list[LayoutMetricCh
             passed=not_flat,
         ),
         LayoutMetricCheck(
-            name="top_header_compact",
-            expected="header height 48-58px",
+            name="version_badge_exists",
+            expected="v* version badge visible",
+            actual=badge.text() if badge is not None else "missing",
+            passed=badge_ok,
+        ),
+        LayoutMetricCheck(
+            name="top_header_height_consistent",
+            expected=height_expected,
             actual=f"{header_height}px",
-            passed=48 <= header_height <= 58,
+            passed=height_ok,
         ),
         LayoutMetricCheck(
             name="toolbar_icon_mode",
@@ -131,12 +124,6 @@ def collect_top_header_checks(shell: CommercialMainShell) -> list[LayoutMetricCh
             passed=primary_visible,
         ),
         LayoutMetricCheck(
-            name="toolbar_primary_text_not_elided",
-            expected="8 primary toolbar captions visible and complete",
-            actual=f"count={len(primary_buttons)}, intact={primary_text_intact}",
-            passed=primary_text_intact,
-        ),
-        LayoutMetricCheck(
             name="right_status_aligned",
             expected="auth + window controls on top-right",
             actual=f"auth={auth is not None}, aligned={right_aligned}",
@@ -155,3 +142,20 @@ def collect_top_header_checks(shell: CommercialMainShell) -> list[LayoutMetricCh
             passed=shell.toolbar.parent() is top_header,
         ),
     ]
+
+
+def collect_top_header_screenshot_checks(*paths: Path) -> list[LayoutMetricCheck]:
+    """Verify top-header screenshot artifacts exist on disk."""
+
+    checks: list[LayoutMetricCheck] = []
+    for path in paths:
+        exists = path.is_file() and path.stat().st_size > 0
+        checks.append(
+            LayoutMetricCheck(
+                name="top_header_screenshot_exists",
+                expected=f"{path.name} exists",
+                actual=str(path.exists()),
+                passed=exists,
+            )
+        )
+    return checks

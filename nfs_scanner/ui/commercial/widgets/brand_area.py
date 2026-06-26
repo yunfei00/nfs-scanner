@@ -11,7 +11,7 @@ from nfs_scanner.version import APP_VERSION
 class CommercialBrandArea(QWidget):
     """Logo square + hierarchical product title block matching the target header."""
 
-    BRAND_WIDTH = 248
+    BRAND_WIDTH = 232
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -25,89 +25,44 @@ class CommercialBrandArea(QWidget):
 
     def _setup_ui(self) -> None:
         root = QHBoxLayout(self)
-        root.setContentsMargins(0, 0, 10, 0)
-        root.setSpacing(10)
+        root.setContentsMargins(0, 0, 8, 0)
+        root.setSpacing(9)
 
         self._logo_block = QFrame(self)
         self._logo_block.setObjectName("commercialTitleBarLogo")
-        self._logo_block.setFixedSize(44, 44)
-        self._logo_block.setStyleSheet(
-            "QFrame#commercialTitleBarLogo {"
-            "background-color: #0EA5FF;"
-            "border: 1px solid #54C8FF;"
-            "border-radius: 8px;"
-            "}"
-        )
+        self._logo_block.setFixedSize(42, 42)
         logo_layout = QVBoxLayout(self._logo_block)
         logo_layout.setContentsMargins(0, 0, 0, 0)
-        logo_layout.setSpacing(0)
         logo_text = QLabel("NFS", self._logo_block)
         logo_text.setObjectName("commercialTitleBarLogoText")
         logo_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        logo_text.setStyleSheet(
-            "QLabel#commercialTitleBarLogoText {"
-            "background-color: transparent;"
-            "color: #04111F;"
-            "font-size: 15px;"
-            "font-weight: 800;"
-            "letter-spacing: 1px;"
-            "}"
-        )
         logo_layout.addWidget(logo_text)
 
         text_column = QWidget(self)
         text_column.setObjectName("commercialBrandTextColumn")
         text_layout = QVBoxLayout(text_column)
-        text_layout.setContentsMargins(0, 1, 0, 1)
-        text_layout.setSpacing(1)
+        text_layout.setContentsMargins(0, 0, 0, 0)
+        text_layout.setSpacing(0)
 
         title_row = QWidget(text_column)
         title_row.setObjectName("commercialBrandTitleRow")
         title_layout = QHBoxLayout(title_row)
         title_layout.setContentsMargins(0, 0, 0, 0)
-        title_layout.setSpacing(8)
+        title_layout.setSpacing(6)
 
         self._title_label = QLabel("近场扫描系统", title_row)
         self._title_label.setObjectName("commercialTitleBarTitle")
-        self._title_label.setStyleSheet(
-            "QLabel#commercialTitleBarTitle {"
-            "background-color: transparent;"
-            "color: #F4F8FF;"
-            "font-size: 16px;"
-            "font-weight: 700;"
-            "}"
-        )
 
         self._version_badge = QLabel(f"v{APP_VERSION}", title_row)
         self._version_badge.setObjectName("commercialTitleBarBadge")
         self._version_badge.setToolTip("Mock · Dry Run · 无硬件控制")
-        self._version_badge.setStyleSheet(
-            "QLabel#commercialTitleBarBadge {"
-            "background-color: rgba(14, 165, 255, 0.16);"
-            "border: 1px solid rgba(84, 200, 255, 0.50);"
-            "border-radius: 5px;"
-            "color: #8FDBFF;"
-            "font-size: 10px;"
-            "font-weight: 700;"
-            "padding: 1px 6px;"
-            "}"
-        )
 
         title_layout.addWidget(self._title_label, 0, Qt.AlignmentFlag.AlignVCenter)
         title_layout.addWidget(self._version_badge, 0, Qt.AlignmentFlag.AlignVCenter)
         title_layout.addStretch(1)
 
-        self._subtitle_label = QLabel("Near Field Scanner · Commercial Demo", text_column)
+        self._subtitle_label = QLabel("Near Field Scanner", text_column)
         self._subtitle_label.setObjectName("commercialTitleBarSubtitle")
-        self._subtitle_label.setStyleSheet(
-            "QLabel#commercialTitleBarSubtitle {"
-            "background-color: transparent;"
-            "color: #8FA0B8;"
-            "font-size: 10px;"
-            "font-weight: 500;"
-            "letter-spacing: 0.5px;"
-            "}"
-        )
 
         text_layout.addWidget(title_row)
         text_layout.addWidget(self._subtitle_label)
@@ -117,6 +72,9 @@ class CommercialBrandArea(QWidget):
 
     def logo_block(self) -> QFrame | None:
         return self._logo_block
+
+    def version_badge(self) -> QLabel | None:
+        return self._version_badge
 
     def _label_top_y_in(self, label: QLabel, ancestor: QWidget) -> int:
         """Map a label's top edge into *ancestor* coordinates."""

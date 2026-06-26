@@ -134,6 +134,7 @@ def run_visual_check() -> int:
 
     from nfs_scanner.ui.commercial.entry import create_commercial_shell
     from nfs_scanner.ui.commercial.layout_metrics import collect_layout_metrics
+    from nfs_scanner.ui.commercial.top_header_metrics import collect_top_header_screenshot_checks
 
     app = QApplication.instance() or QApplication(sys.argv)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -155,6 +156,7 @@ def run_visual_check() -> int:
     if hasattr(shell, "top_header"):
         shell.top_header.grab().save(str(TOP_SHOT))
     default_metrics = collect_layout_metrics(shell)
+    default_metrics.checks.extend(collect_top_header_screenshot_checks(TOP_SHOT, DEFAULT_SHOT))
 
     shell.title_bar._toggle_maximize()
     app.processEvents()
@@ -164,6 +166,7 @@ def run_visual_check() -> int:
     maximized_pixmap = shell.grab()
     maximized_pixmap.save(str(MAXIMIZED_SHOT))
     maximized_metrics = collect_layout_metrics(shell)
+    maximized_metrics.checks.extend(collect_top_header_screenshot_checks(MAXIMIZED_SHOT))
 
     payload = {
         "generated_at": datetime.now().isoformat(timespec="seconds"),

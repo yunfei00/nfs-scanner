@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-06-26T16:53:26",
+  "generated_at": "2026-06-26T19:57:51",
   "default": {
     "uses_custom_title_bar": true,
-    "title_bar_height": 56,
+    "title_bar_height": 52,
     "bottom_dock_height": 200,
     "log_view_height": 140,
     "statistics_panel_height": 192,
@@ -10,10 +10,10 @@
     "right_panel_width": 350,
     "workspace_width": 676,
     "canvas_width": 616,
-    "canvas_height": 346,
+    "canvas_height": 350,
     "canvas_to_right_ratio": 1.76,
     "canvas_to_left_ratio": 2.6782608695652175,
-    "canvas_view_area_ratio": 0.8108346648405995,
+    "canvas_view_area_ratio": 0.8118814863908178,
     "colorbar_gap_px": 2,
     "toolbar_overflow": false,
     "status_bar_visible": true,
@@ -23,7 +23,7 @@
     "screen_available_height": 720,
     "is_maximized": false,
     "workflow_panel_height": 257,
-    "device_status_panel_height": 493,
+    "device_status_panel_height": 624,
     "device_status_collapsed_height": 45,
     "device_status_has_inner_scroll": false,
     "property_tab_bar_visible_after_scroll": true,
@@ -34,7 +34,7 @@
     "action_buttons_clipped": false,
     "realtime_toolbar_min_button_width": 52,
     "realtime_toolbar_has_ellipsis": false,
-    "lut_combo_count": 2,
+    "lut_combo_count": 3,
     "lut_combos_include_common": true,
     "scroll_usability": {
       "left_scrollbar_width": 14,
@@ -82,13 +82,13 @@
         {
           "name": "log_area_scrollable",
           "expected": "log content scrollable",
-          "actual": "range=5",
+          "actual": "range=6",
           "passed": true
         },
         {
           "name": "property_area_scrollable",
           "expected": "property panel scrollable",
-          "actual": "range=465",
+          "actual": "range=461",
           "passed": true
         },
         {
@@ -122,13 +122,13 @@
       {
         "name": "custom_title_bar",
         "expected": "frameless + title bar visible",
-        "actual": "custom=True, height=56px",
+        "actual": "custom=True, height=52px",
         "passed": true
       },
       {
         "name": "title_bar_height",
         "expected": "48–58 px",
-        "actual": "56px",
+        "actual": "52px",
         "passed": true
       },
       {
@@ -152,7 +152,7 @@
       {
         "name": "canvas_size",
         "expected": "height >= 240px",
-        "actual": "616x346px",
+        "actual": "616x350px",
         "passed": true
       },
       {
@@ -181,8 +181,8 @@
       },
       {
         "name": "device_status_panel_height",
-        "expected": "expanded content height 120-520 px in left scroll",
-        "actual": "493px",
+        "expected": "expanded content height 120-650 px in left scroll",
+        "actual": "624px",
         "passed": true
       },
       {
@@ -230,7 +230,7 @@
       {
         "name": "lut_combo_common_presets",
         "expected": "realtime and display LUT combos include Jet/common presets",
-        "actual": "count=2, include_common=True",
+        "actual": "count=3, include_common=True",
         "passed": true
       },
       {
@@ -386,7 +386,7 @@
       {
         "name": "brand_logo_exists",
         "expected": "NFS logo square >= 40px",
-        "actual": "logo=True, size=44x44",
+        "actual": "logo=True, size=42x42",
         "passed": true
       },
       {
@@ -402,9 +402,15 @@
         "passed": true
       },
       {
-        "name": "top_header_compact",
-        "expected": "header height 48-58px",
-        "actual": "56px",
+        "name": "version_badge_exists",
+        "expected": "v* version badge visible",
+        "actual": "v1.0.0",
+        "passed": true
+      },
+      {
+        "name": "top_header_height_consistent",
+        "expected": "48–58px",
+        "actual": "52px",
         "passed": true
       },
       {
@@ -423,12 +429,6 @@
         "name": "toolbar_primary_actions_visible",
         "expected": "connect/start/stop visible",
         "actual": "True",
-        "passed": true
-      },
-      {
-        "name": "toolbar_primary_text_not_elided",
-        "expected": "8 primary toolbar captions visible and complete",
-        "actual": "count=8, intact=True",
         "passed": true
       },
       {
@@ -482,13 +482,13 @@
       {
         "name": "log_area_scrollable",
         "expected": "log content scrollable",
-        "actual": "range=5",
+        "actual": "range=6",
         "passed": true
       },
       {
         "name": "property_area_scrollable",
         "expected": "property panel scrollable",
-        "actual": "range=465",
+        "actual": "range=461",
         "passed": true
       },
       {
@@ -514,13 +514,25 @@
         "expected": "slider handle style configured",
         "actual": "QSlider found",
         "passed": true
+      },
+      {
+        "name": "top_header_screenshot_exists",
+        "expected": "commercial_top_header.png exists",
+        "actual": "True",
+        "passed": true
+      },
+      {
+        "name": "top_header_screenshot_exists",
+        "expected": "commercial_default.png exists",
+        "actual": "True",
+        "passed": true
       }
     ],
     "all_passed": true
   },
   "maximized": {
     "uses_custom_title_bar": true,
-    "title_bar_height": 56,
+    "title_bar_height": 52,
     "bottom_dock_height": 200,
     "log_view_height": 140,
     "statistics_panel_height": 192,
@@ -528,10 +540,10 @@
     "right_panel_width": 350,
     "workspace_width": 676,
     "canvas_width": 616,
-    "canvas_height": 346,
+    "canvas_height": 350,
     "canvas_to_right_ratio": 1.76,
     "canvas_to_left_ratio": 2.6782608695652175,
-    "canvas_view_area_ratio": 0.8108346648405995,
+    "canvas_view_area_ratio": 0.8118814863908178,
     "colorbar_gap_px": 2,
     "toolbar_overflow": false,
     "status_bar_visible": true,
@@ -541,7 +553,7 @@
     "screen_available_height": 720,
     "is_maximized": true,
     "workflow_panel_height": 257,
-    "device_status_panel_height": 493,
+    "device_status_panel_height": 624,
     "device_status_collapsed_height": 45,
     "device_status_has_inner_scroll": false,
     "property_tab_bar_visible_after_scroll": true,
@@ -552,7 +564,7 @@
     "action_buttons_clipped": false,
     "realtime_toolbar_min_button_width": 52,
     "realtime_toolbar_has_ellipsis": false,
-    "lut_combo_count": 2,
+    "lut_combo_count": 3,
     "lut_combos_include_common": true,
     "scroll_usability": {
       "left_scrollbar_width": 14,
@@ -600,13 +612,13 @@
         {
           "name": "log_area_scrollable",
           "expected": "log content scrollable",
-          "actual": "range=5",
+          "actual": "range=7",
           "passed": true
         },
         {
           "name": "property_area_scrollable",
           "expected": "property panel scrollable",
-          "actual": "range=465",
+          "actual": "range=461",
           "passed": true
         },
         {
@@ -640,13 +652,13 @@
       {
         "name": "custom_title_bar",
         "expected": "frameless + title bar visible",
-        "actual": "custom=True, height=56px",
+        "actual": "custom=True, height=52px",
         "passed": true
       },
       {
         "name": "title_bar_height",
         "expected": "48–58 px",
-        "actual": "56px",
+        "actual": "52px",
         "passed": true
       },
       {
@@ -670,7 +682,7 @@
       {
         "name": "canvas_size",
         "expected": "height >= 240px",
-        "actual": "616x346px",
+        "actual": "616x350px",
         "passed": true
       },
       {
@@ -699,8 +711,8 @@
       },
       {
         "name": "device_status_panel_height",
-        "expected": "expanded content height 120-520 px in left scroll",
-        "actual": "493px",
+        "expected": "expanded content height 120-650 px in left scroll",
+        "actual": "624px",
         "passed": true
       },
       {
@@ -748,7 +760,7 @@
       {
         "name": "lut_combo_common_presets",
         "expected": "realtime and display LUT combos include Jet/common presets",
-        "actual": "count=2, include_common=True",
+        "actual": "count=3, include_common=True",
         "passed": true
       },
       {
@@ -844,7 +856,7 @@
       {
         "name": "log_panel_visible",
         "expected": "log panel visible with >= 6 lines",
-        "actual": "lines=12",
+        "actual": "lines=13",
         "passed": true
       },
       {
@@ -904,7 +916,7 @@
       {
         "name": "brand_logo_exists",
         "expected": "NFS logo square >= 40px",
-        "actual": "logo=True, size=44x44",
+        "actual": "logo=True, size=42x42",
         "passed": true
       },
       {
@@ -920,9 +932,15 @@
         "passed": true
       },
       {
-        "name": "top_header_compact",
-        "expected": "header height 48-58px",
-        "actual": "56px",
+        "name": "version_badge_exists",
+        "expected": "v* version badge visible",
+        "actual": "v1.0.0",
+        "passed": true
+      },
+      {
+        "name": "top_header_height_consistent",
+        "expected": "48–58px",
+        "actual": "52px",
         "passed": true
       },
       {
@@ -941,12 +959,6 @@
         "name": "toolbar_primary_actions_visible",
         "expected": "connect/start/stop visible",
         "actual": "True",
-        "passed": true
-      },
-      {
-        "name": "toolbar_primary_text_not_elided",
-        "expected": "8 primary toolbar captions visible and complete",
-        "actual": "count=8, intact=True",
         "passed": true
       },
       {
@@ -1000,13 +1012,13 @@
       {
         "name": "log_area_scrollable",
         "expected": "log content scrollable",
-        "actual": "range=5",
+        "actual": "range=7",
         "passed": true
       },
       {
         "name": "property_area_scrollable",
         "expected": "property panel scrollable",
-        "actual": "range=465",
+        "actual": "range=461",
         "passed": true
       },
       {
@@ -1031,6 +1043,12 @@
         "name": "slider_widgets_present",
         "expected": "slider handle style configured",
         "actual": "QSlider found",
+        "passed": true
+      },
+      {
+        "name": "top_header_screenshot_exists",
+        "expected": "commercial_maximized.png exists",
+        "actual": "True",
         "passed": true
       }
     ],

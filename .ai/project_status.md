@@ -4,16 +4,16 @@ Last updated: 2026-06-26
 
 ## Current Mode
 
-**COMPLETE — Top Header Target Alignment**
+**COMPLETE — Top Header Final Polish**
 
-商业 UI 顶部已对齐目标图：42×42 NFS logo 品牌块 + 52px 一体化 header + 图标工具栏 + 右上授权/窗口控制；visual/QA 自检 PASS。
+商业 UI 顶部最后一轮 polish：品牌区/logo/工具栏/右上状态精修；QA title_bar_height 期望修正为 48–58px；visual/QA PASS。
 
 ## Recent (2026-06-26)
 
-- `CommercialBrandArea`：蓝色 NFS logo 方块 + 中文主标题 + 英文副标题 + v1.0.0 badge（层级清晰）
-- `CommercialTopHeader` 52px：品牌区 / 工具栏 / 授权-Admin-窗口控制 同一顶栏
-- 工具栏 13 项：52×48 图标在上文字在下，分组分隔，绿/红/蓝主操作强调
-- 顶部 QA 10 项检查 + `top_header.png` 特写截图
+- 品牌区：42×42 渐变 NFS logo + 中文标题 + v badge + 英文副标题（232px）
+- 工具栏：54×48 六组仪器风格按钮，mock 项弱化样式
+- 右上：`授权状态：正常` + Admin + 窗口控制（DRY RUN 在 tooltip）
+- QA：`title_bar_height` 期望 48–58px 与判定一致；新增 version_badge / screenshot 检查
 
 ## Application Entry Points
 
@@ -32,6 +32,7 @@ Last updated: 2026-06-26
 | Final Delta Polish | **done** |
 | Unified Top Header | **done** |
 | Top Header Target Alignment | **done** |
+| Top Header Final Polish | **done** |
 | Real Motion Control | **blocked** |
 
 ## Constraints (unchanged)

@@ -1,0 +1,38 @@
+{
+  "generated_at": "2026-06-26 19:57:42",
+  "checks": [
+    {
+      "name": "Project OK",
+      "passed": true
+    },
+    {
+      "name": "Devices Mock OK",
+      "passed": true
+    },
+    {
+      "name": "Scan Params OK",
+      "passed": true
+    },
+    {
+      "name": "Path Preview OK",
+      "passed": true
+    },
+    {
+      "name": "Runtime OK",
+      "passed": true
+    },
+    {
+      "name": "Data View OK",
+      "passed": true
+    },
+    {
+      "name": "Report OK",
+      "passed": true
+    },
+    {
+      "name": "Real Devices Disabled OK",
+      "passed": true
+    }
+  ],
+  "overall_pass": true
+}

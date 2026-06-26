@@ -181,6 +181,16 @@ def run_commercial_qa(*, include_external: bool = True, round_number: int = 1) -
             legacy_top = SCREENSHOT_DIR / "commercial_top_header.png"
             shell.top_header.grab().save(str(legacy_top))
             result.screenshots["commercial_top_header"] = legacy_top.as_posix()
+            result.checks.append(
+                QACheck(
+                    name="top_header_screenshot_exists",
+                    category="visual",
+                    expected="top_header.png exists",
+                    actual=str(top_path.exists() and top_path.stat().st_size > 0),
+                    passed=top_path.is_file() and top_path.stat().st_size > 0,
+                    auto_fixable=False,
+                )
+            )
 
         default_metrics = collect_qa_layout_metrics(shell)
         result.checks.extend(build_qa_visual_checks(default_metrics, shell=shell))

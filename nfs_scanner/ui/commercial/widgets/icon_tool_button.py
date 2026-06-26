@@ -27,6 +27,7 @@ class NFSIconToolButton(QToolButton):
         primary: bool = False,
         danger: bool = False,
         success: bool = False,
+        mock_disabled: bool = False,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -49,9 +50,11 @@ class NFSIconToolButton(QToolButton):
             self.setText(_toolbar_caption_lines(caption))
         self.setToolTip(tooltip or caption)
         self.setAutoRaise(True)
-        self.setIconSize(QSize(16, 16))
+        self.setIconSize(QSize(18, 18))
         font = self.font()
-        font.setPixelSize(10)
+        font.setPixelSize(11)
         self.setFont(font)
-        self.setFixedSize(68, 48)
+        self.setFixedSize(54, 48)
+        if mock_disabled:
+            self.setProperty("mockDisabled", "true")
         self.clicked.connect(self.clicked_action.emit)

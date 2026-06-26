@@ -7,9 +7,8 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QMenu, QStyle, QToolButton, Q
 
 from .widgets.icon_tool_button import NFSIconToolButton
 
-_COMPACT_WIDTH_THRESHOLD = 1120
-_TOOL_BUTTON_WIDTH = 68
-_TOOLBAR_CHROME_WIDTH = 64
+_TOOL_BUTTON_WIDTH = 54
+_TOOLBAR_CHROME_WIDTH = 72
 
 
 class CommercialToolbar(QWidget):
@@ -26,6 +25,7 @@ class CommercialToolbar(QWidget):
     report_center_requested = Signal()
     device_center_requested = Signal()
     demo_reset_requested = Signal()
+    self_check_requested = Signal()
     mock_action_requested = Signal(str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -42,58 +42,70 @@ class CommercialToolbar(QWidget):
         self._export_button: NFSIconToolButton | None = None
         self._connect_device_button: NFSIconToolButton | None = None
         self._overflow_button: QToolButton | None = None
-        self._secondary_group: QWidget | None = None
         self._layout_overflow = False
         self._setup_ui()
 
     def _setup_ui(self) -> None:
         root = QHBoxLayout(self)
-        root.setContentsMargins(2, 0, 2, 0)
+        root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
         style = self.style()
-        items = (
-            ("新建项目", style.standardIcon(QStyle.StandardPixmap.SP_FileIcon), self.project_new_requested.emit, {}),
-            ("打开项目", style.standardIcon(QStyle.StandardPixmap.SP_DialogOpenButton), self.project_open_requested.emit, {}),
-            ("保存项目", style.standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton), self.project_save_requested.emit, {}),
-            (
-                "连接设备",
-                style.standardIcon(QStyle.StandardPixmap.SP_DriveNetIcon),
-                self.connect_device_requested.emit,
-                {"primary": True},
-            ),
-            ("开始扫描", style.standardIcon(QStyle.StandardPixmap.SP_MediaPlay), self.scan_start_requested.emit, {"success": True}),
-            ("停止扫描", style.standardIcon(QStyle.StandardPixmap.SP_MediaStop), self.scan_stop_requested.emit, {"danger": True}),
-            ("拍照", style.standardIcon(QStyle.StandardPixmap.SP_FileDialogContentsView), lambda: self.mock_action_requested.emit("拍照"), {"disabled": True}),
-            ("区域对齐", style.standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView), lambda: self.mock_action_requested.emit("区域对齐"), {"disabled": True}),
-            ("清除覆盖", style.standardIcon(QStyle.StandardPixmap.SP_TrashIcon), lambda: self.mock_action_requested.emit("清除覆盖"), {"disabled": True}),
-            ("导出数据", style.standardIcon(QStyle.StandardPixmap.SP_ArrowUp), self.export_data_requested.emit, {}),
-            ("导出报告", style.standardIcon(QStyle.StandardPixmap.SP_FileDialogInfoView), self.report_center_requested.emit, {}),
-            ("参数模板", style.standardIcon(QStyle.StandardPixmap.SP_FileDialogListView), lambda: self.mock_action_requested.emit("参数模板"), {"disabled": True}),
-            ("帮助", style.standardIcon(QStyle.StandardPixmap.SP_MessageBoxQuestion), lambda: self.mock_action_requested.emit("帮助"), {"disabled": True}),
-        )
+        groups: list[list[tuple[str, object, object, dict]]] = [
+            [
+                ("新建项目", style.standardIcon(QStyle.StandardPixmap.SP_FileIcon), self.project_new_requested.emit, {}),
+                ("打开项目", style.standardIcon(QStyle.StandardPixmap.SP_DialogOpenButton), self.project_open_requested.emit, {}),
+                ("保存项目", style.standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton), self.project_save_requested.emit, {}),
+            ],
+            [
+                (
+                    "连接设备",
+                    style.standardIcon(QStyle.StandardPixmap.SP_DriveNetIcon),
+                    self.connect_device_requested.emit,
+                    {"primary": True},
+                ),
+            ],
+            [
+                ("开始扫描", style.standardIcon(QStyle.StandardPixmap.SP_MediaPlay), self.scan_start_requested.emit, {"success": True}),
+                ("停止扫描", style.standardIcon(QStyle.StandardPixmap.SP_MediaStop), self.scan_stop_requested.emit, {"danger": True}),
+            ],
+            [
+                ("拍照", style.standardIcon(QStyle.StandardPixmap.SP_FileDialogContentsView), lambda: self.mock_action_requested.emit("拍照"), {"mock_disabled": True}),
+                ("区域对齐", style.standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView), lambda: self.mock_action_requested.emit("区域对齐"), {"mock_disabled": True}),
+                ("清除覆盖", style.standardIcon(QStyle.StandardPixmap.SP_TrashIcon), lambda: self.mock_action_requested.emit("清除覆盖"), {"mock_disabled": True}),
+            ],
+            [
+                ("导出数据", style.standardIcon(QStyle.StandardPixmap.SP_ArrowUp), self.export_data_requested.emit, {}),
+                ("导出报告", style.standardIcon(QStyle.StandardPixmap.SP_FileDialogInfoView), self.report_center_requested.emit, {}),
+            ],
+            [
+                ("参数模板", style.standardIcon(QStyle.StandardPixmap.SP_FileDialogListView), lambda: self.mock_action_requested.emit("参数模板"), {"mock_disabled": True}),
+                ("帮助", style.standardIcon(QStyle.StandardPixmap.SP_MessageBoxQuestion), lambda: self.mock_action_requested.emit("帮助"), {"mock_disabled": True}),
+            ],
+        ]
 
-        for index, (caption, icon, slot, options) in enumerate(items):
-            if index == 3:
-                root.addSpacing(8)
+        overflow_captions = {"拍照", "区域对齐", "清除覆盖", "参数模板", "帮助"}
+        flat_items: list[tuple[str, object, object, dict]] = []
+
+        for group_index, group in enumerate(groups):
+            if group_index > 0:
+                root.addSpacing(10)
                 root.addWidget(self._separator())
-                root.addSpacing(8)
-            if index == 6:
-                root.addSpacing(8)
-                root.addWidget(self._separator())
-                root.addSpacing(8)
-            button = self._make_button(icon, caption, slot, **options)
-            if index in (6, 7, 8, 11, 12):
-                self._overflow_candidates.append(button)
-            if caption == "连接设备":
-                self._connect_device_button = button
-            elif caption == "开始扫描":
-                self._start_scan_button = button
-            elif caption == "停止扫描":
-                self._stop_scan_button = button
-            elif caption == "导出数据":
-                self._export_button = button
-            root.addWidget(button)
+                root.addSpacing(10)
+            for caption, icon, slot, options in group:
+                flat_items.append((caption, icon, slot, options))
+                button = self._make_button(icon, caption, slot, **options)
+                if caption in overflow_captions:
+                    self._overflow_candidates.append(button)
+                if caption == "连接设备":
+                    self._connect_device_button = button
+                elif caption == "开始扫描":
+                    self._start_scan_button = button
+                elif caption == "停止扫描":
+                    self._stop_scan_button = button
+                elif caption == "导出数据":
+                    self._export_button = button
+                root.addWidget(button)
 
         self._overflow_button = QToolButton(self)
         self._overflow_button.setObjectName("commercialToolbarOverflow")
@@ -102,15 +114,16 @@ class CommercialToolbar(QWidget):
         self._overflow_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self._overflow_button.setVisible(False)
         menu = QMenu(self._overflow_button)
-        for caption, _icon, slot, _options in items[6:]:
+        for caption, _icon, slot, _options in flat_items:
+            if caption not in overflow_captions:
+                continue
             action = menu.addAction(caption)
-            if _options.get("disabled"):
-                action.setEnabled(False)
-            else:
-                action.triggered.connect(slot)
+            action.setToolTip("Mock 功能：点击写入反馈日志")
+            action.triggered.connect(slot)
         menu.addSeparator()
         menu.addAction("设备中心", self.device_center_requested.emit)
         menu.addAction("重置 Demo", self.demo_reset_requested.emit)
+        menu.addAction("Mock Self Check", self.self_check_requested.emit)
         self._overflow_button.setMenu(menu)
         root.addStretch(1)
         root.addWidget(self._overflow_button)
@@ -120,7 +133,7 @@ class CommercialToolbar(QWidget):
         line.setObjectName("commercialToolbarSeparator")
         line.setFrameShape(QFrame.Shape.VLine)
         line.setFixedWidth(1)
-        line.setFixedHeight(36)
+        line.setFixedHeight(34)
         return line
 
     def _make_button(
@@ -132,7 +145,7 @@ class CommercialToolbar(QWidget):
         primary: bool = False,
         danger: bool = False,
         success: bool = False,
-        disabled: bool = False,
+        mock_disabled: bool = False,
         tooltip: str = "",
     ) -> NFSIconToolButton:
         button = NFSIconToolButton(
@@ -142,13 +155,12 @@ class CommercialToolbar(QWidget):
             primary=primary,
             danger=danger,
             success=success,
+            mock_disabled=mock_disabled,
             parent=self,
         )
-        if disabled:
-            button.setEnabled(False)
+        if mock_disabled:
             button.setToolTip(f"{caption}（Mock 占位）")
-        else:
-            button.clicked_action.connect(slot)
+        button.clicked_action.connect(slot)
         self._tool_buttons.append(button)
         return button
 
@@ -166,7 +178,7 @@ class CommercialToolbar(QWidget):
         for button in self._tool_buttons:
             button.setVisible(True)
 
-        overflow_active = window_width <= 960 or self._measure_overflow(window_width)
+        overflow_active = window_width <= 1120 or self._measure_overflow(window_width)
         if overflow_active:
             for button in self._overflow_candidates:
                 button.setVisible(False)
@@ -182,7 +194,7 @@ class CommercialToolbar(QWidget):
         required = visible_count * _TOOL_BUTTON_WIDTH + _TOOLBAR_CHROME_WIDTH
         available = self.contentsRect().width()
         if available <= 32:
-            available = max(window_width - 520, 400)
+            available = max(window_width - 500, 380)
         return required > available
 
     def set_scan_controls_enabled(

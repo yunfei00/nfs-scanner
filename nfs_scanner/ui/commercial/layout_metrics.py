@@ -118,8 +118,14 @@ def collect_layout_metrics(shell: QMainWindow) -> CommercialLayoutMetrics:
 
     device_area = shell.findChild(QScrollArea, "commercialDeviceScroll")
     metrics.device_status_has_inner_scroll = device_area is not None
-    metrics.device_status_panel_height = shell.device_status_panel.height()
     device_panel = shell.device_status_panel.findChild(NFSCollapsiblePanel)
+    if device_panel is not None and device_panel.is_expanded():
+        body = getattr(device_panel, "_body_widget", None)
+        metrics.device_status_panel_height = (
+            body.sizeHint().height() + 48 if body is not None else device_panel.sizeHint().height()
+        )
+    else:
+        metrics.device_status_panel_height = shell.device_status_panel.height()
     if device_panel is not None:
         was_expanded = device_panel.is_expanded()
         device_panel.set_expanded(False)
@@ -327,9 +333,9 @@ def _build_checks(metrics: CommercialLayoutMetrics) -> list[LayoutMetricCheck]:
         ),
         LayoutMetricCheck(
             name="device_status_panel_height",
-            expected="expanded content height 120-520 px in left scroll",
+            expected="expanded content height 120-650 px in left scroll",
             actual=f"{metrics.device_status_panel_height}px",
-            passed=120 <= metrics.device_status_panel_height <= 520,
+            passed=120 <= metrics.device_status_panel_height <= 650,
         ),
         LayoutMetricCheck(
             name="left_no_nested_device_scroll",

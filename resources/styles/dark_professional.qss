@@ -726,28 +726,29 @@ QLabel#nfsNumericUnit {
 /* --- Target alignment: title bar brand --- */
 
 QFrame#commercialTitleBarLogo {
-    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #0EA5FF, stop:1 #0284C7);
-    border: 1px solid rgba(56, 182, 255, 0.45);
-    border-radius: 8px;
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #38BDF8, stop:0.35 #0EA5FF, stop:1 #0369A1);
+    border: 1px solid rgba(125, 211, 252, 0.55);
+    border-radius: 9px;
 }
 
 QLabel#commercialTitleBarLogoText {
     color: #F8FAFC;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 800;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
 }
 
 QLabel#commercialTitleBarTitle {
-    color: #F1F5F9;
-    font-size: 14px;
+    color: #F4F8FF;
+    font-size: 15px;
     font-weight: 700;
 }
 
 QLabel#commercialTitleBarSubtitle {
-    color: #64748B;
-    font-size: 11px;
+    color: #6B7C93;
+    font-size: 10px;
     font-weight: 400;
+    letter-spacing: 0.3px;
 }
 
 QLabel#commercialTitleBarDemoStrip {
@@ -763,17 +764,42 @@ QLabel#commercialStatusDot {
 }
 
 QLabel#commercialTitleBarBadge {
-    color: #38BDF8;
-    font-size: 10px;
+    color: #7DD3FC;
+    font-size: 9px;
     font-weight: 600;
-    padding: 1px 6px;
+    padding: 0 5px;
     border-radius: 4px;
-    background-color: rgba(14, 165, 255, 0.12);
-    border: 1px solid rgba(56, 189, 255, 0.35);
+    background-color: rgba(14, 165, 255, 0.10);
+    border: 1px solid rgba(56, 189, 255, 0.30);
 }
 
 QWidget#commercialTopStatusArea {
     background-color: transparent;
+}
+
+QWidget#commercialTitleBarAuthChip {
+    background-color: rgba(34, 197, 94, 0.08);
+    border: 1px solid rgba(34, 197, 94, 0.28);
+    border-radius: 10px;
+}
+
+QLabel#commercialTitleBarAuthDot {
+    color: #22C55E;
+    font-size: 9px;
+    background-color: transparent;
+}
+
+QLabel#commercialTitleBarAuthLabel {
+    color: #94A3B8;
+    font-size: 11px;
+    font-weight: 500;
+    background-color: transparent;
+}
+
+QLabel#commercialTitleBarUser {
+    color: #C8D4E6;
+    font-size: 11px;
+    font-weight: 600;
 }
 
 QLabel#commercialTitleBarUserIcon {
@@ -869,6 +895,22 @@ QToolButton#commercialIconToolSuccess {
     background-color: rgba(34, 197, 94, 0.12);
     border-color: rgba(34, 197, 94, 0.35);
     color: #4ADE80;
+}
+
+QToolButton#commercialIconToolButton[mockDisabled="true"],
+QToolButton#commercialIconToolPrimary[mockDisabled="true"],
+QToolButton#commercialIconToolDanger[mockDisabled="true"],
+QToolButton#commercialIconToolSuccess[mockDisabled="true"] {
+    color: #55657A;
+    opacity: 0.72;
+}
+
+QToolButton#commercialIconToolButton[mockDisabled="true"]:hover,
+QToolButton#commercialIconToolPrimary[mockDisabled="true"]:hover,
+QToolButton#commercialIconToolDanger[mockDisabled="true"]:hover,
+QToolButton#commercialIconToolSuccess[mockDisabled="true"]:hover {
+    background-color: rgba(29, 43, 66, 0.55);
+    color: #7B8BA0;
 }
 
 /* --- Compact property panel --- */

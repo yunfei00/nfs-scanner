@@ -79,7 +79,7 @@ def build_qa_visual_checks(metrics: CommercialLayoutMetrics, *, shell: QMainWind
         QACheck(
             name="title_bar_height",
             category="visual",
-            expected="28–44 px",
+            expected="48–58 px",
             actual=f"{metrics.title_bar_height}px",
             passed=_between(metrics.title_bar_height, 48, 58),
             auto_fixable=True,
