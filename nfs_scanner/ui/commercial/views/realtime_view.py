@@ -6,7 +6,17 @@ import math
 
 from PySide6.QtCore import QEvent, QTimer, Qt
 from PySide6.QtGui import QMouseEvent
-from PySide6.QtWidgets import QCheckBox, QHBoxLayout, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QSlider,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from nfs_scanner.core.runtime_service import RuntimeSnapshot
 from nfs_scanner.core.path_planner import generate_preview_points
@@ -29,9 +39,11 @@ class RealtimeView(QWidget):
         super().__init__(parent)
         self.setObjectName("realtimeView")
         self.canvas = RealtimeCanvas(self)
-        self.canvas.setMinimumHeight(260)
+        self.canvas.setMinimumHeight(280)
         self.layer_manager = LayerManager(self.canvas.graphics_scene)
         self.color_bar = ColorBar(self)
+        self.color_bar.set_range(-90.0, -10.0)
+        self.color_bar.set_lut_name("Turbo")
         self.mini_map = MiniMapPanel(self.canvas, self.canvas)
         self.axis_legend = CanvasAxisLegend(self.canvas.viewport())
         self.cursor_hud = CanvasCursorHud(self.canvas.viewport())
@@ -39,29 +51,78 @@ class RealtimeView(QWidget):
         self._current_path_config = ScanPathConfig()
         self._has_preview_region = False
         self._auto_fit_checkbox: QCheckBox | None = None
+        self._heatmap_opacity = 0.52
         self._setup_ui()
         self._load_mock_layers()
 
     def _setup_ui(self) -> None:
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(0, 0, 0, 0)
-        root_layout.setSpacing(6)
+        root_layout.setSpacing(4)
 
         toolbar = QWidget(self)
+        toolbar.setObjectName("realtimeCanvasToolbar")
         toolbar_layout = QHBoxLayout(toolbar)
         toolbar_layout.setContentsMargins(0, 0, 0, 0)
-        toolbar_layout.setSpacing(6)
+        toolbar_layout.setSpacing(4)
 
-        fit_button = NFSSecondaryButton("适应视图", toolbar)
-        reset_button = NFSSecondaryButton("重置视图", toolbar)
+        canvas_tools = (
+            ("选择", True),
+            ("平移", True),
+            ("缩放", True),
+            ("框选", False),
+            ("多边形", False),
+            ("撤销", False),
+            ("重做", False),
+            ("标注", False),
+            ("网格", False),
+            ("测量", False),
+        )
+        for tip, enabled in canvas_tools:
+            button = QToolButton(toolbar)
+            button.setObjectName("realtimeCanvasToolButton")
+            button.setText(tip[:2] if len(tip) > 2 else tip)
+            button.setToolTip(f"{tip}（Mock）")
+            button.setEnabled(enabled)
+            button.setFixedSize(26, 22)
+            toolbar_layout.addWidget(button)
+
+        toolbar_layout.addWidget(self._separator(toolbar))
+
+        fit_button = NFSSecondaryButton("适应", toolbar)
+        reset_button = NFSSecondaryButton("重置", toolbar)
         fit_button.clicked.connect(self.canvas.fit_view)
         reset_button.clicked.connect(self.canvas.reset_view)
         toolbar_layout.addWidget(fit_button)
         toolbar_layout.addWidget(reset_button)
 
-        self._auto_fit_checkbox = QCheckBox("自动适应路径", toolbar)
+        self._auto_fit_checkbox = QCheckBox("自动适应", toolbar)
         self._auto_fit_checkbox.setChecked(False)
         toolbar_layout.addWidget(self._auto_fit_checkbox)
+
+        opacity_label = QLabel("透明度", toolbar)
+        opacity_label.setObjectName("nfsMutedLabel")
+        opacity_slider = QSlider(Qt.Orientation.Horizontal, toolbar)
+        opacity_slider.setObjectName("realtimeHeatmapOpacitySlider")
+        opacity_slider.setRange(20, 90)
+        opacity_slider.setValue(60)
+        opacity_slider.setFixedWidth(72)
+        opacity_slider.valueChanged.connect(self._on_opacity_changed)
+        self._opacity_value_label = QLabel("60%", toolbar)
+        self._opacity_value_label.setObjectName("nfsMutedLabel")
+        self._opacity_value_label.setFixedWidth(32)
+        toolbar_layout.addWidget(opacity_label)
+        toolbar_layout.addWidget(opacity_slider)
+        toolbar_layout.addWidget(self._opacity_value_label)
+
+        lut_label = QLabel("LUT", toolbar)
+        lut_label.setObjectName("nfsMutedLabel")
+        lut_combo = QComboBox(toolbar)
+        lut_combo.addItems(["Turbo", "Viridis", "Plasma"])
+        lut_combo.setCurrentText("Turbo")
+        lut_combo.currentTextChanged.connect(self.color_bar.set_lut_name)
+        toolbar_layout.addWidget(lut_label)
+        toolbar_layout.addWidget(lut_combo)
         toolbar_layout.addStretch(1)
 
         canvas_row = QWidget(self)
@@ -88,6 +149,21 @@ class RealtimeView(QWidget):
         root_layout.addWidget(toolbar)
         root_layout.addWidget(canvas_row, 1)
 
+    @staticmethod
+    def _separator(parent: QWidget) -> QFrame:
+        line = QFrame(parent)
+        line.setFrameShape(QFrame.Shape.VLine)
+        line.setFixedWidth(1)
+        line.setFixedHeight(22)
+        return line
+
+    def _on_opacity_changed(self, value: int) -> None:
+        self._heatmap_opacity = value / 100.0
+        if self._opacity_value_label is not None:
+            self._opacity_value_label.setText(f"{value}%")
+        heatmap_layer = self.layer_manager.ensure_layer(LayerKind.HEATMAP)
+        heatmap_layer.set_opacity(self._heatmap_opacity)
+
     def eventFilter(self, watched, event) -> bool:
         if watched is self.canvas.viewport():
             if event.type() == QEvent.Type.Resize:
@@ -98,8 +174,8 @@ class RealtimeView(QWidget):
                     x=scene_point.x(),
                     y=scene_point.y(),
                     z=self._current_region.z_height,
-                    freq="1.50 GHz",
-                    amp="-41.2 dBm",
+                    freq="2.450 GHz",
+                    amp="-23.45 dBm",
                 )
         return super().eventFilter(watched, event)
 
@@ -131,7 +207,8 @@ class RealtimeView(QWidget):
 
         heatmap_layer = self.layer_manager.ensure_layer(LayerKind.HEATMAP)
         heatmap_layer.build_mock()
-        self.color_bar.set_lut_name(heatmap_layer.lut_name)
+        heatmap_layer.set_opacity(self._heatmap_opacity)
+        self.color_bar.set_lut_name("Turbo")
 
         annotation_layer = self.layer_manager.ensure_layer(LayerKind.ANNOTATION)
         annotation_layer.build_mock()
@@ -193,6 +270,7 @@ class RealtimeView(QWidget):
 
         path_layer = self.layer_manager.ensure_layer(LayerKind.PATH)
         path_layer.set_path_points(scene_points)
+        path_layer.set_progress(current_index=2740, completed_count=2100, active=True)
         self.mini_map.update()
 
         if initial or auto_fit or region_changed or not self._has_preview_region:

@@ -23,10 +23,10 @@ def board_content_rect(
 
 
 def create_mock_board_qimage(width: int = CANVAS_WIDTH, height: int = CANVAS_HEIGHT) -> QImage:
-    """Generate a realistic PCB mock image filling most of the canvas."""
+    """Generate a photo-like PCB mock image filling most of the canvas."""
 
     base = np.zeros((height, width, 3), dtype=np.uint8)
-    base[:, :] = (22, 38, 32)
+    base[:, :] = (18, 28, 24)
 
     board_x, board_y, board_w, board_h = board_content_rect(width, height)
     left = int(board_x)
@@ -35,18 +35,28 @@ def create_mock_board_qimage(width: int = CANVAS_WIDTH, height: int = CANVAS_HEI
     bottom = int(board_y + board_h)
 
     board = base[top:bottom, left:right].copy()
-    board[:, :] = (32, 72, 52)
-
+    _fill_board_substrate(board)
     _draw_pcb_silkscreen(board)
     _draw_pcb_traces(board, seed=11)
     _draw_pcb_chips(board, seed=17)
     _draw_pcb_vias(board, seed=23)
     _draw_pcb_connector(board)
     _draw_pcb_usb(board)
+    _draw_copper_pads(board, seed=29)
     _apply_board_shadow(board)
+    _apply_photo_texture(board, seed=37)
+    _apply_vignette(board)
 
     base[top:bottom, left:right] = board
     return _array_to_qimage(base)
+
+
+def _fill_board_substrate(board: NDArray[np.uint8]) -> None:
+    height, width = board.shape[:2]
+    y_grad = np.linspace(0.92, 1.06, height, dtype=np.float32)[:, None, None]
+    x_grad = np.linspace(0.96, 1.02, width, dtype=np.float32)[None, :, None]
+    substrate = np.array([28, 82, 54], dtype=np.float32)[None, None, :]
+    board[:, :] = np.clip(substrate * y_grad * x_grad, 0, 255).astype(np.uint8)
 
 
 def _draw_pcb_silkscreen(board: NDArray[np.uint8]) -> None:
@@ -136,9 +146,41 @@ def _draw_pcb_usb(board: NDArray[np.uint8]) -> None:
 def _apply_board_shadow(board: NDArray[np.uint8]) -> None:
     height, width = board.shape[:2]
     shadow = board.astype(np.int16)
-    shadow[:, 2:] = np.minimum(shadow[:, 2:] * 0.96, 255).astype(np.int16)
-    shadow[2:, :] = np.minimum(shadow[2:, :] * 0.98, 255).astype(np.int16)
+    shadow[:, 2:] = np.minimum(shadow[:, 2:] * 0.95, 255).astype(np.int16)
+    shadow[2:, :] = np.minimum(shadow[2:, :] * 0.97, 255).astype(np.int16)
     board[:, :] = np.clip(shadow, 0, 255).astype(np.uint8)
+
+
+def _draw_copper_pads(board: NDArray[np.uint8], *, seed: int) -> None:
+    height, width = board.shape[:2]
+    rng = np.random.default_rng(seed)
+    outer = np.array([184, 152, 96], dtype=np.uint8)
+    inner = np.array([132, 104, 58], dtype=np.uint8)
+    for _ in range(18):
+        cx = int(rng.integers(width // 8, width - width // 8))
+        cy = int(rng.integers(height // 8, height - height // 8))
+        radius = int(rng.integers(5, 10))
+        y0, y1 = max(cy - radius, 0), min(cy + radius + 1, height)
+        x0, x1 = max(cx - radius, 0), min(cx + radius + 1, width)
+        for y in range(y0, y1):
+            for x in range(x0, x1):
+                if (x - cx) ** 2 + (y - cy) ** 2 <= radius**2:
+                    board[y, x] = outer if (x + y) % 2 == 0 else inner
+
+
+def _apply_photo_texture(board: NDArray[np.uint8], *, seed: int) -> None:
+    rng = np.random.default_rng(seed)
+    noise = rng.integers(-10, 11, board.shape, dtype=np.int16)
+    board[:] = np.clip(board.astype(np.int16) + noise, 0, 255).astype(np.uint8)
+
+
+def _apply_vignette(board: NDArray[np.uint8]) -> None:
+    height, width = board.shape[:2]
+    y_coords, x_coords = np.mgrid[0:height, 0:width]
+    cx, cy = width / 2.0, height / 2.0
+    radius = max(width, height) * 0.72
+    falloff = 1.0 - np.clip(((x_coords - cx) ** 2 + (y_coords - cy) ** 2) / (radius**2), 0.0, 1.0) * 0.18
+    board[:] = np.clip(board.astype(np.float32) * falloff[..., None], 0, 255).astype(np.uint8)
 
 
 def generate_snake_path_points(
@@ -192,8 +234,8 @@ def create_mock_heatmap_qimage(
     )
     field[outside_board] *= 0.05
 
-    rgb = _apply_spectral_lut(field)
-    alpha = np.full((height, width), 150, dtype=np.uint8)
+    rgb = _apply_turbo_lut(field)
+    alpha = np.full((height, width), 165, dtype=np.uint8)
     alpha[outside_board] = 0
     rgba = np.dstack((rgb, alpha))
     return _array_to_qimage(rgba, rgba=True)
@@ -236,6 +278,23 @@ def _box_blur(values: NDArray[np.float64], *, kernel: int) -> NDArray[np.float64
     for col in range(values.shape[1]):
         blurred[:, col] = np.convolve(padded_v[:, col], kernel_1d, mode="valid")
     return blurred
+
+
+def _apply_turbo_lut(values: NDArray[np.float64]) -> NDArray[np.uint8]:
+    """Approximate Turbo colormap (blue → cyan → green → yellow → red)."""
+
+    t = np.clip(values, 0.0, 1.0)
+    red = np.clip(1.6 * t - 0.1, 0.0, 1.0) * np.clip(2.4 - 2.0 * t, 0.0, 1.0)
+    green = np.clip(2.2 * t, 0.0, 1.0) * np.clip(2.0 - 1.2 * t, 0.0, 1.0)
+    blue = np.clip(1.4 - 1.8 * t, 0.0, 1.0) + np.clip(0.35 * t - 0.15, 0.0, 0.35)
+    blue = np.clip(blue, 0.0, 1.0)
+    return np.dstack(
+        (
+            (red * 255.0).astype(np.uint8),
+            (green * 255.0).astype(np.uint8),
+            (blue * 255.0).astype(np.uint8),
+        )
+    )
 
 
 def _apply_spectral_lut(values: NDArray[np.float64]) -> NDArray[np.uint8]:

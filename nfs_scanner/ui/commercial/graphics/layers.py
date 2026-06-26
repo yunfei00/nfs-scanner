@@ -228,7 +228,7 @@ class ScanPathLayer(BaseLayer):
             path.lineTo(x_value, y_value)
 
         path_item = QGraphicsPathItem(path)
-        path_item.setPen(QPen(QColor(255, 255, 255, 210), line_width))
+        path_item.setPen(QPen(QColor(255, 255, 255, 235), max(line_width, 1.6)))
         self._register_item(path_item)
 
         dot_radius = 3.0 if display_level.value == "full" else 2.5
@@ -392,12 +392,12 @@ class AnnotationLayer(BaseLayer):
 
         self.clear()
         rect_item = QGraphicsRectItem(QRectF(x, y, width, height))
-        rect_item.setPen(QPen(QColor("#38B6FF"), 2.0, Qt.PenStyle.SolidLine))
-        rect_item.setBrush(QBrush(QColor(56, 182, 255, 28)))
+        rect_item.setPen(QPen(QColor("#38B6FF"), 2.5, Qt.PenStyle.SolidLine))
+        rect_item.setBrush(QBrush(QColor(56, 182, 255, 36)))
         self._register_item(rect_item)
 
-        handle_radius = 4.0
-        handle_pen = QPen(QColor("#FFFFFF"), 1.2)
+        handle_radius = 5.0
+        handle_pen = QPen(QColor("#FFFFFF"), 1.5)
         handle_brush = QBrush(QColor("#38B6FF"))
         anchors = (
             (x, y),
