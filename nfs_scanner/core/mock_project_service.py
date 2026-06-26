@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 from uuid import uuid4
 
 StorageStatus = Literal["unsaved", "saved"]
 
 _DEFAULT_PROJECT_NAME = "Demo Near Field Scan"
-_SAVE_DIR = Path.home() / ".nfs_scanner" / "projects"
+_SAVE_DIR = Path.home() / ".nfs_scanner" / "demo_projects"
 _SAVE_FILENAME = "demo_project.json"
 
 
@@ -28,6 +28,15 @@ class ProjectSession:
     task_count: int
 
 
+@dataclass(slots=True)
+class ProjectSessionContext:
+    """Optional mock project payload persisted alongside session metadata."""
+
+    scan_config: dict[str, Any] = field(default_factory=dict)
+    device_summary: list[dict[str, str]] = field(default_factory=list)
+    last_task_id: str | None = None
+
+
 def _now_text() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -37,6 +46,7 @@ class MockProjectService:
 
     def __init__(self) -> None:
         self._session: ProjectSession | None = None
+        self._context = ProjectSessionContext()
 
     def new_project(self, *, name: str = _DEFAULT_PROJECT_NAME) -> ProjectSession:
         """Create a fresh unsaved project session in memory."""
@@ -50,6 +60,7 @@ class MockProjectService:
             storage_status="unsaved",
             task_count=0,
         )
+        self._context = ProjectSessionContext()
         return self._session
 
     def open_mock_project(self, name: str | None = None) -> ProjectSession:
@@ -64,10 +75,32 @@ class MockProjectService:
             storage_status="unsaved",
             task_count=2,
         )
+        self._context = ProjectSessionContext()
         return self._session
 
+    def reset_project(self) -> ProjectSession:
+        """Restore the default demo project session."""
+
+        return self.open_mock_project()
+
+    def update_session_context(
+        self,
+        *,
+        scan_config: dict[str, Any] | None = None,
+        device_summary: list[dict[str, str]] | None = None,
+        last_task_id: str | None = None,
+    ) -> None:
+        """Attach mock scan/device context before save."""
+
+        if scan_config is not None:
+            self._context.scan_config = dict(scan_config)
+        if device_summary is not None:
+            self._context.device_summary = list(device_summary)
+        if last_task_id is not None:
+            self._context.last_task_id = last_task_id
+
     def save_project(self) -> Path:
-        """Persist current session metadata to ~/.nfs_scanner/projects/demo_project.json."""
+        """Persist current session metadata to ~/.nfs_scanner/demo_projects/demo_project.json."""
 
         session = self._require_session()
         _SAVE_DIR.mkdir(parents=True, exist_ok=True)
@@ -82,7 +115,18 @@ class MockProjectService:
             task_count=session.task_count,
         )
         self._session = saved
-        payload = asdict(saved)
+        payload = {
+            "project_id": saved.project_id,
+            "project_name": saved.name,
+            "created_at": saved.created_at,
+            "updated_at": saved.modified_at,
+            "storage_status": saved.storage_status,
+            "task_count": saved.task_count,
+            "scan_config": self._context.scan_config,
+            "device_summary": self._context.device_summary,
+            "last_task_id": self._context.last_task_id,
+            "session": asdict(saved),
+        }
         save_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         return save_path
 

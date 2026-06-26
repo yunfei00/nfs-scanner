@@ -28,6 +28,11 @@ class MockProjectServiceTestCase(unittest.TestCase):
 
     def test_save_project_writes_metadata_json(self) -> None:
         self.service.new_project()
+        self.service.update_session_context(
+            scan_config={"x_start": 0, "x_stop": 20},
+            device_summary=[{"device_id": "motion-001", "status": "connected"}],
+            last_task_id="mock-task-001",
+        )
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             with patch("nfs_scanner.core.mock_project_service._SAVE_DIR", target):
@@ -35,6 +40,10 @@ class MockProjectServiceTestCase(unittest.TestCase):
             self.assertTrue(path.exists())
             payload = json.loads(path.read_text(encoding="utf-8"))
             self.assertEqual(payload["storage_status"], "saved")
+            self.assertEqual(payload["project_name"], "Demo Near Field Scan")
+            self.assertIn("scan_config", payload)
+            self.assertIn("device_summary", payload)
+            self.assertEqual(payload["last_task_id"], "mock-task-001")
 
     def test_increment_task_count(self) -> None:
         self.service.open_mock_project()
