@@ -4,16 +4,16 @@ Last updated: 2026-06-26
 
 ## Current Mode
 
-**COMPLETE — Commercial Header Asset Polish**
+**COMPLETE — Commercial Demo v0.2 Functional Completion**
 
-顶部品牌 Logo 与工具栏图标资产收敛：自绘 `NFSLogoWidget` + 内部 `ToolIconFactory`；QA 增加 logo/icon 检查；主体区域未改。
+商业 UI Mock Demo 功能闭环已完成：项目会话、设备中心、扫描参数、Mock 运行时、实时视图、Data View、Report Center、Reset Demo、QA 全流程验证。顶部 Header 已冻结。
 
 ## Recent (2026-06-26)
 
-- `NFSLogoWidget`：44×44 QPainter 蓝色渐变 + 六边形 + NFS 字样
-- `ToolIconFactory`：13 种工具栏线性图标，替换 Qt 标准图标
-- QA 修正 logo 检测类型（QWidget 非 QFrame）
-- 148 tests + visual + QA PASS
+- Mock 项目 JSON 保存（含 scan_config / device_summary）
+- 设备中心 + 扫描运行时 + Data/Report 导出闭环
+- QA pipeline 覆盖 start/pause/resume/complete/export/reset
+- 149 tests + visual + QA PASS
 
 ## Application Entry Points
 
@@ -28,15 +28,13 @@ Last updated: 2026-06-26
 |--------|--------|
 | 001–022 | done — Demo 闭环 v0.1 |
 | Commercial Target Alignment | **done** |
-| Target Screenshot Replication | **done** |
-| Final Delta Polish | **done** |
-| Unified Top Header | **done** |
-| Top Header Target Alignment | **done** |
-| Top Header Final Polish | **done** |
-| Header Readability Fix | **done** |
-| Top Header Target Match Final | **done** |
 | Commercial Header Asset Polish | **done** |
+| **Commercial Demo v0.2** | **done** |
 | Real Motion Control | **blocked** |
+
+## Manual Acceptance
+
+见 `.ai/daily/2026-06-26-commercial-demo-v0.2-functional-completion.md`
 
 ## Constraints (unchanged)
 

@@ -544,3 +544,12 @@ Needs Review: yes/no
 - Impact: 148 tests + visual + QA PASS；仅改顶部 logo/icon；QA 检测改用 `NFSLogoWidget` 类型查找。
 - Needs Review: no
 
+### 2026-06-26 - Commercial Demo v0.2 Functional Completion
+
+- Date: 2026-06-26
+- Task: commercial-demo-v0.2-functional-completion
+- Decision: 完成商业 UI Mock Demo 闭环：项目 JSON 会话、设备中心 mock 流、扫描运行时状态机、Data/Report 导出、Reset Demo；QA 自动化覆盖全流程；Reset 时 `clear_analysis_tasks=True` 恢复默认可演示任务集。
+- Reason: 用户要求一次性完成功能验收闭环，不再交互式微调 Header；全部保持 mock/dry run/no hardware control。
+- Impact: unittest + visual + QA PASS；未接真实设备；旧 UI 默认入口不变。
+- Needs Review: no
+
