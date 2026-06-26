@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-26 21:07:24",
+  "generated_at": "2026-06-26 21:23:43",
   "round_number": 1,
   "overall_pass": true,
   "screenshots": {
@@ -368,7 +368,7 @@
       "name": "data_view_export_mock_json",
       "category": "functional",
       "expected": "data export creates mock json",
-      "actual": "C:\\Users\\yunfei\\.nfs_scanner\\mock_exports\\data\\mock_data_mock-0691a8fc_20260626_210727.json",
+      "actual": "C:\\Users\\yunfei\\.nfs_scanner\\mock_exports\\data\\mock_data_mock-2a155127_20260626_212346.json",
       "passed": true,
       "severity": "error",
       "auto_fixable": true,
@@ -388,7 +388,7 @@
       "name": "mock_report_export",
       "category": "functional",
       "expected": "markdown/txt report file created",
-      "actual": "C:\\Users\\yunfei\\.nfs_scanner\\reports\\report_mock-0691a8fc_20260626_210727.md",
+      "actual": "C:\\Users\\yunfei\\.nfs_scanner\\reports\\report_mock-2a155127_20260626_212346.md",
       "passed": true,
       "severity": "error",
       "auto_fixable": true,

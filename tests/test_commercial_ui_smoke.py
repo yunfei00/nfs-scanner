@@ -67,7 +67,7 @@ class CommercialUiSmokeTestCase(unittest.TestCase):
         shell = create_commercial_shell(services=services)
         try:
             self.assertIs(services.runtime, shell.mock_scan.service)
-            self.assertEqual(len(services.devices.list_devices()), 3)
+            self.assertEqual(len(services.devices.list_devices()), 4)
             self.assertIsNotNone(services.motion_connection)
             if shell.toolbar._connect_device_button is not None:
                 self.assertTrue(shell.toolbar._connect_device_button.isEnabled())

@@ -106,7 +106,7 @@ def run_functional_demo_flow(shell: CommercialMainShell) -> tuple[list[QACheck],
 
     # Mock connect devices
     center = shell.workspace.device_center_view()
-    for device_id in ("motion-001", "spectrum-001", "camera-001"):
+    for device_id in ("motion-001", "spectrum-001", "camera-001", "vna-001"):
         center._connect(device_id)
     app.processEvents()
     connected = [
@@ -119,7 +119,7 @@ def run_functional_demo_flow(shell: CommercialMainShell) -> tuple[list[QACheck],
             "mock_connect_devices",
             "all mock devices connected",
             ", ".join(connected) or "none",
-            len(connected) >= 3,
+            len(connected) >= 4,
         )
     )
 
@@ -202,6 +202,15 @@ def run_functional_demo_flow(shell: CommercialMainShell) -> tuple[list[QACheck],
             task_count >= 1,
         )
     )
+    data_export_path = data_view.export_selected_task()
+    checks.append(
+        _check(
+            "data_view_export_mock_json",
+            "data export creates mock json",
+            str(data_export_path) if data_export_path else "none",
+            data_export_path is not None and data_export_path.is_file() and data_export_path.suffix == ".json",
+        )
+    )
 
     # Report center preview
     report_view = shell.workspace.report_view()
@@ -221,6 +230,7 @@ def run_functional_demo_flow(shell: CommercialMainShell) -> tuple[list[QACheck],
     # Export mock report
     export_path: Path | None = None
     if report_view._task_combo is not None and report_view._task_combo.count() > 0:
+        report_view._generate_report()
         report_view._export_report()
         app.processEvents()
         export_path_text = report_view.last_export_path()
@@ -231,6 +241,33 @@ def run_functional_demo_flow(shell: CommercialMainShell) -> tuple[list[QACheck],
             "markdown/txt report file created",
             str(export_path) if export_path else "none",
             export_path is not None and export_path.is_file() and export_path.suffix.lower() in (".md", ".txt"),
+        )
+    )
+    format_paths = []
+    if report_view._task_combo is not None and report_view._task_combo.count() > 0:
+        for file_format in ("html", "pdf", "png"):
+            path = report_view._report_service.export_mock_report(
+                str(report_view._task_combo.currentData()),
+                file_format=file_format,
+            )
+            format_paths.append(path)
+    checks.append(
+        _check(
+            "mock_report_multi_format_export",
+            "html/pdf/png mock report files created",
+            ", ".join(str(path.suffix) for path in format_paths),
+            len(format_paths) == 3 and all(path.is_file() for path in format_paths),
+        )
+    )
+
+    shell._run_mock_self_check()
+    self_check_path = Path(".ai") / "qa" / "latest" / "commercial_mock_self_check.json"
+    checks.append(
+        _check(
+            "mock_self_check_report",
+            "local mock self-check report created",
+            str(self_check_path),
+            self_check_path.is_file(),
         )
     )
 
