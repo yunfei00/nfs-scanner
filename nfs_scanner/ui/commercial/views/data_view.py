@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QFormLayout,
@@ -17,7 +17,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtCore import Signal
 
 from nfs_scanner.core.mock_analysis_service import MockAnalysisService, MockScanTaskRecord
 
@@ -32,6 +31,7 @@ class DataView(QWidget):
 
     status_message = Signal(str, str)
     data_exported = Signal(str)
+    history_task_selected = Signal(str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -189,8 +189,10 @@ class DataView(QWidget):
     def _on_task_selected(self, current: QListWidgetItem | None, _previous: QListWidgetItem | None) -> None:
         if current is None:
             return
+        task_id = str(current.data(Qt.ItemDataRole.UserRole))
+        self.history_task_selected.emit(task_id)
         self._refresh_selected_summary()
-        self.status_message.emit("DATA", f"Mock data task selected: {current.text().splitlines()[0]}")
+        self.status_message.emit("DATA", f"已选择任务: {current.text().splitlines()[0]}")
 
     def _refresh_selected_summary(self) -> None:
         if self._task_list is None or self._view_mode_combo is None:
@@ -227,10 +229,6 @@ class DataView(QWidget):
             )
         if self._spectrum_widget is not None:
             self._spectrum_widget.set_view_mode(view_mode)
-        self.status_message.emit(
-            "DATA",
-            f"Mock data view refreshed: {task.name}, {trace}, {frequency}, {component}, LUT={lut}",
-        )
 
     def export_selected_task(self) -> Path | None:
         if self._task_list is None:

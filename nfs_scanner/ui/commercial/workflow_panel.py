@@ -7,7 +7,7 @@ from typing import Literal
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget
 
-StepState = Literal["pending", "active", "completed"]
+StepState = Literal["pending", "active", "completed", "disabled"]
 
 WORKFLOW_STEPS = (
     ("1", "项目管理", "创建或打开扫描项目"),
@@ -180,9 +180,33 @@ class CommercialWorkflowPanel(QWidget):
             row.set_progress_text("")
         self._refresh_step_styles()
 
-    def set_scan_progress(self, index: int, text: str) -> None:
-        """Show scan progress text on a workflow step row."""
+    def update_from_demo_state(
+        self,
+        step_states: list[StepState],
+        progress_hints: dict[int, str] | None = None,
+    ) -> None:
+        """Apply workflow step states from DemoState (single source of truth)."""
 
+        hints = progress_hints or {}
+        for index, state in enumerate(step_states):
+            if index < len(self._step_states):
+                self._step_states[index] = state
+        for index, row in enumerate(self._step_rows):
+            row.set_progress_text(hints.get(index, ""))
+        self._refresh_step_styles()
+
+    def active_step_index(self) -> int | None:
+        for index, state in enumerate(self._step_states):
+            if state == "active":
+                return index
+        return None
+
+    def step_state(self, index: int) -> StepState:
+        if 0 <= index < len(self._step_states):
+            return self._step_states[index]
+        return "pending"
+
+    def set_scan_progress(self, index: int, text: str) -> None:
         if 0 <= index < len(self._step_rows):
             self._step_rows[index].set_progress_text(text)
 

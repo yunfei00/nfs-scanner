@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFontMetrics, QTextCursor
 from PySide6.QtWidgets import (
@@ -47,7 +49,8 @@ class CommercialBottomDock(QWidget):
     """Bottom dock with three visible instrument panels."""
 
     _LOG_VISIBLE_LINES = 6
-    _LOG_MAX_LINES = 400
+    _LOG_MAX_LINES = 300
+    _LOG_DEDUP_SECONDS = 1.0
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -61,6 +64,7 @@ class CommercialBottomDock(QWidget):
         self._stats_panel: QWidget | None = None
         self._progress_bar: QProgressBar | None = None
         self._last_log_signature: str = ""
+        self._last_log_time: float = 0.0
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -175,9 +179,11 @@ class CommercialBottomDock(QWidget):
         if self._log_view is None or not message.strip():
             return
         signature = f"{level}:{message.strip()}"
-        if signature == self._last_log_signature:
+        now = time.monotonic()
+        if signature == self._last_log_signature and now - self._last_log_time < self._LOG_DEDUP_SECONDS:
             return
         self._last_log_signature = signature
+        self._last_log_time = now
         self._log_view.appendPlainText(f"[{level}] {message.strip()}")
         document = self._log_view.document()
         if document.blockCount() > self._LOG_MAX_LINES:

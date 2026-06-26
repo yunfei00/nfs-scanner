@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
 from nfs_scanner.core.demo_session import DemoServiceBundle, DemoSessionController
 from nfs_scanner.core.mock_scan_runtime import MockScanRuntimeService
 
-from .demo_state_sync import devices_ready, sync_status_bar, sync_workflow_from_runtime
+from .demo_state_sync import apply_demo_state, build_demo_state, devices_ready
 from .bottom_dock import CommercialBottomDock
 from .device_status_panel import CommercialDeviceStatusPanel
 from .property_panel import CommercialPropertyPanel
@@ -81,6 +81,9 @@ class CommercialMainShell(QMainWindow):
         self._completed_scan_registered = False
         self._scan_home_after_complete = False
         self._report_exported = False
+        self._report_exported_for_task_id: str | None = None
+        self._current_task_id: str | None = None
+        self._selected_history_task_id: str | None = None
         self._last_dry_run_log_flush_point = 0
         self._body_splitter: QSplitter | None = None
         self._center_splitter: QSplitter | None = None
@@ -230,9 +233,8 @@ class CommercialMainShell(QMainWindow):
         )
 
         data_view = self.workspace.data_view()
-        data_view.status_message.connect(
-            lambda level, message: self.bottom_dock.append_log_line(message, level=level)
-        )
+        data_view.status_message.connect(self._on_data_view_status)
+        data_view.history_task_selected.connect(self._on_history_task_selected)
         data_view.data_exported.connect(
             lambda path: self.bottom_dock.append_log_line(f"Mock data exported: {path}", level="EXPORT")
         )
@@ -248,34 +250,74 @@ class CommercialMainShell(QMainWindow):
         self.property_panel.scan_pause_toggle_requested.connect(self._toggle_mock_scan_pause)
         self.mock_scan.snapshot_changed.connect(self._on_mock_scan_snapshot)
         self.mock_scan.log_line.connect(self.bottom_dock.append_log_line)
-        self._update_scan_controls(self.mock_scan.snapshot())
+        self._sync_demo_state()
 
     def _sync_demo_state(self, snapshot=None) -> None:
         """Keep workflow and status bar aligned with mock runtime and project state."""
 
         if snapshot is None:
             snapshot = self.mock_scan.snapshot()
+        session = self._services.project.current_session()
         tasks = self.workspace.data_view().analysis_service.list_tasks()
-        last_task_name = tasks[0].name if tasks else None
-        sync_workflow_from_runtime(
-            self.workflow_panel,
+        last_task_name = None
+        if self._current_task_id:
+            for task in tasks:
+                if task.task_id == self._current_task_id:
+                    last_task_name = task.name
+                    break
+        state = build_demo_state(
             snapshot,
+            session=session,
             devices_connected=devices_ready(self._services.devices),
-            has_tasks=bool(tasks),
+            scan_config_valid=self.property_panel.can_start_scan(),
+            current_task_id=self._current_task_id,
+            last_completed_task_id=self._current_task_id,
+            selected_history_task_id=self._selected_history_task_id,
             report_exported=self._report_exported,
+            report_exported_for_task_id=self._report_exported_for_task_id,
+            has_history_tasks=bool(tasks),
         )
-        sync_status_bar(
-            self.status_bar_widget,
-            session=self._services.project.current_session(),
+        apply_demo_state(
+            state,
+            workflow=self.workflow_panel,
+            status_bar=self.status_bar_widget,
+            toolbar=self.toolbar,
             snapshot=snapshot,
+            session=session,
             last_task_name=last_task_name,
         )
+        buttons = state.button_states()
+        paused = state.scan_state == "paused"
+        self.property_panel.set_scan_controls_enabled(
+            start_enabled=buttons["start"],
+            stop_enabled=buttons["stop"],
+        )
+        self.property_panel.set_pause_button_state(
+            visible=state.scan_state in ("running", "paused"),
+            paused=paused,
+            enabled=buttons["pause"],
+        )
+        return state
+
+    def _on_data_view_status(self, level: str, message: str) -> None:
+        if level == "DATA" and message.startswith("Mock data view refreshed"):
+            return
+        self.bottom_dock.append_log_line(message, level=level)
+
+    def _on_history_task_selected(self, task_id: str) -> None:
+        if task_id and task_id != self._current_task_id:
+            self._selected_history_task_id = task_id
+        else:
+            self._selected_history_task_id = None
+        self._sync_demo_state()
 
     def _on_report_exported(self, path: str) -> None:
+        report_view = self.workspace.report_view()
+        task_id = report_view._current_task_id() if hasattr(report_view, "_current_task_id") else None
         self._report_exported = True
+        self._report_exported_for_task_id = task_id
         self.bottom_dock.append_log_line(f"Mock 报告已导出: {path}", level="REPORT")
         self.status_bar_widget.update_storage_saved(path)
-        self.workflow_panel.mark_completed_through(6)
         self._sync_demo_state()
 
     def _on_toolbar_mock_action(self, action: str) -> None:
@@ -284,12 +326,7 @@ class CommercialMainShell(QMainWindow):
     def _on_scan_validity_changed(self, valid: bool, message: str) -> None:
         snapshot = self.mock_scan.snapshot()
         if snapshot.status not in ("running", "paused"):
-            self.property_panel.set_scan_controls_enabled(start_enabled=valid, stop_enabled=False)
-            self.toolbar.set_scan_controls_enabled(
-                start_enabled=valid,
-                pause_enabled=False,
-                stop_enabled=False,
-            )
+            self._sync_demo_state(snapshot)
         if not valid and message:
             self.bottom_dock.append_log_line(f"参数校验失败: {message}", level="WARN")
 
@@ -359,6 +396,9 @@ class CommercialMainShell(QMainWindow):
     def _on_new_project(self) -> None:
         session = self._services.project.new_project()
         self._report_exported = False
+        self._report_exported_for_task_id = None
+        self._current_task_id = None
+        self._selected_history_task_id = None
         self._completed_scan_registered = False
         self.property_panel.clear_target_presentation()
         self.bottom_dock.append_log_line(f"新建项目: {session.name}", level="PROJECT")
@@ -368,6 +408,9 @@ class CommercialMainShell(QMainWindow):
     def _on_open_project(self) -> None:
         session = self._services.project.open_mock_project()
         self._report_exported = False
+        self._report_exported_for_task_id = None
+        self._current_task_id = None
+        self._selected_history_task_id = None
         self._completed_scan_registered = False
         self.bottom_dock.append_log_line(f"打开项目: {session.name}", level="PROJECT")
         self.property_panel.apply_target_demo_values()
@@ -502,7 +545,11 @@ class CommercialMainShell(QMainWindow):
         )
         self._demo_controller.reset_demo(bundle, clear_analysis_tasks=True)
         self.mock_scan.stop()
+        self.mock_scan.reset()
         self._report_exported = False
+        self._report_exported_for_task_id = None
+        self._current_task_id = None
+        self._selected_history_task_id = None
         self._completed_scan_registered = False
         self._last_dry_run_point = 0
         self._last_dry_run_log_flush_point = 0
@@ -512,8 +559,8 @@ class CommercialMainShell(QMainWindow):
         self.workspace.report_view().refresh_tasks()
         self._refresh_project_ui()
         self.bottom_dock.clear_logs()
-        self.bottom_dock.append_log_line("Demo 会话已重置", level="INFO")
-        self._update_scan_controls(self.mock_scan.snapshot())
+        self.bottom_dock.seed_idle_demo_stats()
+        self.bottom_dock.append_log_line("Demo 会话已重置", level="RESET")
         self._sync_demo_state()
 
     def _start_mock_scan(self) -> None:
@@ -530,6 +577,8 @@ class CommercialMainShell(QMainWindow):
         self._last_dry_run_point = 0
         self._last_dry_run_log_flush_point = 0
         self._completed_scan_registered = False
+        self._current_task_id = None
+        self._selected_history_task_id = None
         self._services.dry_run.log.clear()
         self._services.dry_run.motion.home()
         self._services.dry_run.spectrum.configure_frequency(1.5e9, 2.0e9)
@@ -570,6 +619,8 @@ class CommercialMainShell(QMainWindow):
                 self.property_panel.current_scan_region(),
                 self.property_panel.current_scan_path_config(),
             )
+            self._current_task_id = record.task_id
+            self._selected_history_task_id = None
             self._services.project.increment_task_count()
             data_view.refresh_tasks()
             self.workspace.report_view().refresh_tasks()
@@ -581,7 +632,6 @@ class CommercialMainShell(QMainWindow):
             self.bottom_dock.append_log_line(f"Mock 任务已注册: {record.name}", level="SCAN")
             data_view.show_new_task_hint(record.name)
         self._emit_dry_run_if_needed(snapshot)
-        self._update_scan_controls(snapshot)
         self._sync_demo_state(snapshot)
 
     def _emit_dry_run_if_needed(self, snapshot) -> None:
@@ -615,17 +665,10 @@ class CommercialMainShell(QMainWindow):
         self.bottom_dock.append_log_line(latest, level="DRY RUN")
         self.workspace.device_center_view().append_dry_run_line(latest)
 
-    def _update_scan_controls(self, snapshot) -> None:
-        running = snapshot.status in ("running", "paused")
-        paused = snapshot.status == "paused"
-        controls = dict(start_enabled=not running, stop_enabled=running)
-        self.property_panel.set_scan_controls_enabled(**controls)
-        self.toolbar.set_scan_controls_enabled(
-            start_enabled=not running,
-            pause_enabled=running,
-            stop_enabled=running,
-            pause_label="继续" if paused else "暂停",
-        )
+    def build_demo_state(self, snapshot=None):
+        """Public accessor for QA and tests."""
+
+        return self._sync_demo_state(snapshot)
 
     def _setup_ui(self) -> None:
         outer = QWidget(self)
