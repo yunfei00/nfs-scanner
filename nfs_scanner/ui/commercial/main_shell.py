@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 from nfs_scanner.core.demo_session import DemoServiceBundle, DemoSessionController
 from nfs_scanner.core.mock_scan_runtime import MockScanRuntimeService
 
+from .demo_state_sync import devices_ready, sync_status_bar, sync_workflow_from_runtime
 from .bottom_dock import CommercialBottomDock
 from .device_status_panel import CommercialDeviceStatusPanel
 from .property_panel import CommercialPropertyPanel
@@ -79,6 +80,8 @@ class CommercialMainShell(QMainWindow):
         self._last_dry_run_point = 0
         self._completed_scan_registered = False
         self._scan_home_after_complete = False
+        self._report_exported = False
+        self._last_dry_run_log_flush_point = 0
         self._body_splitter: QSplitter | None = None
         self._center_splitter: QSplitter | None = None
         self._upper_splitter: QSplitter | None = None
@@ -92,9 +95,7 @@ class CommercialMainShell(QMainWindow):
         self._connect_toolbar_actions()
         self._connect_workflow_navigation()
         self.workspace.bind_report_analysis(self.workspace.data_view().analysis_service)
-        self.workspace.report_view().report_exported.connect(
-            lambda path: self.bottom_dock.append_log_line(f"Mock 报告已导出: {path}", level="REPORT")
-        )
+        self.workspace.report_view().report_exported.connect(self._on_report_exported)
         self.toolbar.apply_integration_safety()
         self._services.project.open_mock_project()
         self._refresh_project_ui()
@@ -102,27 +103,24 @@ class CommercialMainShell(QMainWindow):
         apply_commercial_scroll_config(self)
 
     def _apply_target_demo_presentation(self) -> None:
-        """Seed UI fields to match the target screenshot demo state."""
+        """Seed visual demo fields without faking runtime/workflow progress."""
 
         self.property_panel.apply_target_demo_values()
         for device_id in ("motion-001", "spectrum-001", "camera-001"):
             self._services.devices.connect_device(device_id)
         self.device_status_panel.refresh_devices()
-        self.workflow_panel.apply_target_demo_state(active_index=4, progress_percent=65.2)
-        self.bottom_dock.seed_target_demo_stats()
-        self.status_bar_widget.apply_target_demo_labels()
         self.workspace.apply_target_presentation()
         realtime = self.workspace.realtime_view()
         realtime.color_bar.set_range(-90.0, -10.0)
         realtime.color_bar.set_lut_name("Turbo")
         realtime.cursor_hud.update_readout(x=45.2, y=32.8, z=5.0, freq="2.450 GHz", amp="-23.45 dBm")
+        self.bottom_dock.seed_idle_demo_stats()
+        self._sync_demo_state()
 
     def _refresh_target_demo_presentation(self) -> None:
-        """Re-apply demo-only presentation fields after deferred UI refresh."""
+        """Re-apply demo-only canvas presentation after deferred UI refresh."""
 
-        if self.property_panel._target_presentation_active:
-            self.property_panel._apply_target_stat_overrides()
-        self.status_bar_widget.apply_target_demo_labels()
+        pass
 
     @property
     def title_bar(self) -> CommercialTopHeader:
@@ -252,6 +250,34 @@ class CommercialMainShell(QMainWindow):
         self.mock_scan.log_line.connect(self.bottom_dock.append_log_line)
         self._update_scan_controls(self.mock_scan.snapshot())
 
+    def _sync_demo_state(self, snapshot=None) -> None:
+        """Keep workflow and status bar aligned with mock runtime and project state."""
+
+        if snapshot is None:
+            snapshot = self.mock_scan.snapshot()
+        tasks = self.workspace.data_view().analysis_service.list_tasks()
+        last_task_name = tasks[0].name if tasks else None
+        sync_workflow_from_runtime(
+            self.workflow_panel,
+            snapshot,
+            devices_connected=devices_ready(self._services.devices),
+            has_tasks=bool(tasks),
+            report_exported=self._report_exported,
+        )
+        sync_status_bar(
+            self.status_bar_widget,
+            session=self._services.project.current_session(),
+            snapshot=snapshot,
+            last_task_name=last_task_name,
+        )
+
+    def _on_report_exported(self, path: str) -> None:
+        self._report_exported = True
+        self.bottom_dock.append_log_line(f"Mock 报告已导出: {path}", level="REPORT")
+        self.status_bar_widget.update_storage_saved(path)
+        self.workflow_panel.mark_completed_through(6)
+        self._sync_demo_state()
+
     def _on_toolbar_mock_action(self, action: str) -> None:
         self.bottom_dock.append_log_line(f"Mock toolbar action feedback: {action}", level="UI")
 
@@ -332,12 +358,17 @@ class CommercialMainShell(QMainWindow):
 
     def _on_new_project(self) -> None:
         session = self._services.project.new_project()
+        self._report_exported = False
+        self._completed_scan_registered = False
+        self.property_panel.clear_target_presentation()
         self.bottom_dock.append_log_line(f"新建项目: {session.name}", level="PROJECT")
         self._refresh_project_ui()
-        self.workflow_panel.mark_completed_through(0)
+        self._sync_demo_state()
 
     def _on_open_project(self) -> None:
         session = self._services.project.open_mock_project()
+        self._report_exported = False
+        self._completed_scan_registered = False
         self.bottom_dock.append_log_line(f"打开项目: {session.name}", level="PROJECT")
         self.property_panel.apply_target_demo_values()
         for device in self._services.devices.list_devices():
@@ -348,7 +379,7 @@ class CommercialMainShell(QMainWindow):
         self.workspace.data_view().refresh_tasks()
         self.workspace.report_view().refresh_tasks()
         self._refresh_project_ui()
-        self.workflow_panel.mark_completed_through(0)
+        self._sync_demo_state()
 
     def _on_save_project(self) -> None:
         try:
@@ -392,12 +423,14 @@ class CommercialMainShell(QMainWindow):
         session = self._services.project.current_session()
         self.bottom_dock.append_log_line(f"项目已保存: {path}", level="PROJECT")
         self._refresh_project_ui()
+        self.status_bar_widget.update_storage_saved(str(path))
         if session is not None:
             self.status_bar_widget.update_project_session(session)
 
     def _refresh_project_ui(self) -> None:
         session = self._services.project.current_session()
         self.status_bar_widget.update_project_session(session)
+        self._sync_demo_state()
 
     def _on_connect_device(self) -> None:
         for device in self._services.devices.list_devices():
@@ -405,8 +438,8 @@ class CommercialMainShell(QMainWindow):
         self.device_status_panel.refresh_devices()
         self.workspace.device_center_view().refresh_devices()
         self.workspace.switch_to_tab(self.workspace.DEVICE_CENTER_TAB_INDEX)
-        self.workflow_panel.set_step_state(1, "active")
         self.bottom_dock.append_log_line("打开设备中心", level="DEVICE")
+        self._sync_demo_state()
 
     def _on_devices_changed(self) -> None:
         connected = [
@@ -415,11 +448,11 @@ class CommercialMainShell(QMainWindow):
             if device.connection_status == "connected"
         ]
         if connected:
-            self.workflow_panel.mark_completed_through(1)
             self.bottom_dock.append_log_line(
                 f"Mock 设备已连接: {', '.join(connected)}",
                 level="DEVICE",
             )
+        self._sync_demo_state()
 
     def _on_export_data(self) -> None:
         data_view = self.workspace.data_view()
@@ -469,36 +502,48 @@ class CommercialMainShell(QMainWindow):
         )
         self._demo_controller.reset_demo(bundle, clear_analysis_tasks=True)
         self.mock_scan.stop()
+        self._report_exported = False
+        self._completed_scan_registered = False
+        self._last_dry_run_point = 0
+        self._last_dry_run_log_flush_point = 0
+        self.property_panel.apply_target_demo_values()
         self.device_status_panel.refresh_devices()
         self.workspace.data_view().refresh_tasks()
         self.workspace.report_view().refresh_tasks()
         self._refresh_project_ui()
-        self.workflow_panel.mark_completed_through(0)
         self.bottom_dock.clear_logs()
         self.bottom_dock.append_log_line("Demo 会话已重置", level="INFO")
         self._update_scan_controls(self.mock_scan.snapshot())
+        self._sync_demo_state()
 
     def _start_mock_scan(self) -> None:
+        if self._services.project.current_session() is None:
+            self.bottom_dock.append_log_line("Mock 扫描未启动: 请先新建或打开项目", level="WARN")
+            return
+        if not devices_ready(self._services.devices):
+            self.bottom_dock.append_log_line("Mock 扫描未启动: 请先连接 Mock 设备", level="WARN")
+            return
         if not self.property_panel.can_start_scan():
             message = self.property_panel.validation_message() or "参数无效"
             self.bottom_dock.append_log_line(f"Mock 扫描未启动: {message}", level="WARN")
             return
         self._last_dry_run_point = 0
+        self._last_dry_run_log_flush_point = 0
         self._completed_scan_registered = False
         self._services.dry_run.log.clear()
         self._services.dry_run.motion.home()
         self._services.dry_run.spectrum.configure_frequency(1.5e9, 2.0e9)
-        self._flush_dry_run_logs()
-        self.bottom_dock.append_log_line("Mock 扫描状态: Preparing", level="SCAN")
+        self._flush_dry_run_logs(force=True)
         self.bottom_dock.append_log_line("Mock 扫描开始", level="SCAN")
         region = self.property_panel.current_scan_region()
         path_config = self.property_panel.current_scan_path_config()
-        self.workflow_panel.set_step_state(4, "active")
         self.mock_scan.start(region, path_config)
+        self._sync_demo_state(self.mock_scan.snapshot())
 
     def _stop_mock_scan(self) -> None:
         self.mock_scan.stop()
         self.bottom_dock.append_log_line("Mock 扫描已停止", level="SCAN")
+        self._sync_demo_state(self.mock_scan.snapshot())
 
     def _toggle_mock_scan_pause(self) -> None:
         snapshot = self.mock_scan.snapshot()
@@ -508,10 +553,10 @@ class CommercialMainShell(QMainWindow):
         elif snapshot.status == "running":
             self.mock_scan.pause()
             self.bottom_dock.append_log_line("Mock 扫描暂停", level="SCAN")
+        self._sync_demo_state(self.mock_scan.snapshot())
 
     def _on_mock_scan_snapshot(self, snapshot) -> None:
         self.workspace.realtime_view().update_scan_progress(snapshot)
-        self.status_bar_widget.update_runtime_snapshot(snapshot)
         self.bottom_dock.update_runtime_stats(snapshot)
         self.property_panel.set_pause_button_state(
             visible=snapshot.status in ("running", "paused"),
@@ -526,18 +571,18 @@ class CommercialMainShell(QMainWindow):
                 self.property_panel.current_scan_path_config(),
             )
             self._services.project.increment_task_count()
-            self._refresh_project_ui()
             data_view.refresh_tasks()
             self.workspace.report_view().refresh_tasks()
             self.workspace.report_view().select_task(record.task_id)
             self.workspace.switch_to_tab(self.workspace.DATA_VIEW_TAB_INDEX)
-            self.workflow_panel.mark_completed_through(5)
             self.toolbar.set_export_enabled(True)
             if self._scan_home_after_complete or self.property_panel.home_after_scan_enabled():
                 self.bottom_dock.append_log_line("Mock 扫描完成回零：DRY RUN home issued", level="SCAN")
             self.bottom_dock.append_log_line(f"Mock 任务已注册: {record.name}", level="SCAN")
+            data_view.show_new_task_hint(record.name)
         self._emit_dry_run_if_needed(snapshot)
         self._update_scan_controls(snapshot)
+        self._sync_demo_state(snapshot)
 
     def _emit_dry_run_if_needed(self, snapshot) -> None:
         if snapshot.status not in ("running", "completed"):
@@ -556,13 +601,17 @@ class CommercialMainShell(QMainWindow):
             if snapshot.completed_points % 5 == 0:
                 self._services.dry_run.camera.capture_frame()
         self._last_dry_run_point = snapshot.completed_points
-        self._flush_dry_run_logs()
+        if snapshot.completed_points - self._last_dry_run_log_flush_point >= 10 or snapshot.status == "completed":
+            self._last_dry_run_log_flush_point = snapshot.completed_points
+            self._flush_dry_run_logs()
 
-    def _flush_dry_run_logs(self) -> None:
+    def _flush_dry_run_logs(self, *, force: bool = False) -> None:
         lines = self._services.dry_run.log.format_lines()
         if not lines:
             return
         latest = lines[-1]
+        if not force and latest.startswith("[DRY RUN] move"):
+            return
         self.bottom_dock.append_log_line(latest, level="DRY RUN")
         self.workspace.device_center_view().append_dry_run_line(latest)
 

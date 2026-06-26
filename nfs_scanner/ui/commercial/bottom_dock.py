@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFontMetrics
+from PySide6.QtGui import QFontMetrics, QTextCursor
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -47,6 +47,7 @@ class CommercialBottomDock(QWidget):
     """Bottom dock with three visible instrument panels."""
 
     _LOG_VISIBLE_LINES = 6
+    _LOG_MAX_LINES = 400
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -59,6 +60,7 @@ class CommercialBottomDock(QWidget):
         self._spectrum_widget: MockSpectrumWidget | None = None
         self._stats_panel: QWidget | None = None
         self._progress_bar: QProgressBar | None = None
+        self._last_log_signature: str = ""
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -80,6 +82,26 @@ class CommercialBottomDock(QWidget):
         tri_layout.addWidget(self._stats_panel, 2)
         tri_layout.addWidget(log_panel, 3)
         layout.addWidget(tri_panel, 1)
+
+    def seed_idle_demo_stats(self) -> None:
+        """Populate scan statistics with idle mock placeholders (no fake progress)."""
+
+        values = {
+            "completed_points": "0 / --",
+            "current_xyz": "X:--  Y:--  Z:5.0",
+            "current_freq": "2.450 GHz",
+            "current_amp": "-23.45 dBm",
+            "started_at": "--",
+            "elapsed": "0s",
+            "remaining": "--",
+            "runtime_status": "已配置",
+        }
+        for key, label in self._runtime_stat_labels.items():
+            if key in values:
+                label.setText(values[key])
+        if self._progress_bar is not None:
+            self._progress_bar.setValue(0)
+            self._progress_bar.setFormat("0%")
 
     def seed_target_demo_stats(self) -> None:
         """Populate scan statistics with target-screenshot-like demo values."""
@@ -152,7 +174,21 @@ class CommercialBottomDock(QWidget):
     def append_log_line(self, message: str, *, level: str = "INFO") -> None:
         if self._log_view is None or not message.strip():
             return
+        signature = f"{level}:{message.strip()}"
+        if signature == self._last_log_signature:
+            return
+        self._last_log_signature = signature
         self._log_view.appendPlainText(f"[{level}] {message.strip()}")
+        document = self._log_view.document()
+        if document.blockCount() > self._LOG_MAX_LINES:
+            cursor = self._log_view.textCursor()
+            cursor.movePosition(QTextCursor.MoveOperation.Start)
+            cursor.movePosition(
+                QTextCursor.MoveOperation.Down,
+                QTextCursor.MoveMode.KeepAnchor,
+                document.blockCount() - self._LOG_MAX_LINES,
+            )
+            cursor.removeSelectedText()
         scrollbar = self._log_view.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
 

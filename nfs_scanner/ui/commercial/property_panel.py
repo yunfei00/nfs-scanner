@@ -640,6 +640,11 @@ class CommercialPropertyPanel(QScrollArea):
             self._mode_combo.setCurrentIndex(0)
         self._emit_scan_config()
 
+    def clear_target_presentation(self) -> None:
+        """Stop overriding preview stats with target-screenshot demo values."""
+
+        self._target_presentation_active = False
+
     def has_horizontal_clipping(self) -> bool:
         """Return True when horizontal clipping or scroll is required."""
 

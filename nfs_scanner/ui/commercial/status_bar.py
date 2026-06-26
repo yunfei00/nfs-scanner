@@ -109,11 +109,35 @@ class CommercialStatusBar(QFrame):
         self.project_label.setToolTip(session.name)
         self._refresh_chip_widths()
 
-    def update_runtime_snapshot(self, snapshot: RuntimeSnapshot) -> None:
+    def update_runtime_snapshot(
+        self,
+        snapshot: RuntimeSnapshot,
+        *,
+        task_name: str | None = None,
+    ) -> None:
         self.system_label.setText(f"系统: {format_runtime_status(snapshot.status)}")
         if snapshot.status in ("idle", "configured"):
             self.task_label.setText("任务: 未开始")
+        elif snapshot.status == "paused":
+            percent = int(snapshot.progress * 100)
+            self.task_label.setText(f"任务: 已暂停 · {percent}%")
+        elif snapshot.status == "stopped":
+            self.task_label.setText("任务: 已停止")
+        elif snapshot.status == "completed":
+            label = task_name or "扫描任务"
+            self.task_label.setText(f"任务: {label} · 已完成")
         else:
             percent = int(snapshot.progress * 100)
             self.task_label.setText(f"任务: 扫描执行中 · {percent}%")
+        self._refresh_chip_widths()
+
+    def update_storage_saved(self, path: str | None = None) -> None:
+        """Show saved storage hint after mock project save."""
+
+        if path:
+            self.storage_label.setText("存储: 已保存")
+            self.storage_label.setToolTip(path)
+        else:
+            self.storage_label.setText("模式: 无硬件控制")
+            self.storage_label.setToolTip("")
         self._refresh_chip_widths()

@@ -180,6 +180,12 @@ class CommercialWorkflowPanel(QWidget):
             row.set_progress_text("")
         self._refresh_step_styles()
 
+    def set_scan_progress(self, index: int, text: str) -> None:
+        """Show scan progress text on a workflow step row."""
+
+        if 0 <= index < len(self._step_rows):
+            self._step_rows[index].set_progress_text(text)
+
     def _refresh_step_styles(self) -> None:
         for index, row in enumerate(self._step_rows):
             state = self._step_states[index]
