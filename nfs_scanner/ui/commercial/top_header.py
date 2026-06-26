@@ -13,7 +13,7 @@ from .widgets.brand_area import CommercialBrandArea
 class CommercialTopHeader(QFrame):
     """Single integrated top strip matching the target instrument layout."""
 
-    HEADER_HEIGHT = 52
+    HEADER_HEIGHT = 56
 
     def __init__(
         self,
@@ -34,7 +34,7 @@ class CommercialTopHeader(QFrame):
 
     def _setup_ui(self) -> None:
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 0, 4, 0)
+        layout.setContentsMargins(10, 0, 6, 0)
         layout.setSpacing(0)
 
         self.brand_area = CommercialBrandArea(self)
@@ -44,10 +44,10 @@ class CommercialTopHeader(QFrame):
         brand_separator.setObjectName("commercialBrandSeparator")
         brand_separator.setFrameShape(QFrame.Shape.VLine)
         brand_separator.setFixedWidth(1)
-        brand_separator.setFixedHeight(40)
-        layout.addSpacing(10)
+        brand_separator.setFixedHeight(42)
+        layout.addSpacing(8)
         layout.addWidget(brand_separator, 0, Qt.AlignmentFlag.AlignVCenter)
-        layout.addSpacing(10)
+        layout.addSpacing(8)
 
         self.toolbar.setParent(self)
         self.toolbar.setObjectName("commercialToolbar")
@@ -57,13 +57,14 @@ class CommercialTopHeader(QFrame):
         toolbar_separator.setObjectName("commercialToolbarSeparator")
         toolbar_separator.setFrameShape(QFrame.Shape.VLine)
         toolbar_separator.setFixedWidth(1)
-        toolbar_separator.setFixedHeight(40)
+        toolbar_separator.setFixedHeight(42)
         layout.addSpacing(8)
         layout.addWidget(toolbar_separator, 0, Qt.AlignmentFlag.AlignVCenter)
         layout.addSpacing(8)
 
         status_area = self._build_status_area(self)
         layout.addWidget(status_area, 0)
+        layout.addSpacing(4)
 
         self._minimize_button = self._make_control_button("—", "最小化", self._on_minimize)
         self._maximize_button = self._make_control_button("□", "最大化", self._on_maximize)
@@ -79,10 +80,21 @@ class CommercialTopHeader(QFrame):
         layout.setContentsMargins(0, 0, 4, 0)
         layout.setSpacing(6)
 
-        auth_dot = QLabel("●", status)
+        auth_chip = QWidget(status)
+        auth_chip.setObjectName("commercialTitleBarAuthChip")
+        auth_layout = QHBoxLayout(auth_chip)
+        auth_layout.setContentsMargins(8, 2, 8, 2)
+        auth_layout.setSpacing(5)
+        auth_dot = QLabel("●", auth_chip)
         auth_dot.setObjectName("commercialTitleBarAuthDot")
-        auth_label = QLabel("授权状态: 正常", status)
+        auth_label = QLabel("授权: Mock 有效", auth_chip)
         auth_label.setObjectName("commercialTitleBarAuthLabel")
+        auth_layout.addWidget(auth_dot)
+        auth_layout.addWidget(auth_label)
+
+        safety_chip = QLabel("DRY RUN", status)
+        safety_chip.setObjectName("commercialTitleBarSafetyChip")
+        safety_chip.setToolTip("No Hardware Control · Real Device Disabled")
 
         user_icon = QLabel(status)
         user_icon.setObjectName("commercialTitleBarUserIcon")
@@ -96,9 +108,9 @@ class CommercialTopHeader(QFrame):
         chevron = QLabel("▾", status)
         chevron.setObjectName("commercialTitleBarUserChevron")
 
-        layout.addWidget(auth_dot)
-        layout.addWidget(auth_label)
-        layout.addSpacing(6)
+        layout.addWidget(auth_chip)
+        layout.addWidget(safety_chip)
+        layout.addSpacing(4)
         layout.addWidget(user_icon)
         layout.addWidget(user_label)
         layout.addWidget(chevron)
@@ -128,7 +140,7 @@ class CommercialTopHeader(QFrame):
         button.setObjectName("commercialTitleBarClose" if danger else "commercialTitleBarControl")
         button.setText(text)
         button.setToolTip(tooltip)
-        button.setFixedSize(28, 24)
+        button.setFixedSize(28, 26)
         button.clicked.connect(slot)
         return button
 
