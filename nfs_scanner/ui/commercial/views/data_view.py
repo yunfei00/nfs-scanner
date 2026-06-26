@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import json
+from datetime import datetime
+from pathlib import Path
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
@@ -13,16 +17,21 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from PySide6.QtCore import Signal
 
 from nfs_scanner.core.mock_analysis_service import MockAnalysisService, MockScanTaskRecord
 
+from ..lut_presets import COMMON_LUT_NAMES
 from ..scroll_helpers import configure_abstract_scroll_area
-from ..widgets import NFSCard
+from ..widgets import NFSCard, NFSSecondaryButton
 from ..widgets.mock_chart_widgets import MockHeatmapWidget, MockSpectrumWidget
 
 
 class DataView(QWidget):
     """Mock historical scan analysis workspace tab."""
+
+    status_message = Signal(str, str)
+    data_exported = Signal(str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -30,6 +39,10 @@ class DataView(QWidget):
         self._analysis_service = MockAnalysisService()
         self._task_list: QListWidget | None = None
         self._view_mode_combo: QComboBox | None = None
+        self._trace_combo: QComboBox | None = None
+        self._frequency_combo: QComboBox | None = None
+        self._component_combo: QComboBox | None = None
+        self._lut_combo: QComboBox | None = None
         self._summary_labels: dict[str, QLabel] = {}
         self._heatmap_widget: MockHeatmapWidget | None = None
         self._spectrum_widget: MockSpectrumWidget | None = None
@@ -96,6 +109,25 @@ class DataView(QWidget):
         self._view_mode_combo.addItems(["trace", "frequency"])
         self._view_mode_combo.currentTextChanged.connect(self._refresh_selected_summary)
         toolbar_layout.addWidget(self._view_mode_combo)
+        self._trace_combo = QComboBox(toolbar)
+        self._trace_combo.addItems(["Trace 1", "Trace 2"])
+        self._trace_combo.currentTextChanged.connect(self._refresh_selected_summary)
+        toolbar_layout.addWidget(self._trace_combo)
+        self._frequency_combo = QComboBox(toolbar)
+        self._frequency_combo.addItems(["2.450 GHz", "1.000 GHz", "6.000 GHz"])
+        self._frequency_combo.currentTextChanged.connect(self._refresh_selected_summary)
+        toolbar_layout.addWidget(self._frequency_combo)
+        self._component_combo = QComboBox(toolbar)
+        self._component_combo.addItems(["幅度", "相位", "实部", "虚部"])
+        self._component_combo.currentTextChanged.connect(self._refresh_selected_summary)
+        toolbar_layout.addWidget(self._component_combo)
+        self._lut_combo = QComboBox(toolbar)
+        self._lut_combo.addItems(list(COMMON_LUT_NAMES))
+        self._lut_combo.currentTextChanged.connect(self._refresh_selected_summary)
+        toolbar_layout.addWidget(self._lut_combo)
+        export_button = NFSSecondaryButton("导出数据", toolbar)
+        export_button.clicked.connect(self.export_selected_task)
+        toolbar_layout.addWidget(export_button)
         toolbar_layout.addStretch(1)
 
         summary_card = NFSCard("分析摘要", analysis_column)
@@ -144,6 +176,7 @@ class DataView(QWidget):
         if current is None:
             return
         self._refresh_selected_summary()
+        self.status_message.emit("DATA", f"Mock data task selected: {current.text().splitlines()[0]}")
 
     def _refresh_selected_summary(self) -> None:
         if self._task_list is None or self._view_mode_combo is None:
@@ -153,6 +186,10 @@ class DataView(QWidget):
             return
         task_id = item.data(Qt.ItemDataRole.UserRole)
         view_mode = self._view_mode_combo.currentText()
+        trace = self._trace_combo.currentText() if self._trace_combo is not None else "Trace 1"
+        frequency = self._frequency_combo.currentText() if self._frequency_combo is not None else "2.450 GHz"
+        component = self._component_combo.currentText() if self._component_combo is not None else "幅度"
+        lut = self._lut_combo.currentText() if self._lut_combo is not None else "Turbo"
         summary = self._analysis_service.build_summary(task_id, view_mode=view_mode)
         task = self._analysis_service.get_task(task_id)
         if summary is None or task is None:
@@ -170,9 +207,45 @@ class DataView(QWidget):
 
         if self._heatmap_widget is not None:
             self._heatmap_widget.set_task_context(
-                title=f"{task.name} [{view_mode}]",
+                title=f"{task.name} [{trace}/{component}/{lut}]",
                 point_count=task.point_count,
                 view_mode=view_mode,
             )
         if self._spectrum_widget is not None:
             self._spectrum_widget.set_view_mode(view_mode)
+        self.status_message.emit(
+            "DATA",
+            f"Mock data view refreshed: {task.name}, {trace}, {frequency}, {component}, LUT={lut}",
+        )
+
+    def export_selected_task(self) -> Path | None:
+        if self._task_list is None:
+            return None
+        item = self._task_list.currentItem()
+        if item is None:
+            self.status_message.emit("EXPORT", "No mock data task selected")
+            return None
+        task_id = str(item.data(Qt.ItemDataRole.UserRole))
+        task = self._analysis_service.get_task(task_id)
+        if task is None:
+            self.status_message.emit("EXPORT", f"Unknown mock data task: {task_id}")
+            return None
+        output_dir = Path.home() / ".nfs_scanner" / "mock_exports" / "data"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        path = output_dir / f"mock_data_{task.task_id}_{timestamp}.json"
+        payload = {
+            "task_id": task.task_id,
+            "name": task.name,
+            "point_count": task.point_count,
+            "completed_at": task.completed_at,
+            "scan_mode": task.scan_mode,
+            "peak_frequency": task.peak_frequency,
+            "peak_amplitude": task.peak_amplitude,
+            "area_mm2": task.area_mm2,
+            "mock_only": True,
+        }
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        self.data_exported.emit(str(path))
+        self.status_message.emit("EXPORT", f"Mock data exported: {path}")
+        return path

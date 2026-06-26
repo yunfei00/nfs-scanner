@@ -25,6 +25,7 @@ class ReportView(QWidget):
     """Mock report preview and export workspace tab."""
 
     report_exported = Signal(str)
+    status_message = Signal(str, str)
 
     def __init__(
         self,
@@ -92,10 +93,20 @@ class ReportView(QWidget):
         self._task_combo = QComboBox(toolbar)
         self._task_combo.currentIndexChanged.connect(self._refresh_preview)
         toolbar_layout.addWidget(self._task_combo, 1)
+        generate_button = QPushButton("生成报告", toolbar)
+        generate_button.setObjectName("nfsSecondaryButton")
+        generate_button.clicked.connect(self._generate_report)
+        toolbar_layout.addWidget(generate_button)
         export_button = QPushButton("导出 Mock 报告", toolbar)
         export_button.setObjectName("nfsPrimaryButton")
-        export_button.clicked.connect(self._export_report)
+        export_button.setText("导出 MD")
+        export_button.clicked.connect(lambda: self._export_report("md"))
         toolbar_layout.addWidget(export_button)
+        for caption, file_format in (("HTML", "html"), ("PDF", "pdf"), ("PNG", "png")):
+            button = QPushButton(caption, toolbar)
+            button.setObjectName("nfsSecondaryButton")
+            button.clicked.connect(lambda _checked=False, fmt=file_format: self._export_report(fmt))
+            toolbar_layout.addWidget(button)
         layout.addWidget(toolbar)
 
         preview_card = NFSCard("报告预览", self)
@@ -172,13 +183,27 @@ class ReportView(QWidget):
         if self._status_label is not None:
             self._status_label.setText(f"预览生成于 {preview.get('generated_at', '')}")
 
-    def _export_report(self) -> None:
+    def _generate_report(self) -> None:
         task_id = self._current_task_id()
         if task_id is None:
+            self.status_message.emit("REPORT", "No mock report task selected")
             return
-        path = self._report_service.export_markdown_report(task_id)
+        if self._status_label is not None:
+            self._status_label.setText("Generating...")
+        self._refresh_preview()
+        if self._status_label is not None:
+            self._status_label.setText("Ready")
+        self.status_message.emit("REPORT", f"Mock report ready: {task_id}")
+
+    def _export_report(self, file_format: str = "md") -> None:
+        task_id = self._current_task_id()
+        if task_id is None:
+            self.status_message.emit("REPORT", "No mock report task selected")
+            return
+        path = self._report_service.export_mock_report(task_id, file_format=file_format)
         path_text = str(path)
         self.report_exported.emit(path_text)
+        self.status_message.emit("REPORT", f"Mock report exported: {path_text}")
         if self._status_label is not None:
             self._status_label.setText(f"Mock 报告已导出: {path_text}")
 

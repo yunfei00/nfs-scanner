@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 
-from PySide6.QtCore import QEvent, QTimer, Qt
+from PySide6.QtCore import QEvent, QTimer, Qt, Signal
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -38,6 +38,12 @@ _CANVAS_TOOL_BUTTON_HEIGHT = 26
 class RealtimeView(QWidget):
     """Live scanning workspace with mock layers and assistive widgets."""
 
+    tool_changed = Signal(str)
+    canvas_action_requested = Signal(str)
+    auto_fit_changed = Signal(bool)
+    heatmap_opacity_changed = Signal(int)
+    lut_changed = Signal(str)
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("realtimeView")
@@ -55,6 +61,8 @@ class RealtimeView(QWidget):
         self._has_preview_region = False
         self._auto_fit_checkbox: QCheckBox | None = None
         self._heatmap_opacity = 0.52
+        self._tool_buttons: list[QToolButton] = []
+        self._current_tool = "选择"
         self._setup_ui()
         self._load_mock_layers()
 
@@ -81,14 +89,19 @@ class RealtimeView(QWidget):
             ("网格", False),
             ("测量", False),
         )
-        for tip, enabled in canvas_tools:
+        for tip, _enabled in canvas_tools:
             button = QToolButton(toolbar)
             button.setObjectName("realtimeCanvasToolButton")
             button.setText(tip)
             button.setToolTip(f"{tip}（Mock）")
-            button.setEnabled(enabled)
+            button.setEnabled(True)
+            button.setCheckable(True)
+            button.clicked.connect(lambda _checked=False, name=tip: self._select_tool(name))
             button.setFixedSize(_CANVAS_TOOL_BUTTON_WIDTH, _CANVAS_TOOL_BUTTON_HEIGHT)
+            self._tool_buttons.append(button)
             toolbar_layout.addWidget(button)
+        if self._tool_buttons:
+            self._tool_buttons[0].setChecked(True)
 
         toolbar_layout.addWidget(self._separator(toolbar))
 
@@ -96,13 +109,14 @@ class RealtimeView(QWidget):
         reset_button = NFSSecondaryButton("重置", toolbar)
         fit_button.setMinimumWidth(48)
         reset_button.setMinimumWidth(48)
-        fit_button.clicked.connect(self.canvas.fit_view)
-        reset_button.clicked.connect(self.canvas.reset_view)
+        fit_button.clicked.connect(self.fit_canvas)
+        reset_button.clicked.connect(self.reset_canvas)
         toolbar_layout.addWidget(fit_button)
         toolbar_layout.addWidget(reset_button)
 
         self._auto_fit_checkbox = QCheckBox("自动适应", toolbar)
         self._auto_fit_checkbox.setChecked(False)
+        self._auto_fit_checkbox.toggled.connect(self.auto_fit_changed.emit)
         toolbar_layout.addWidget(self._auto_fit_checkbox)
 
         opacity_label = QLabel("透明度", toolbar)
@@ -169,12 +183,34 @@ class RealtimeView(QWidget):
             self._opacity_value_label.setText(f"{value}%")
         heatmap_layer = self.layer_manager.ensure_layer(LayerKind.HEATMAP)
         heatmap_layer.set_opacity(self._heatmap_opacity)
+        self.heatmap_opacity_changed.emit(value)
 
     def _on_lut_changed(self, lut_name: str) -> None:
         self.color_bar.set_lut_name(lut_name)
         heatmap_layer = self.layer_manager.ensure_layer(LayerKind.HEATMAP)
         if hasattr(heatmap_layer, "set_lut_name"):
             heatmap_layer.set_lut_name(lut_name)
+        self.lut_changed.emit(lut_name)
+
+    def _select_tool(self, tool_name: str) -> None:
+        self._current_tool = tool_name
+        for button in self._tool_buttons:
+            button.setChecked(button.text() == tool_name)
+        self.canvas.setToolTip(f"Mock 工具已切换：{tool_name}")
+        self.tool_changed.emit(tool_name)
+
+    def fit_canvas(self) -> None:
+        self.canvas.fit_view()
+        self.canvas_action_requested.emit("适应")
+
+    def reset_canvas(self) -> None:
+        self.canvas.reset_view()
+        self.canvas_action_requested.emit("重置")
+
+    def set_heatmap_visible(self, visible: bool) -> None:
+        self.layer_manager.ensure_layer(LayerKind.HEATMAP).set_visible(visible)
+        self.color_bar.setVisible(visible)
+        self.canvas_action_requested.emit("热力图显示" if visible else "热力图隐藏")
 
     def eventFilter(self, watched, event) -> bool:
         if watched is self.canvas.viewport():

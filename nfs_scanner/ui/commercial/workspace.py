@@ -84,10 +84,10 @@ class CommercialWorkspace(QWidget):
             self.tab_widget.setCurrentIndex(index)
 
     def apply_target_presentation(self) -> None:
-        """Hide secondary workspace tabs to match the target screenshot."""
+        """Keep all commercial v0.2 workspace tabs reachable."""
 
-        for index in (self.REPORT_VIEW_TAB_INDEX, self.DEVICE_CENTER_TAB_INDEX):
-            self.tab_widget.setTabVisible(index, False)
+        for index in range(self.tab_widget.count()):
+            self.tab_widget.setTabVisible(index, True)
 
     def realtime_view(self) -> RealtimeView:
         """Return the live realtime workspace tab."""
