@@ -43,7 +43,22 @@ def _set_scan_fields(shell: CommercialMainShell) -> None:
     panel._emit_scan_config()
 
 
-def _drive_scan_to_completion(shell: CommercialMainShell, *, max_ticks: int = 50) -> str:
+def _drive_scan_until_progress(shell: CommercialMainShell, min_progress: float, *, max_ticks: int = 200) -> float:
+    runtime = shell._services.runtime
+    if not isinstance(runtime, MockScanRuntimeService):
+        return 0.0
+    ticks = 0
+    progress = runtime.snapshot().progress
+    while runtime.snapshot().status == "running" and progress < min_progress and ticks < max_ticks:
+        snapshot = runtime.tick()
+        shell._on_mock_scan_snapshot(snapshot)
+        QApplication.processEvents()
+        progress = snapshot.progress
+        ticks += 1
+    return progress
+
+
+def _drive_scan_to_completion(shell: CommercialMainShell, *, max_ticks: int = 200) -> str:
     runtime = shell._services.runtime
     if not isinstance(runtime, MockScanRuntimeService):
         return "not mock runtime"
@@ -152,6 +167,26 @@ def run_functional_demo_flow(shell: CommercialMainShell) -> tuple[list[QACheck],
         )
     )
 
+    progress_after_start = _drive_scan_until_progress(shell, 0.05)
+    checks.append(
+        _check(
+            "scan_progress_above_5_percent",
+            "progress > 5%",
+            f"{int(progress_after_start * 100)}%",
+            progress_after_start >= 0.05,
+        )
+    )
+
+    workflow_scan_active = shell.workflow_panel._step_states[4] == "active"
+    checks.append(
+        _check(
+            "workflow_scan_step_active",
+            "workflow step 5 active while scanning",
+            str(shell.workflow_panel._step_states[4]),
+            workflow_scan_active,
+        )
+    )
+
     # Pause
     shell._toggle_mock_scan_pause()
     app.processEvents()
@@ -166,9 +201,15 @@ def run_functional_demo_flow(shell: CommercialMainShell) -> tuple[list[QACheck],
     )
 
     # Resume
+    progress_before_resume = shell.mock_scan.snapshot().progress
     shell._toggle_mock_scan_pause()
     app.processEvents()
     resumed_status = shell.mock_scan.snapshot().status
+    progress_after_resume = _drive_scan_until_progress(
+        shell,
+        min(progress_before_resume + 0.02, 0.99),
+        max_ticks=50,
+    )
     checks.append(
         _check(
             "resume_scan_running",
@@ -177,8 +218,31 @@ def run_functional_demo_flow(shell: CommercialMainShell) -> tuple[list[QACheck],
             resumed_status == "running",
         )
     )
+    checks.append(
+        _check(
+            "scan_progress_increases_after_resume",
+            "progress increases after resume",
+            f"before={int(progress_before_resume * 100)}%, after={int(progress_after_resume * 100)}%",
+            progress_after_resume > progress_before_resume,
+        )
+    )
 
-    # Complete scan
+    # Stop first run
+    shell._stop_mock_scan()
+    app.processEvents()
+    stopped_status = shell.mock_scan.snapshot().status
+    checks.append(
+        _check(
+            "stop_scan_stopped",
+            "runtime status == stopped",
+            stopped_status,
+            stopped_status == "stopped",
+        )
+    )
+
+    # Second run to completion
+    shell._start_mock_scan()
+    app.processEvents()
     final_status = _drive_scan_to_completion(shell)
     checks.append(
         _check(

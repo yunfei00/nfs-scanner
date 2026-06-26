@@ -1,6 +1,6 @@
 # Commercial UI Visual Report
 
-- Generated: 2026-06-26 21:33:28
+- Generated: 2026-06-26 21:57:56
 - Default screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_default.png`
 - Top header screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_top_header.png`
 - Maximized screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_maximized.png`
@@ -20,7 +20,7 @@
 | colorbar_adjacent | gap <= 12 px | 2px | PASS |
 | right_panel_width | 340–380 px | 350px | PASS |
 | left_panel_width | 220–280 px | 230px | PASS |
-| workflow_panel_height | <= 360 px | 257px | PASS |
+| workflow_panel_height | <= 360 px | 261px | PASS |
 | device_status_panel_height | expanded content height 120-650 px in left scroll | 624px | PASS |
 | left_no_nested_device_scroll | no isolated device-status scroll area | inner_scroll=False | PASS |
 | device_status_collapsed_height | collapsed height <= 100 px | 45px | PASS |
@@ -44,7 +44,7 @@
 | spectrum_panel_visible | spectrum panel visible | visible=True | PASS |
 | spectrum_yellow_curve_mode | yellow curve spectrum widget | true | PASS |
 | scan_stats_panel_visible | scan stats panel visible | visible=True | PASS |
-| scan_stats_demo_values | seeded runtime stat values | 2.450 GHz | PASS |
+| scan_stats_demo_values | runtime stat labels populated | 2.450 GHz | PASS |
 | log_panel_visible | log panel visible with >= 6 lines | lines=12 | PASS |
 | log_category_tags | INFO/WARN/ERROR/SCAN/DATA tags | True | PASS |
 | pcb_like_mock_board | photo layer mock board loaded | photo_layer_ready | PASS |
@@ -125,7 +125,7 @@
 | colorbar_adjacent | gap <= 12 px | 2px | PASS |
 | right_panel_width | 340–380 px | 350px | PASS |
 | left_panel_width | 220–280 px | 230px | PASS |
-| workflow_panel_height | <= 360 px | 257px | PASS |
+| workflow_panel_height | <= 360 px | 261px | PASS |
 | device_status_panel_height | expanded content height 120-650 px in left scroll | 624px | PASS |
 | left_no_nested_device_scroll | no isolated device-status scroll area | inner_scroll=False | PASS |
 | device_status_collapsed_height | collapsed height <= 100 px | 45px | PASS |
@@ -149,7 +149,7 @@
 | spectrum_panel_visible | spectrum panel visible | visible=True | PASS |
 | spectrum_yellow_curve_mode | yellow curve spectrum widget | true | PASS |
 | scan_stats_panel_visible | scan stats panel visible | visible=True | PASS |
-| scan_stats_demo_values | seeded runtime stat values | 2.450 GHz | PASS |
+| scan_stats_demo_values | runtime stat labels populated | 2.450 GHz | PASS |
 | log_panel_visible | log panel visible with >= 6 lines | lines=13 | PASS |
 | log_category_tags | INFO/WARN/ERROR/SCAN/DATA tags | True | PASS |
 | pcb_like_mock_board | photo layer mock board loaded | photo_layer_ready | PASS |

@@ -1,6 +1,6 @@
 # Commercial Demo QA Report
 
-- Generated: 2026-06-26 21:31:52
+- Generated: 2026-06-26 21:56:41
 - Round: 1
 - Overall: **PASS**
 
@@ -13,6 +13,7 @@
 - `device_center`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/device_center.png`
 - `data_view`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/data_view.png`
 - `report_center`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/report_center.png`
+- `reset_demo`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/reset_demo.png`
 - `commercial_maximized`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/commercial_maximized.png`
 
 ## Startup — PASS
@@ -42,6 +43,7 @@
 | statistics_panel_height | >= 100px | 192px | PASS |
 | status_bar_visible | status bar visible | True | PASS |
 | default_window_within_screen | window <= available screen | 1280x720 <= 1280x720 | PASS |
+| reset_demo_screenshot_exists | reset_demo.png exists | True | PASS |
 | maximized_custom_title_bar | frameless custom title bar | custom=True, height=54px | PASS |
 | maximized_no_native_title_bar | FramelessWindowHint enabled | custom=True | PASS |
 | maximized_title_bar_height | 48–58 px | 54px | PASS |
@@ -68,13 +70,17 @@
 | mock_connect_devices | all mock devices connected | 相机, 运动平台, 频谱仪, VNA / Trace Source | PASS |
 | scan_params_update_preview_stats | preview point count updates | before=91 x 71 = 6,461, after=3 x 3 = 9 | PASS |
 | start_scan_running | runtime status == running | running | PASS |
+| scan_progress_above_5_percent | progress > 5% | 11% | PASS |
+| workflow_scan_step_active | workflow step 5 active while scanning | active | PASS |
 | pause_scan_paused | runtime status == paused | paused | PASS |
 | resume_scan_running | runtime status == running | running | PASS |
+| scan_progress_increases_after_resume | progress increases after resume | before=22%, after=33% | PASS |
+| stop_scan_stopped | runtime status == stopped | stopped | PASS |
 | scan_completes_or_stops | runtime status completed or stopped | completed | PASS |
 | data_view_mock_task | data view lists mock scan tasks | 3 | PASS |
-| data_view_export_mock_json | data export creates mock json | C:\Users\yunfei\.nfs_scanner\mock_exports\data\mock_data_mock-c509fb10_20260626_213155.json | PASS |
+| data_view_export_mock_json | data export creates mock json | C:\Users\yunfei\.nfs_scanner\mock_exports\data\mock_data_mock-f433ab79_20260626_215644.json | PASS |
 | report_center_preview | report preview populated | Demo Near Field Scan | PASS |
-| mock_report_export | markdown/txt report file created | C:\Users\yunfei\.nfs_scanner\reports\report_mock-c509fb10_20260626_213155.md | PASS |
+| mock_report_export | markdown/txt report file created | C:\Users\yunfei\.nfs_scanner\reports\report_mock-f433ab79_20260626_215644.md | PASS |
 | mock_report_multi_format_export | html/pdf/png mock report files created | .html, .pdf, .png | PASS |
 | mock_self_check_report | local mock self-check report created | .ai\qa\latest\commercial_mock_self_check.json | PASS |
 | reset_demo_restores_state | runtime idle and demo reset applied | status=stopped, tasks 3->2 | PASS |

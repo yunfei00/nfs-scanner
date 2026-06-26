@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-26 21:31:52",
+  "generated_at": "2026-06-26 21:56:41",
   "round_number": 1,
   "overall_pass": true,
   "screenshots": {
@@ -10,6 +10,7 @@
     "device_center": "D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/device_center.png",
     "data_view": "D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/data_view.png",
     "report_center": "D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/report_center.png",
+    "reset_demo": "D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/reset_demo.png",
     "commercial_maximized": "D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/commercial_maximized.png"
   },
   "known_issues": [],
@@ -325,6 +326,26 @@
       "blocked": false
     },
     {
+      "name": "scan_progress_above_5_percent",
+      "category": "functional",
+      "expected": "progress > 5%",
+      "actual": "11%",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "workflow_scan_step_active",
+      "category": "functional",
+      "expected": "workflow step 5 active while scanning",
+      "actual": "active",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
       "name": "pause_scan_paused",
       "category": "functional",
       "expected": "runtime status == paused",
@@ -339,6 +360,26 @@
       "category": "functional",
       "expected": "runtime status == running",
       "actual": "running",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "scan_progress_increases_after_resume",
+      "category": "functional",
+      "expected": "progress increases after resume",
+      "actual": "before=22%, after=33%",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "stop_scan_stopped",
+      "category": "functional",
+      "expected": "runtime status == stopped",
+      "actual": "stopped",
       "passed": true,
       "severity": "error",
       "auto_fixable": true,
@@ -368,7 +409,7 @@
       "name": "data_view_export_mock_json",
       "category": "functional",
       "expected": "data export creates mock json",
-      "actual": "C:\\Users\\yunfei\\.nfs_scanner\\mock_exports\\data\\mock_data_mock-c509fb10_20260626_213155.json",
+      "actual": "C:\\Users\\yunfei\\.nfs_scanner\\mock_exports\\data\\mock_data_mock-f433ab79_20260626_215644.json",
       "passed": true,
       "severity": "error",
       "auto_fixable": true,
@@ -388,7 +429,7 @@
       "name": "mock_report_export",
       "category": "functional",
       "expected": "markdown/txt report file created",
-      "actual": "C:\\Users\\yunfei\\.nfs_scanner\\reports\\report_mock-c509fb10_20260626_213155.md",
+      "actual": "C:\\Users\\yunfei\\.nfs_scanner\\reports\\report_mock-f433ab79_20260626_215644.md",
       "passed": true,
       "severity": "error",
       "auto_fixable": true,
@@ -422,6 +463,16 @@
       "passed": true,
       "severity": "error",
       "auto_fixable": true,
+      "blocked": false
+    },
+    {
+      "name": "reset_demo_screenshot_exists",
+      "category": "visual",
+      "expected": "reset_demo.png exists",
+      "actual": "True",
+      "passed": true,
+      "severity": "error",
+      "auto_fixable": false,
       "blocked": false
     },
     {

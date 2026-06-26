@@ -201,6 +201,20 @@ def run_commercial_qa(*, include_external: bool = True, round_number: int = 1) -
         functional_checks, dry_run_lines = run_functional_demo_flow(shell)
         result.checks.extend(functional_checks)
 
+        reset_path = SCREENSHOT_DIR / "reset_demo.png"
+        _save_screenshot(shell, reset_path)
+        result.screenshots["reset_demo"] = reset_path.as_posix()
+        result.checks.append(
+            QACheck(
+                name="reset_demo_screenshot_exists",
+                category="visual",
+                expected="reset_demo.png exists",
+                actual=str(reset_path.exists()),
+                passed=reset_path.is_file() and reset_path.stat().st_size > 0,
+                auto_fixable=False,
+            )
+        )
+
         result.checks.append(verify_dry_run_only(dry_run_lines))
         result.checks.extend(verify_no_real_spectrum_camera(dry_run_lines))
 
