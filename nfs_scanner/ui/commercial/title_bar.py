@@ -6,13 +6,14 @@ from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QToolButton, QVBoxLayout, QWidget
 
+from nfs_scanner.core.integration_safety import REAL_DEVICE_ENABLED
 from nfs_scanner.version import APP_VERSION
 
 
 class CommercialTitleBar(QFrame):
     """Dark title bar with brand block, auth/user area, and window controls."""
 
-    TITLE_HEIGHT = 36
+    TITLE_HEIGHT = 32
 
     def __init__(self, window: QWidget, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -26,12 +27,12 @@ class CommercialTitleBar(QFrame):
 
     def _setup_ui(self) -> None:
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(10, 0, 4, 0)
-        layout.setSpacing(8)
+        layout.setContentsMargins(8, 0, 2, 0)
+        layout.setSpacing(6)
 
         logo = QFrame(self)
         logo.setObjectName("commercialTitleBarLogo")
-        logo.setFixedSize(36, 36)
+        logo.setFixedSize(28, 28)
         logo_layout = QVBoxLayout(logo)
         logo_layout.setContentsMargins(0, 0, 0, 0)
         logo_text = QLabel("NFS", logo)
@@ -54,11 +55,16 @@ class CommercialTitleBar(QFrame):
         layout.addWidget(brand)
         layout.addStretch(1)
 
+        demo_strip = QLabel(self._demo_strip_text(), self)
+        demo_strip.setObjectName("commercialTitleBarDemoStrip")
+        demo_strip.setToolTip("演示模式：未启用真实硬件控制")
+        layout.addWidget(demo_strip)
+
         auth_row = QWidget(self)
         auth_row.setObjectName("commercialTitleBarAuth")
         auth_layout = QHBoxLayout(auth_row)
         auth_layout.setContentsMargins(0, 0, 0, 0)
-        auth_layout.setSpacing(8)
+        auth_layout.setSpacing(6)
         auth_dot = QLabel("●", auth_row)
         auth_dot.setObjectName("commercialTitleBarAuthDot")
         auth_label = QLabel("授权状态: 正常", auth_row)
@@ -78,6 +84,12 @@ class CommercialTitleBar(QFrame):
         layout.addWidget(self._maximize_button)
         layout.addWidget(close_button)
 
+    @staticmethod
+    def _demo_strip_text() -> str:
+        if REAL_DEVICE_ENABLED:
+            return "Demo · Real Device Enabled"
+        return "Mock · Dry Run · 无硬件控制"
+
     def _make_control_button(
         self,
         text: str,
@@ -90,7 +102,7 @@ class CommercialTitleBar(QFrame):
         button.setObjectName("commercialTitleBarClose" if danger else "commercialTitleBarControl")
         button.setText(text)
         button.setToolTip(tooltip)
-        button.setFixedSize(32, 26)
+        button.setFixedSize(28, 24)
         button.clicked.connect(slot)
         return button
 

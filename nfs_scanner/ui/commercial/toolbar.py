@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QMenu, QStyle, QToolButton, Q
 
 from .widgets.icon_tool_button import NFSIconToolButton
 
-_COMPACT_WIDTH_THRESHOLD = 1400
+_COMPACT_WIDTH_THRESHOLD = 1120
 
 
 class CommercialToolbar(QWidget):
@@ -30,8 +30,8 @@ class CommercialToolbar(QWidget):
         super().__init__(parent)
         self.setObjectName("commercialToolbar")
         self.setProperty("targetStyleMode", "true")
-        self.setMinimumHeight(40)
-        self.setMaximumHeight(40)
+        self.setMinimumHeight(34)
+        self.setMaximumHeight(34)
         self._tool_buttons: list[NFSIconToolButton] = []
         self._start_scan_button: NFSIconToolButton | None = None
         self._pause_scan_button: NFSIconToolButton | None = None
@@ -45,8 +45,8 @@ class CommercialToolbar(QWidget):
 
     def _setup_ui(self) -> None:
         root = QHBoxLayout(self)
-        root.setContentsMargins(6, 2, 6, 2)
-        root.setSpacing(1)
+        root.setContentsMargins(4, 2, 4, 2)
+        root.setSpacing(0)
 
         style = self.style()
         items = (
@@ -111,7 +111,7 @@ class CommercialToolbar(QWidget):
         line.setObjectName("commercialToolbarSeparator")
         line.setFrameShape(QFrame.Shape.VLine)
         line.setFixedWidth(1)
-        line.setFixedHeight(32)
+        line.setFixedHeight(28)
         return line
 
     def _make_button(
@@ -152,20 +152,21 @@ class CommercialToolbar(QWidget):
         self.set_export_enabled(False)
 
     def update_compact_mode(self, window_width: int) -> None:
-        compact = window_width <= _COMPACT_WIDTH_THRESHOLD
-        visible_count = 8 if compact else len(self._tool_buttons)
-        for index, button in enumerate(self._tool_buttons):
-            button.setVisible(index < visible_count)
+        """Keep all toolbar actions visible; overflow menu only on very narrow widths."""
+
+        for button in self._tool_buttons:
+            button.setVisible(True)
+        narrow = window_width <= 960
         if self._overflow_button is not None:
-            self._overflow_button.setVisible(compact)
-        self._layout_overflow = False
+            self._overflow_button.setVisible(narrow)
+        self._layout_overflow = self._measure_overflow(window_width)
 
     def has_layout_overflow(self) -> bool:
         return self._layout_overflow
 
     def _measure_overflow(self, window_width: int) -> bool:
-        required = len(self._tool_buttons) * 50 + 80
-        available = max(window_width - 480, 400)
+        required = len(self._tool_buttons) * 50 + 64
+        available = max(window_width - 420, 400)
         return required > available
 
     def set_scan_controls_enabled(
