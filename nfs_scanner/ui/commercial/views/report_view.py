@@ -115,11 +115,15 @@ class ReportView(QWidget):
         preview_form.setVerticalSpacing(6)
         for key, label in (
             ("project_name", "项目"),
+            ("task_id", "任务 ID"),
             ("scan_time", "扫描时间"),
             ("scan_area", "扫描区域"),
+            ("scan_mode", "扫描模式"),
             ("point_count", "采样点数"),
+            ("path_length", "路径长度"),
             ("peak_frequency", "峰值频率"),
             ("peak_amplitude", "峰值幅度"),
+            ("safety_mode", "安全模式"),
         ):
             label_widget = QLabel(label, preview_card.body)
             label_widget.setObjectName("nfsMutedLabel")
@@ -162,11 +166,15 @@ class ReportView(QWidget):
         project = preview["project"]
         values = {
             "project_name": str(project.get("name", "-")),
+            "task_id": str(scan.get("task_id", "-")),
             "scan_time": str(scan.get("completed_at", "-")),
             "scan_area": f"{scan.get('area_mm2', '-')} mm²",
+            "scan_mode": str(scan.get("scan_mode", "-")),
             "point_count": str(scan.get("point_count", "-")),
+            "path_length": str(scan.get("path_length", "-")),
             "peak_frequency": str(scan.get("peak_frequency", "-")),
             "peak_amplitude": str(scan.get("peak_amplitude", "-")),
+            "safety_mode": "MOCK / DRY RUN / NO HARDWARE CONTROL",
         }
         for key, label in self._preview_labels.items():
             label.setText(values.get(key, "--"))

@@ -38,6 +38,7 @@ class DataView(QWidget):
         self.setObjectName("dataView")
         self._analysis_service = MockAnalysisService()
         self._task_list: QListWidget | None = None
+        self._empty_state_label: QLabel | None = None
         self._view_mode_combo: QComboBox | None = None
         self._trace_combo: QComboBox | None = None
         self._frequency_combo: QComboBox | None = None
@@ -59,12 +60,19 @@ class DataView(QWidget):
         if self._task_list is None:
             return
         self._task_list.clear()
-        for task in self._analysis_service.list_tasks():
+        tasks = self._analysis_service.list_tasks()
+        for task in tasks:
             item = QListWidgetItem(self._format_task_item(task))
             item.setData(Qt.ItemDataRole.UserRole, task.task_id)
             self._task_list.addItem(item)
+        if self._empty_state_label is not None:
+            self._empty_state_label.setVisible(len(tasks) == 0)
         if self._task_list.count() > 0:
             self._task_list.setCurrentRow(0)
+            self._refresh_selected_summary()
+
+    def show_new_task_hint(self, task_name: str) -> None:
+        self.status_message.emit("DATA", f"新 Mock 任务已生成: {task_name}，可在 Data View 查看结果")
 
     def select_task(self, task_id: str) -> None:
         if self._task_list is None:
@@ -78,6 +86,7 @@ class DataView(QWidget):
     def _format_task_item(self, task: MockScanTaskRecord) -> str:
         return (
             f"{task.name}\n"
+            f"ID: {task.task_id} | 状态: completed\n"
             f"{task.completed_at} | {task.point_count} pts | {task.scan_mode}"
         )
 
@@ -94,6 +103,11 @@ class DataView(QWidget):
         configure_abstract_scroll_area(self._task_list)
         self._task_list.currentItemChanged.connect(self._on_task_selected)
         list_card.body_layout.addWidget(self._task_list, 1)
+        self._empty_state_label = QLabel("暂无 Mock 扫描任务\n请先运行一次 Mock 扫描", list_card.body)
+        self._empty_state_label.setObjectName("nfsMutedLabel")
+        self._empty_state_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._empty_state_label.setWordWrap(True)
+        list_card.body_layout.addWidget(self._empty_state_label)
 
         analysis_column = QWidget(self)
         analysis_layout = QVBoxLayout(analysis_column)
