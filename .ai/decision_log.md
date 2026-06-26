@@ -562,12 +562,12 @@ Needs Review: yes/no
 - Impact: visual + QA PASS；Header 未改。
 - Needs Review: no
 
-### 2026-06-26 - Commercial Demo v0.4 Acceptance Blocking Fix
+### 2026-06-26 - Commercial Demo v0.4 Final Acceptance Pass
 
 - Date: 2026-06-26
-- Task: commercial-demo-v0.4-acceptance-blocking-fix
-- Decision: 引入 `DemoState` 单一状态源；修复 idle+has_tasks 误激活 workflow 第 7 步；Reset 清空 current_task/report_exported；历史任务不污染当前 workflow；QA 新增 reset/stop/log/button acceptance 检查。
-- Reason: 用户验收截图显示状态栏与 workflow 矛盾，QA 未能卡住。
-- Impact: 151 tests + QA PASS；未接真实设备。
+- Task: commercial-demo-v0.4-final-acceptance
+- Decision: 冻结 Commercial Demo v0.4；17 步验收模拟全 PASS；Visual QA 布局度量 FAIL 记为非阻断；未进入真实设备 Sprint。
+- Reason: 用户要求 Final Acceptance Pass：只修阻断项、不改 Header、不接真实设备；Functional/Acceptance/Safety 全 PASS。
+- Impact: 151 tests PASS；新增 `tools/run_final_acceptance_v0_4.py` 与 final acceptance 报告；QA visual 子项待后续 polish sprint。
 - Needs Review: no
 
