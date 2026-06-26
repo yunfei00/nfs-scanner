@@ -1,6 +1,6 @@
 # Commercial UI Visual Report
 
-- Generated: 2026-06-26 19:57:51
+- Generated: 2026-06-26 20:08:28
 - Default screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_default.png`
 - Top header screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_top_header.png`
 - Maximized screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_maximized.png`
@@ -56,13 +56,18 @@
 | canvas_cursor_hud | cursor HUD visible | visible=True | PASS |
 | minimap_title_visible | MiniMap title "全局视图" | 全局视图 | PASS |
 | brand_logo_exists | NFS logo square >= 40px | logo=True, size=42x42 | PASS |
+| brand_logo_blue_block | blue brand logo block, not flat black | brandBlueBlock=True | PASS |
 | brand_title_hierarchy | CN title + EN subtitle + version badge | title=True, subtitle=True, badge=True, hierarchy=True | PASS |
 | brand_not_flat_text | brand is not a single flat text row | flat=False | PASS |
 | version_badge_exists | v* version badge visible | v1.0.0 | PASS |
 | top_header_height_consistent | 48–58px | 52px | PASS |
+| toolbar_button_text_not_overlapping | visible toolbar buttons do not overlap | count=8, min_gap>=2px | PASS |
+| toolbar_caption_readable | short readable captions, width >= 58px | count=8, width=62px | PASS |
 | toolbar_icon_mode | icon-above-text tool buttons | count=13, icon_mode=True | PASS |
 | toolbar_no_placeholder_dots | no ellipsis placeholder buttons | 0 | PASS |
+| primary_actions_visible | connect/start/stop/export/report visible | True | PASS |
 | toolbar_primary_actions_visible | connect/start/stop visible | True | PASS |
+| auth_status_not_too_heavy | lightweight auth label, not large chip | label_hint=84x16 | PASS |
 | right_status_aligned | auth + window controls on top-right | auth=True, aligned=True | PASS |
 | frameless_titlebar_still_active | custom frameless shell | True | PASS |
 | top_header_integrated | toolbar embedded in top header | parent=commercialTopHeader | PASS |
@@ -144,13 +149,18 @@
 | canvas_cursor_hud | cursor HUD visible | visible=True | PASS |
 | minimap_title_visible | MiniMap title "全局视图" | 全局视图 | PASS |
 | brand_logo_exists | NFS logo square >= 40px | logo=True, size=42x42 | PASS |
+| brand_logo_blue_block | blue brand logo block, not flat black | brandBlueBlock=True | PASS |
 | brand_title_hierarchy | CN title + EN subtitle + version badge | title=True, subtitle=True, badge=True, hierarchy=True | PASS |
 | brand_not_flat_text | brand is not a single flat text row | flat=False | PASS |
 | version_badge_exists | v* version badge visible | v1.0.0 | PASS |
 | top_header_height_consistent | 48–58px | 52px | PASS |
+| toolbar_button_text_not_overlapping | visible toolbar buttons do not overlap | count=8, min_gap>=2px | PASS |
+| toolbar_caption_readable | short readable captions, width >= 58px | count=8, width=62px | PASS |
 | toolbar_icon_mode | icon-above-text tool buttons | count=13, icon_mode=True | PASS |
 | toolbar_no_placeholder_dots | no ellipsis placeholder buttons | 0 | PASS |
+| primary_actions_visible | connect/start/stop/export/report visible | True | PASS |
 | toolbar_primary_actions_visible | connect/start/stop visible | True | PASS |
+| auth_status_not_too_heavy | lightweight auth label, not large chip | label_hint=84x16 | PASS |
 | right_status_aligned | auth + window controls on top-right | auth=True, aligned=True | PASS |
 | frameless_titlebar_still_active | custom frameless shell | True | PASS |
 | top_header_integrated | toolbar embedded in top header | parent=commercialTopHeader | PASS |

@@ -726,16 +726,17 @@ QLabel#nfsNumericUnit {
 /* --- Target alignment: title bar brand --- */
 
 QFrame#commercialTitleBarLogo {
-    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #38BDF8, stop:0.35 #0EA5FF, stop:1 #0369A1);
-    border: 1px solid rgba(125, 211, 252, 0.55);
-    border-radius: 9px;
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #5DD3FF, stop:0.35 #1EB0FF, stop:1 #0284D4);
+    border: 1px solid #7DD3FC;
+    border-radius: 8px;
 }
 
 QLabel#commercialTitleBarLogoText {
-    color: #F8FAFC;
-    font-size: 12px;
+    color: #FFFFFF;
+    font-size: 13px;
     font-weight: 800;
     letter-spacing: 1px;
+    background-color: transparent;
 }
 
 QLabel#commercialTitleBarTitle {
@@ -778,22 +779,24 @@ QWidget#commercialTopStatusArea {
 }
 
 QWidget#commercialTitleBarAuthChip {
-    background-color: rgba(34, 197, 94, 0.08);
-    border: 1px solid rgba(34, 197, 94, 0.28);
-    border-radius: 10px;
+    background-color: transparent;
+    border: none;
 }
 
 QLabel#commercialTitleBarAuthDot {
     color: #22C55E;
-    font-size: 9px;
+    font-size: 8px;
     background-color: transparent;
+    padding: 0;
+    margin: 0;
 }
 
 QLabel#commercialTitleBarAuthLabel {
-    color: #94A3B8;
+    color: #8FA0B8;
     font-size: 11px;
-    font-weight: 500;
+    font-weight: 400;
     background-color: transparent;
+    padding: 0;
 }
 
 QLabel#commercialTitleBarUser {
@@ -871,7 +874,9 @@ QToolButton#commercialIconToolSuccess {
     border-radius: 4px;
     color: #94A3B8;
     font-size: 11px;
-    padding: 2px 1px;
+    padding: 1px 2px;
+    min-width: 58px;
+    max-width: 66px;
 }
 
 QToolButton#commercialIconToolButton:hover {

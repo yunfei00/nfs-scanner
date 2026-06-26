@@ -1,6 +1,6 @@
 # Commercial Demo QA Report
 
-- Generated: 2026-06-26 19:56:29
+- Generated: 2026-06-26 20:07:08
 - Round: 1
 - Overall: **PASS**
 
@@ -72,9 +72,9 @@
 | resume_scan_running | runtime status == running | running | PASS |
 | scan_completes_or_stops | runtime status completed or stopped | completed | PASS |
 | data_view_mock_task | data view lists mock scan tasks | 3 | PASS |
-| data_view_export_mock_json | data export creates mock json | C:\Users\yunfei\.nfs_scanner\mock_exports\data\mock_data_mock-ae9127c9_20260626_195632.json | PASS |
+| data_view_export_mock_json | data export creates mock json | C:\Users\yunfei\.nfs_scanner\mock_exports\data\mock_data_mock-eb9bcd66_20260626_200711.json | PASS |
 | report_center_preview | report preview populated | Demo Near Field Scan | PASS |
-| mock_report_export | markdown/txt report file created | C:\Users\yunfei\.nfs_scanner\reports\report_mock-ae9127c9_20260626_195632.md | PASS |
+| mock_report_export | markdown/txt report file created | C:\Users\yunfei\.nfs_scanner\reports\report_mock-eb9bcd66_20260626_200711.md | PASS |
 | mock_report_multi_format_export | html/pdf/png mock report files created | .html, .pdf, .png | PASS |
 | mock_self_check_report | local mock self-check report created | .ai\qa\latest\commercial_mock_self_check.json | PASS |
 | reset_demo_restores_state | runtime idle and demo reset applied | status=stopped, tasks 3->2 | PASS |

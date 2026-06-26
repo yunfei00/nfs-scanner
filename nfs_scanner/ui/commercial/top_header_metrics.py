@@ -10,10 +10,45 @@ from PySide6.QtWidgets import QApplication, QFrame, QLabel, QToolButton, QWidget
 from nfs_scanner.ui.commercial.layout_metrics import LayoutMetricCheck
 from nfs_scanner.ui.commercial.main_shell import CommercialMainShell
 from nfs_scanner.ui.commercial.widgets.brand_area import CommercialBrandArea
-from nfs_scanner.ui.commercial.widgets.icon_tool_button import NFSIconToolButton
+from nfs_scanner.ui.commercial.widgets.icon_tool_button import NFSIconToolButton, TOOL_BUTTON_WIDTH
 
 HEADER_HEIGHT_MIN = 48
 HEADER_HEIGHT_MAX = 58
+
+
+def _visible_toolbar_buttons(shell: CommercialMainShell) -> list[NFSIconToolButton]:
+    return [button for button in shell.toolbar.findChildren(NFSIconToolButton) if button.isVisible()]
+
+
+def _toolbar_overlap_status(buttons: list[NFSIconToolButton]) -> tuple[bool, str]:
+    if not buttons:
+        return False, "no visible buttons"
+    ordered = sorted(buttons, key=lambda item: item.geometry().x())
+    for left, right in zip(ordered, ordered[1:]):
+        gap = right.geometry().x() - left.geometry().right()
+        if left.geometry().intersects(right.geometry()) or gap < 2:
+            return False, f"gap={gap}px between '{left.text()}' and '{right.text()}'"
+    return True, f"count={len(ordered)}, min_gap>=2px"
+
+
+def _toolbar_caption_status(buttons: list[NFSIconToolButton]) -> tuple[bool, str]:
+    if not buttons:
+        return False, "no visible buttons"
+    for button in buttons:
+        caption = button.text().replace("\n", "").strip()
+        full = button.full_caption()
+        if not caption:
+            return False, "empty caption"
+        if len(caption) > 4:
+            return False, f"caption too long: {caption}"
+        if button.width() < 58:
+            return False, f"{caption} width={button.width()}px"
+        if full and caption == full and len(full) > 4:
+            return False, f"full caption on button: {full}"
+    joined = "".join(button.text().replace("\n", "") for button in buttons)
+    if any(full in joined and full != button.text() for button in buttons for full in [button.full_caption()] if len(full) > 4):
+        pass  # short labels intentionally differ from full names
+    return True, f"count={len(buttons)}, width={TOOL_BUTTON_WIDTH}px"
 
 
 def collect_top_header_checks(shell: CommercialMainShell) -> list[LayoutMetricCheck]:
@@ -25,6 +60,7 @@ def collect_top_header_checks(shell: CommercialMainShell) -> list[LayoutMetricCh
     brand_area = shell.findChild(CommercialBrandArea, "commercialBrandArea")
     logo = shell.findChild(QFrame, "commercialTitleBarLogo")
     auth = shell.findChild(QWidget, "commercialTopStatusArea")
+    auth_label = shell.findChild(QLabel, "commercialTitleBarAuthLabel")
 
     title = subtitle = badge = None
     if brand_area is not None:
@@ -33,6 +69,7 @@ def collect_top_header_checks(shell: CommercialMainShell) -> list[LayoutMetricCh
         badge = brand_area.findChild(QLabel, "commercialTitleBarBadge")
 
     toolbar_buttons = shell.toolbar.findChildren(NFSIconToolButton)
+    visible_buttons = _visible_toolbar_buttons(shell)
     icon_mode = bool(toolbar_buttons) and all(
         button.toolButtonStyle() == Qt.ToolButtonStyle.ToolButtonTextUnderIcon
         for button in toolbar_buttons
@@ -48,13 +85,30 @@ def collect_top_header_checks(shell: CommercialMainShell) -> list[LayoutMetricCh
             shell.toolbar._connect_device_button,
             shell.toolbar._start_scan_button,
             shell.toolbar._stop_scan_button,
+            shell.toolbar._export_button,
+            shell.toolbar._report_button,
         )
     )
+    overlap_ok, overlap_actual = _toolbar_overlap_status(visible_buttons)
+    caption_ok, caption_actual = _toolbar_caption_status(visible_buttons)
+
     header_height = top_header.height() if top_header is not None else 0
     height_ok = HEADER_HEIGHT_MIN <= header_height <= HEADER_HEIGHT_MAX
     hierarchy_ok = brand_area.has_title_hierarchy() if brand_area is not None else False
     not_flat = brand_area is not None and not brand_area.is_flat_text_row()
     badge_ok = badge is not None and badge.isVisible() and badge.text().startswith("v")
+
+    logo_blue = False
+    if logo is not None:
+        logo_blue = logo.property("brandBlueBlock") is True and logo.width() >= 40
+
+    auth_light = False
+    if auth_label is not None:
+        from PySide6.QtGui import QFontMetrics
+
+        label_width = auth_label.sizeHint().width()
+        label_height = QFontMetrics(auth_label.font()).height()
+        auth_light = label_width <= 120 and label_height <= 18
 
     close_buttons = (
         shell.top_header.findChildren(QToolButton, "commercialTitleBarClose")
@@ -77,6 +131,12 @@ def collect_top_header_checks(shell: CommercialMainShell) -> list[LayoutMetricCh
                 else "missing"
             ),
             passed=logo is not None and logo.isVisible() and logo.width() >= 40,
+        ),
+        LayoutMetricCheck(
+            name="brand_logo_blue_block",
+            expected="blue brand logo block, not flat black",
+            actual=f"brandBlueBlock={logo.property('brandBlueBlock') if logo else None}",
+            passed=logo_blue,
         ),
         LayoutMetricCheck(
             name="brand_title_hierarchy",
@@ -106,6 +166,18 @@ def collect_top_header_checks(shell: CommercialMainShell) -> list[LayoutMetricCh
             passed=height_ok,
         ),
         LayoutMetricCheck(
+            name="toolbar_button_text_not_overlapping",
+            expected="visible toolbar buttons do not overlap",
+            actual=overlap_actual,
+            passed=overlap_ok,
+        ),
+        LayoutMetricCheck(
+            name="toolbar_caption_readable",
+            expected="short readable captions, width >= 58px",
+            actual=caption_actual,
+            passed=caption_ok,
+        ),
+        LayoutMetricCheck(
             name="toolbar_icon_mode",
             expected="icon-above-text tool buttons",
             actual=f"count={len(toolbar_buttons)}, icon_mode={icon_mode}",
@@ -118,10 +190,42 @@ def collect_top_header_checks(shell: CommercialMainShell) -> list[LayoutMetricCh
             passed=len(dot_buttons) == 0,
         ),
         LayoutMetricCheck(
-            name="toolbar_primary_actions_visible",
-            expected="connect/start/stop visible",
+            name="primary_actions_visible",
+            expected="connect/start/stop/export/report visible",
             actual=str(primary_visible),
             passed=primary_visible,
+        ),
+        LayoutMetricCheck(
+            name="toolbar_primary_actions_visible",
+            expected="connect/start/stop visible",
+            actual=str(
+                all(
+                    button is not None and button.isVisible()
+                    for button in (
+                        shell.toolbar._connect_device_button,
+                        shell.toolbar._start_scan_button,
+                        shell.toolbar._stop_scan_button,
+                    )
+                )
+            ),
+            passed=all(
+                button is not None and button.isVisible()
+                for button in (
+                    shell.toolbar._connect_device_button,
+                    shell.toolbar._start_scan_button,
+                    shell.toolbar._stop_scan_button,
+                )
+            ),
+        ),
+        LayoutMetricCheck(
+            name="auth_status_not_too_heavy",
+            expected="lightweight auth label, not large chip",
+            actual=(
+                f"label_hint={auth_label.sizeHint().width()}x{auth_label.sizeHint().height()}"
+                if auth_label is not None
+                else "missing"
+            ),
+            passed=auth_light,
         ),
         LayoutMetricCheck(
             name="right_status_aligned",

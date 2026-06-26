@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-26T19:57:51",
+  "generated_at": "2026-06-26T20:08:28",
   "default": {
     "uses_custom_title_bar": true,
     "title_bar_height": 52,
@@ -390,6 +390,12 @@
         "passed": true
       },
       {
+        "name": "brand_logo_blue_block",
+        "expected": "blue brand logo block, not flat black",
+        "actual": "brandBlueBlock=True",
+        "passed": true
+      },
+      {
         "name": "brand_title_hierarchy",
         "expected": "CN title + EN subtitle + version badge",
         "actual": "title=True, subtitle=True, badge=True, hierarchy=True",
@@ -414,6 +420,18 @@
         "passed": true
       },
       {
+        "name": "toolbar_button_text_not_overlapping",
+        "expected": "visible toolbar buttons do not overlap",
+        "actual": "count=8, min_gap>=2px",
+        "passed": true
+      },
+      {
+        "name": "toolbar_caption_readable",
+        "expected": "short readable captions, width >= 58px",
+        "actual": "count=8, width=62px",
+        "passed": true
+      },
+      {
         "name": "toolbar_icon_mode",
         "expected": "icon-above-text tool buttons",
         "actual": "count=13, icon_mode=True",
@@ -426,9 +444,21 @@
         "passed": true
       },
       {
+        "name": "primary_actions_visible",
+        "expected": "connect/start/stop/export/report visible",
+        "actual": "True",
+        "passed": true
+      },
+      {
         "name": "toolbar_primary_actions_visible",
         "expected": "connect/start/stop visible",
         "actual": "True",
+        "passed": true
+      },
+      {
+        "name": "auth_status_not_too_heavy",
+        "expected": "lightweight auth label, not large chip",
+        "actual": "label_hint=84x16",
         "passed": true
       },
       {
@@ -920,6 +950,12 @@
         "passed": true
       },
       {
+        "name": "brand_logo_blue_block",
+        "expected": "blue brand logo block, not flat black",
+        "actual": "brandBlueBlock=True",
+        "passed": true
+      },
+      {
         "name": "brand_title_hierarchy",
         "expected": "CN title + EN subtitle + version badge",
         "actual": "title=True, subtitle=True, badge=True, hierarchy=True",
@@ -944,6 +980,18 @@
         "passed": true
       },
       {
+        "name": "toolbar_button_text_not_overlapping",
+        "expected": "visible toolbar buttons do not overlap",
+        "actual": "count=8, min_gap>=2px",
+        "passed": true
+      },
+      {
+        "name": "toolbar_caption_readable",
+        "expected": "short readable captions, width >= 58px",
+        "actual": "count=8, width=62px",
+        "passed": true
+      },
+      {
         "name": "toolbar_icon_mode",
         "expected": "icon-above-text tool buttons",
         "actual": "count=13, icon_mode=True",
@@ -956,9 +1004,21 @@
         "passed": true
       },
       {
+        "name": "primary_actions_visible",
+        "expected": "connect/start/stop/export/report visible",
+        "actual": "True",
+        "passed": true
+      },
+      {
         "name": "toolbar_primary_actions_visible",
         "expected": "connect/start/stop visible",
         "actual": "True",
+        "passed": true
+      },
+      {
+        "name": "auth_status_not_too_heavy",
+        "expected": "lightweight auth label, not large chip",
+        "actual": "label_hint=84x16",
         "passed": true
       },
       {

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QMouseEvent
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QStyle, QToolButton, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QSizePolicy, QStyle, QToolButton, QWidget
 
 from .toolbar import CommercialToolbar
 from .widgets.brand_area import CommercialBrandArea
@@ -78,20 +78,17 @@ class CommercialTopHeader(QFrame):
         status.setObjectName("commercialTopStatusArea")
         layout = QHBoxLayout(status)
         layout.setContentsMargins(0, 0, 2, 0)
-        layout.setSpacing(5)
+        layout.setSpacing(4)
 
-        auth_chip = QWidget(status)
-        auth_chip.setObjectName("commercialTitleBarAuthChip")
-        auth_layout = QHBoxLayout(auth_chip)
-        auth_layout.setContentsMargins(7, 2, 7, 2)
-        auth_layout.setSpacing(4)
-        auth_dot = QLabel("●", auth_chip)
+        auth_dot = QLabel("●", status)
         auth_dot.setObjectName("commercialTitleBarAuthDot")
-        auth_label = QLabel("授权状态：正常", auth_chip)
+        auth_dot.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        auth_dot.setFixedHeight(14)
+        auth_label = QLabel("授权状态：正常", status)
         auth_label.setObjectName("commercialTitleBarAuthLabel")
         auth_label.setToolTip("DRY RUN · Real Device OFF · Mock 安全模式")
-        auth_layout.addWidget(auth_dot)
-        auth_layout.addWidget(auth_label)
+        auth_label.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
+        auth_label.setMaximumHeight(18)
 
         user_icon = QLabel(status)
         user_icon.setObjectName("commercialTitleBarUserIcon")
@@ -105,8 +102,9 @@ class CommercialTopHeader(QFrame):
         chevron = QLabel("▾", status)
         chevron.setObjectName("commercialTitleBarUserChevron")
 
-        layout.addWidget(auth_chip)
-        layout.addSpacing(6)
+        layout.addWidget(auth_dot)
+        layout.addWidget(auth_label)
+        layout.addSpacing(8)
         layout.addWidget(user_icon)
         layout.addWidget(user_label)
         layout.addWidget(chevron)

@@ -11,7 +11,7 @@ from nfs_scanner.version import APP_VERSION
 class CommercialBrandArea(QWidget):
     """Logo square + hierarchical product title block matching the target header."""
 
-    BRAND_WIDTH = 232
+    BRAND_WIDTH = 224
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -30,6 +30,8 @@ class CommercialBrandArea(QWidget):
 
         self._logo_block = QFrame(self)
         self._logo_block.setObjectName("commercialTitleBarLogo")
+        self._logo_block.setProperty("brandBlueBlock", True)
+        self._logo_block.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self._logo_block.setFixedSize(42, 42)
         logo_layout = QVBoxLayout(self._logo_block)
         logo_layout.setContentsMargins(0, 0, 0, 0)

@@ -483,6 +483,15 @@ Needs Review: yes/no
 - Impact: visual + QA PASS；145 tests；不接真实设备。
 - Needs Review: no
 
+### 2026-06-26 - Header Readability Fix
+
+- Date: 2026-06-26
+- Task: header-readability-fix
+- Decision: 工具栏改用 62px 宽按钮 + 5px 间距 + 短标签（完整 tooltip）；Logo 启用 WA_StyledBackground 与亮蓝渐变；右上移除绿色 chip 改为轻量绿点+文本；新增 toolbar 重叠/可读性 QA 检查。
+- Reason: 用户反馈工具栏文字连串、logo 过暗、授权状态过重。
+- Impact: visual + QA PASS；148 tests；仅改顶部。
+- Needs Review: no
+
 ### 2026-06-26 - Top Header Final Polish
 
 - Date: 2026-06-26

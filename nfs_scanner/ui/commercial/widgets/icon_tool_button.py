@@ -6,15 +6,12 @@ from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QToolButton, QWidget
 
-
-def _toolbar_caption_lines(caption: str) -> str:
-    """Return the full one-line toolbar caption."""
-
-    return caption.replace("\n", "")
+TOOL_BUTTON_WIDTH = 62
+TOOL_BUTTON_HEIGHT = 48
 
 
 class NFSIconToolButton(QToolButton):
-    """Icon-first tool button with caption for instrument-style toolbar."""
+    """Icon-first tool button with short caption and full-name tooltip."""
 
     clicked_action = Signal()
 
@@ -23,6 +20,7 @@ class NFSIconToolButton(QToolButton):
         icon: QIcon | str,
         caption: str,
         *,
+        full_caption: str = "",
         tooltip: str = "",
         primary: bool = False,
         danger: bool = False,
@@ -31,6 +29,7 @@ class NFSIconToolButton(QToolButton):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
+        self._full_caption = full_caption or caption
         self.setObjectName(
             "commercialIconToolDanger"
             if danger
@@ -43,18 +42,23 @@ class NFSIconToolButton(QToolButton):
         if isinstance(icon, QIcon):
             self.setIcon(icon)
             self.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+            self.setText(caption.replace("\n", ""))
         else:
             self.setText(f"{icon} {caption}")
             self.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
-        if isinstance(icon, QIcon):
-            self.setText(_toolbar_caption_lines(caption))
-        self.setToolTip(tooltip or caption)
+        self.setToolTip(tooltip or self._full_caption)
+        self.setProperty("fullCaption", self._full_caption)
         self.setAutoRaise(True)
-        self.setIconSize(QSize(18, 18))
+        self.setIconSize(QSize(20, 20))
         font = self.font()
         font.setPixelSize(11)
         self.setFont(font)
-        self.setFixedSize(54, 48)
+        self.setFixedSize(TOOL_BUTTON_WIDTH, TOOL_BUTTON_HEIGHT)
         if mock_disabled:
             self.setProperty("mockDisabled", "true")
         self.clicked.connect(self.clicked_action.emit)
+
+    def full_caption(self) -> str:
+        """Return the full toolbar action name."""
+
+        return self._full_caption

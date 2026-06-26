@@ -4,16 +4,16 @@ Last updated: 2026-06-26
 
 ## Current Mode
 
-**COMPLETE — Top Header Final Polish**
+**COMPLETE — Header Readability Fix**
 
-商业 UI 顶部最后一轮 polish：品牌区/logo/工具栏/右上状态精修；QA title_bar_height 期望修正为 48–58px；visual/QA PASS。
+商业 UI 顶部可读性修复：工具栏短标签+宽按钮、蓝色 NFS logo、轻量授权状态；QA PASS。
 
 ## Recent (2026-06-26)
 
-- 品牌区：42×42 渐变 NFS logo + 中文标题 + v badge + 英文副标题（232px）
-- 工具栏：54×48 六组仪器风格按钮，mock 项弱化样式
-- 右上：`授权状态：正常` + Admin + 窗口控制（DRY RUN 在 tooltip）
-- QA：`title_bar_height` 期望 48–58px 与判定一致；新增 version_badge / screenshot 检查
+- 工具栏：62×48 按钮、5px 间距、短标签（新建/连接/开始…）+ 完整 tooltip
+- Logo：亮蓝渐变 + WA_StyledBackground，42×42 品牌块
+- 右上：绿点 +「授权状态：正常」轻量文本（DRY RUN 在 tooltip）
+- QA：toolbar 重叠/可读性、brand_logo_blue_block、auth_status_not_too_heavy
 
 ## Application Entry Points
 
