@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-06-26T08:41:44",
+  "generated_at": "2026-06-26T16:06:22",
   "default": {
     "uses_custom_title_bar": true,
-    "title_bar_height": 52,
+    "title_bar_height": 56,
     "bottom_dock_height": 200,
     "log_view_height": 140,
     "statistics_panel_height": 192,
@@ -10,10 +10,10 @@
     "right_panel_width": 350,
     "workspace_width": 676,
     "canvas_width": 616,
-    "canvas_height": 350,
+    "canvas_height": 346,
     "canvas_to_right_ratio": 1.76,
     "canvas_to_left_ratio": 2.6782608695652175,
-    "canvas_view_area_ratio": 0.8118814863908178,
+    "canvas_view_area_ratio": 0.8108346648405995,
     "colorbar_gap_px": 2,
     "toolbar_overflow": false,
     "status_bar_visible": true,
@@ -22,6 +22,15 @@
     "screen_available_width": 1280,
     "screen_available_height": 720,
     "is_maximized": false,
+    "workflow_panel_height": 257,
+    "device_status_panel_height": 341,
+    "property_tab_bar_visible_after_scroll": true,
+    "numeric_field_line_edit_min_width": 52,
+    "numeric_field_total_min_width": 88,
+    "action_buttons_count": 3,
+    "action_buttons_overlap": false,
+    "realtime_toolbar_min_button_width": 52,
+    "realtime_toolbar_has_ellipsis": false,
     "scroll_usability": {
       "left_scrollbar_width": 0,
       "device_scrollbar_width": 14,
@@ -74,7 +83,7 @@
         {
           "name": "property_area_scrollable",
           "expected": "property panel scrollable",
-          "actual": "range=532",
+          "actual": "range=544",
           "passed": true
         },
         {
@@ -108,13 +117,13 @@
       {
         "name": "custom_title_bar",
         "expected": "frameless + title bar visible",
-        "actual": "custom=True, height=52px",
+        "actual": "custom=True, height=56px",
         "passed": true
       },
       {
         "name": "title_bar_height",
         "expected": "48–58 px",
-        "actual": "52px",
+        "actual": "56px",
         "passed": true
       },
       {
@@ -138,7 +147,7 @@
       {
         "name": "canvas_size",
         "expected": "height >= 240px",
-        "actual": "616x350px",
+        "actual": "616x346px",
         "passed": true
       },
       {
@@ -157,6 +166,48 @@
         "name": "left_panel_width",
         "expected": "220–280 px",
         "actual": "230px",
+        "passed": true
+      },
+      {
+        "name": "workflow_panel_height",
+        "expected": "<= 360 px",
+        "actual": "257px",
+        "passed": true
+      },
+      {
+        "name": "device_status_panel_height",
+        "expected": ">= 220 px on default desktop layout",
+        "actual": "341px",
+        "passed": true
+      },
+      {
+        "name": "property_tab_bar_fixed",
+        "expected": "tab bar visible after content scroll",
+        "actual": "True",
+        "passed": true
+      },
+      {
+        "name": "numeric_field_line_edit_width",
+        "expected": ">= 48 px",
+        "actual": "52px",
+        "passed": true
+      },
+      {
+        "name": "numeric_field_total_width",
+        "expected": ">= 88 px",
+        "actual": "88px",
+        "passed": true
+      },
+      {
+        "name": "scan_action_buttons_layout",
+        "expected": "start/pause/stop present with no overlap",
+        "actual": "count=3, overlap=False",
+        "passed": true
+      },
+      {
+        "name": "realtime_toolbar_button_text",
+        "expected": "no \"...\" labels and width >= 44 px",
+        "actual": "min_width=52px, ellipsis=False",
         "passed": true
       },
       {
@@ -312,7 +363,7 @@
       {
         "name": "brand_logo_exists",
         "expected": "NFS logo square >= 40px",
-        "actual": "logo=True, size=42x42",
+        "actual": "logo=True, size=44x44",
         "passed": true
       },
       {
@@ -330,7 +381,7 @@
       {
         "name": "top_header_compact",
         "expected": "header height 48-58px",
-        "actual": "52px",
+        "actual": "56px",
         "passed": true
       },
       {
@@ -349,6 +400,12 @@
         "name": "toolbar_primary_actions_visible",
         "expected": "connect/start/stop visible",
         "actual": "True",
+        "passed": true
+      },
+      {
+        "name": "toolbar_primary_text_not_elided",
+        "expected": "8 primary toolbar captions visible and complete",
+        "actual": "count=8, intact=True",
         "passed": true
       },
       {
@@ -408,7 +465,7 @@
       {
         "name": "property_area_scrollable",
         "expected": "property panel scrollable",
-        "actual": "range=532",
+        "actual": "range=544",
         "passed": true
       },
       {
@@ -440,7 +497,7 @@
   },
   "maximized": {
     "uses_custom_title_bar": true,
-    "title_bar_height": 52,
+    "title_bar_height": 56,
     "bottom_dock_height": 200,
     "log_view_height": 140,
     "statistics_panel_height": 192,
@@ -448,10 +505,10 @@
     "right_panel_width": 350,
     "workspace_width": 676,
     "canvas_width": 616,
-    "canvas_height": 350,
+    "canvas_height": 346,
     "canvas_to_right_ratio": 1.76,
     "canvas_to_left_ratio": 2.6782608695652175,
-    "canvas_view_area_ratio": 0.8118814863908178,
+    "canvas_view_area_ratio": 0.8108346648405995,
     "colorbar_gap_px": 2,
     "toolbar_overflow": false,
     "status_bar_visible": true,
@@ -460,6 +517,15 @@
     "screen_available_width": 1280,
     "screen_available_height": 720,
     "is_maximized": true,
+    "workflow_panel_height": 257,
+    "device_status_panel_height": 341,
+    "property_tab_bar_visible_after_scroll": true,
+    "numeric_field_line_edit_min_width": 52,
+    "numeric_field_total_min_width": 88,
+    "action_buttons_count": 3,
+    "action_buttons_overlap": false,
+    "realtime_toolbar_min_button_width": 52,
+    "realtime_toolbar_has_ellipsis": false,
     "scroll_usability": {
       "left_scrollbar_width": 0,
       "device_scrollbar_width": 14,
@@ -512,7 +578,7 @@
         {
           "name": "property_area_scrollable",
           "expected": "property panel scrollable",
-          "actual": "range=532",
+          "actual": "range=544",
           "passed": true
         },
         {
@@ -546,13 +612,13 @@
       {
         "name": "custom_title_bar",
         "expected": "frameless + title bar visible",
-        "actual": "custom=True, height=52px",
+        "actual": "custom=True, height=56px",
         "passed": true
       },
       {
         "name": "title_bar_height",
         "expected": "48–58 px",
-        "actual": "52px",
+        "actual": "56px",
         "passed": true
       },
       {
@@ -576,7 +642,7 @@
       {
         "name": "canvas_size",
         "expected": "height >= 240px",
-        "actual": "616x350px",
+        "actual": "616x346px",
         "passed": true
       },
       {
@@ -595,6 +661,48 @@
         "name": "left_panel_width",
         "expected": "220–280 px",
         "actual": "230px",
+        "passed": true
+      },
+      {
+        "name": "workflow_panel_height",
+        "expected": "<= 360 px",
+        "actual": "257px",
+        "passed": true
+      },
+      {
+        "name": "device_status_panel_height",
+        "expected": ">= 220 px on default desktop layout",
+        "actual": "341px",
+        "passed": true
+      },
+      {
+        "name": "property_tab_bar_fixed",
+        "expected": "tab bar visible after content scroll",
+        "actual": "True",
+        "passed": true
+      },
+      {
+        "name": "numeric_field_line_edit_width",
+        "expected": ">= 48 px",
+        "actual": "52px",
+        "passed": true
+      },
+      {
+        "name": "numeric_field_total_width",
+        "expected": ">= 88 px",
+        "actual": "88px",
+        "passed": true
+      },
+      {
+        "name": "scan_action_buttons_layout",
+        "expected": "start/pause/stop present with no overlap",
+        "actual": "count=3, overlap=False",
+        "passed": true
+      },
+      {
+        "name": "realtime_toolbar_button_text",
+        "expected": "no \"...\" labels and width >= 44 px",
+        "actual": "min_width=52px, ellipsis=False",
         "passed": true
       },
       {
@@ -750,7 +858,7 @@
       {
         "name": "brand_logo_exists",
         "expected": "NFS logo square >= 40px",
-        "actual": "logo=True, size=42x42",
+        "actual": "logo=True, size=44x44",
         "passed": true
       },
       {
@@ -768,7 +876,7 @@
       {
         "name": "top_header_compact",
         "expected": "header height 48-58px",
-        "actual": "52px",
+        "actual": "56px",
         "passed": true
       },
       {
@@ -787,6 +895,12 @@
         "name": "toolbar_primary_actions_visible",
         "expected": "connect/start/stop visible",
         "actual": "True",
+        "passed": true
+      },
+      {
+        "name": "toolbar_primary_text_not_elided",
+        "expected": "8 primary toolbar captions visible and complete",
+        "actual": "count=8, intact=True",
         "passed": true
       },
       {
@@ -846,7 +960,7 @@
       {
         "name": "property_area_scrollable",
         "expected": "property panel scrollable",
-        "actual": "range=532",
+        "actual": "range=544",
         "passed": true
       },
       {

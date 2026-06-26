@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -48,7 +49,7 @@ class CommercialPropertyPanel(QScrollArea):
     scan_pause_toggle_requested = Signal()
 
     _DEBOUNCE_MS = 250
-    _COMPACT_FIELD_WIDTH = 56
+    _COMPACT_FIELD_WIDTH = 104
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -57,7 +58,7 @@ class CommercialPropertyPanel(QScrollArea):
         self.setProperty("targetStyleMode", "true")
         self.setWidgetResizable(True)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._debounce_timer = QTimer(self)
         self._debounce_timer.setSingleShot(True)
         self._debounce_timer.timeout.connect(self._emit_scan_config)
@@ -69,6 +70,7 @@ class CommercialPropertyPanel(QScrollArea):
         self._stop_scan_button: NFSDangerButton | None = None
         self._pause_scan_button: NFSSecondaryButton | None = None
         self._target_presentation_active = False
+        self._tabs: QTabWidget | None = None
         self._setup_ui()
         QTimer.singleShot(0, self._emit_scan_config)
 
@@ -80,12 +82,27 @@ class CommercialPropertyPanel(QScrollArea):
 
         tabs = QTabWidget(container)
         tabs.setObjectName("commercialPropertyTabs")
-        tabs.addTab(self._build_scan_tab(tabs), "扫描参数")
-        tabs.addTab(self._build_display_tab(tabs), "显示设置")
-        tabs.addTab(self._build_instrument_tab(tabs), "仪表设置")
-        layout.addWidget(tabs)
+        tabs.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        tabs.addTab(self._wrap_scroll_page(self._build_scan_tab(tabs), tabs), "扫描参数")
+        tabs.addTab(self._wrap_scroll_page(self._build_display_tab(tabs), tabs), "显示设置")
+        tabs.addTab(self._wrap_scroll_page(self._build_instrument_tab(tabs), tabs), "仪表设置")
+        layout.addWidget(tabs, 1)
+        self._tabs = tabs
         self.setWidget(container)
-        configure_scroll_area(self, vertical=True, horizontal=False)
+        configure_scroll_area(self, vertical=False, horizontal=False)
+
+    def _wrap_scroll_page(self, content: QWidget, parent: QWidget) -> QScrollArea:
+        """Wrap one tab page so the tab bar stays fixed while content scrolls."""
+
+        scroll = QScrollArea(parent)
+        scroll.setObjectName("commercialPropertyTabScroll")
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setWidget(content)
+        configure_scroll_area(scroll, vertical=True, horizontal=False)
+        return scroll
 
     def _build_scan_tab(self, parent: QWidget) -> QWidget:
         page = QWidget(parent)
@@ -120,6 +137,7 @@ class CommercialPropertyPanel(QScrollArea):
     def _compact_field(self, parent: QWidget, key: str, default: float, unit: str = "mm") -> NFSNumericField:
         field = NFSNumericField(unit, parent)
         field.setText(f"{default:g}")
+        field.setMinimumWidth(self._COMPACT_FIELD_WIDTH)
         field.setMaximumWidth(self._COMPACT_FIELD_WIDTH)
         field.valueChanged.connect(self._schedule_emit_scan_config)
         self._field_map[key] = field
@@ -133,20 +151,36 @@ class CommercialPropertyPanel(QScrollArea):
     ) -> QWidget:
         row = QWidget(parent)
         row.setObjectName("commercialPropertyGridRow")
-        layout = QHBoxLayout(row)
+        layout = QVBoxLayout(row)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(4)
+        layout.setSpacing(3)
         caption = QLabel(row_label, row)
         caption.setObjectName("nfsMutedLabel")
-        caption.setFixedWidth(28)
         layout.addWidget(caption)
-        axis_names = {"x_start": "X", "y_start": "Y", "z_height": "Z", "x_stop": "X", "y_stop": "Y", "z_stop": "Z", "x_step": "X", "y_step": "Y", "z_step": "Z"}
-        for key, default in specs:
+
+        grid = QGridLayout()
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setHorizontalSpacing(6)
+        grid.setVerticalSpacing(2)
+        axis_names = {
+            "x_start": "X",
+            "y_start": "Y",
+            "z_height": "Z",
+            "x_stop": "X",
+            "y_stop": "Y",
+            "z_stop": "Z",
+            "x_step": "X",
+            "y_step": "Y",
+            "z_step": "Z",
+        }
+        for column, (key, default) in enumerate(specs):
             axis = QLabel(axis_names[key], row)
-            axis.setFixedWidth(12)
-            layout.addWidget(axis)
-            layout.addWidget(self._compact_field(row, key, default))
-        layout.addStretch(1)
+            axis.setObjectName("nfsMutedLabel")
+            axis.setAlignment(Qt.AlignmentFlag.AlignLeft)
+            grid.addWidget(axis, 0, column)
+            grid.addWidget(self._compact_field(row, key, default), 1, column)
+            grid.setColumnStretch(column, 1)
+        layout.addLayout(grid)
         return row
 
     def _build_region_section(self, parent: QWidget) -> QWidget:
@@ -299,7 +333,11 @@ class CommercialPropertyPanel(QScrollArea):
         self._pause_scan_button = NFSSecondaryButton("暂停", row)
         self._pause_scan_button.clicked.connect(self.scan_pause_toggle_requested.emit)
         self._pause_scan_button.setVisible(False)
+        for button in (self._start_scan_button, self._pause_scan_button, self._stop_scan_button):
+            button.setMinimumWidth(70)
+            button.setMinimumHeight(32)
         layout.addWidget(self._start_scan_button, 1)
+        layout.addWidget(self._pause_scan_button, 1)
         layout.addWidget(self._stop_scan_button, 1)
         return row
 

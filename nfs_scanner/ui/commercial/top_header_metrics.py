@@ -32,6 +32,28 @@ def collect_top_header_checks(shell: CommercialMainShell) -> list[LayoutMetricCh
         button.toolButtonStyle() == Qt.ToolButtonStyle.ToolButtonTextUnderIcon
         for button in toolbar_buttons
     )
+    primary_captions = {
+        "新建项目",
+        "打开项目",
+        "保存项目",
+        "连接设备",
+        "开始扫描",
+        "停止扫描",
+        "导出数据",
+        "导出报告",
+    }
+    primary_buttons = [
+        button for button in toolbar_buttons if button.toolTip() in primary_captions
+    ]
+    primary_text_intact = len(primary_buttons) == len(primary_captions) and all(
+        button.isVisible()
+        and button.text().replace("\n", "") == button.toolTip()
+        and all(
+            button.fontMetrics().horizontalAdvance(line) <= max(button.width() - 8, 1)
+            for line in button.text().splitlines()
+        )
+        for button in primary_buttons
+    )
     dot_buttons = [
         button
         for button in toolbar_buttons
@@ -107,6 +129,12 @@ def collect_top_header_checks(shell: CommercialMainShell) -> list[LayoutMetricCh
             expected="connect/start/stop visible",
             actual=str(primary_visible),
             passed=primary_visible,
+        ),
+        LayoutMetricCheck(
+            name="toolbar_primary_text_not_elided",
+            expected="8 primary toolbar captions visible and complete",
+            actual=f"count={len(primary_buttons)}, intact={primary_text_intact}",
+            passed=primary_text_intact,
         ),
         LayoutMetricCheck(
             name="right_status_aligned",

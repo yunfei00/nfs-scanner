@@ -31,6 +31,15 @@ class CommercialLayoutMetricsTestCase(unittest.TestCase):
             screen_available_width=1920,
             screen_available_height=1080,
             is_maximized=False,
+            workflow_panel_height=340,
+            device_status_panel_height=280,
+            property_tab_bar_visible_after_scroll=True,
+            numeric_field_line_edit_min_width=52,
+            numeric_field_total_min_width=88,
+            action_buttons_count=3,
+            action_buttons_overlap=False,
+            realtime_toolbar_min_button_width=52,
+            realtime_toolbar_has_ellipsis=False,
         )
         metrics.checks = _build_checks(metrics)
         self.assertTrue(metrics.all_passed())
@@ -58,6 +67,15 @@ class CommercialLayoutMetricsTestCase(unittest.TestCase):
             screen_available_width=1920,
             screen_available_height=1080,
             is_maximized=False,
+            workflow_panel_height=340,
+            device_status_panel_height=280,
+            property_tab_bar_visible_after_scroll=True,
+            numeric_field_line_edit_min_width=52,
+            numeric_field_total_min_width=88,
+            action_buttons_count=3,
+            action_buttons_overlap=False,
+            realtime_toolbar_min_button_width=52,
+            realtime_toolbar_has_ellipsis=False,
         )
         metrics.checks = _build_checks(metrics)
         self.assertFalse(metrics.all_passed())
@@ -85,6 +103,15 @@ class CommercialLayoutMetricsTestCase(unittest.TestCase):
             screen_available_width=1280,
             screen_available_height=720,
             is_maximized=False,
+            workflow_panel_height=340,
+            device_status_panel_height=220,
+            property_tab_bar_visible_after_scroll=True,
+            numeric_field_line_edit_min_width=52,
+            numeric_field_total_min_width=88,
+            action_buttons_count=3,
+            action_buttons_overlap=False,
+            realtime_toolbar_min_button_width=52,
+            realtime_toolbar_has_ellipsis=False,
         )
         metrics.checks = _build_checks(metrics)
         priority = next(item for item in metrics.checks if item.name == "center_canvas_priority")

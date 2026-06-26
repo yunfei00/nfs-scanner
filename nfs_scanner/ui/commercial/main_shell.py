@@ -441,7 +441,7 @@ class CommercialMainShell(QMainWindow):
         left_container.setObjectName("commercialLeftArea")
         left_container.setMinimumWidth(self.LEFT_PANEL_MIN_WIDTH)
         left_container.setMaximumWidth(self.LEFT_PANEL_MAX_WIDTH)
-        left_container.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
+        left_container.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
 
         left_layout = QVBoxLayout(left_container)
         left_layout.setContentsMargins(8, 8, 8, 8)
@@ -456,8 +456,8 @@ class CommercialMainShell(QMainWindow):
         device_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         device_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         device_scroll.setWidget(self.device_status_panel)
-        device_scroll.setMinimumHeight(100)
-        device_scroll.setMaximumHeight(200)
+        device_scroll.setMinimumHeight(220)
+        device_scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         left_layout.addWidget(device_scroll, 1)
 
         scroll_area = QScrollArea(self)

@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QScrollArea, QScrollBar, QSlider, QWidget
+from PySide6.QtWidgets import QApplication, QScrollArea, QScrollBar, QSlider, QTabWidget, QWidget
 
 from nfs_scanner.ui.commercial.main_shell import CommercialMainShell
 from nfs_scanner.ui.commercial.scroll_helpers import COMMERCIAL_SCROLLBAR_WIDTH
@@ -95,6 +95,14 @@ def _exercise_scroll_bar(scroll_bar: QScrollBar | None) -> tuple[bool, bool]:
     return wheel_ok, handle_ok
 
 
+def _current_property_tab_scroll(shell: CommercialMainShell) -> QScrollArea | None:
+    tabs = shell.property_panel.findChild(QTabWidget, "commercialPropertyTabs")
+    if tabs is None:
+        return None
+    current = tabs.currentWidget()
+    return current if isinstance(current, QScrollArea) else None
+
+
 def collect_scroll_usability_metrics(shell: CommercialMainShell) -> ScrollUsabilityMetrics:
     """Measure scrollbar widths and basic interaction on key commercial regions."""
 
@@ -118,7 +126,8 @@ def collect_scroll_usability_metrics(shell: CommercialMainShell) -> ScrollUsabil
     device_area = shell.findChild(QScrollArea, "commercialDeviceScroll")
     device_scroll = device_area.verticalScrollBar() if device_area is not None else None
 
-    property_scroll = shell.property_panel.verticalScrollBar()
+    property_area = _current_property_tab_scroll(shell)
+    property_scroll = property_area.verticalScrollBar() if property_area is not None else None
     log_view = shell.bottom_dock.log_view_widget()
     log_scroll = log_view.verticalScrollBar() if log_view is not None else None
 
@@ -161,7 +170,8 @@ def collect_scroll_usability_metrics(shell: CommercialMainShell) -> ScrollUsabil
 def _build_scroll_checks(metrics: ScrollUsabilityMetrics, shell: CommercialMainShell) -> list[ScrollMetricCheck]:
     log_view = shell.bottom_dock.log_view_widget()
     log_scroll = log_view.verticalScrollBar() if log_view is not None else None
-    property_scroll = shell.property_panel.verticalScrollBar()
+    property_area = _current_property_tab_scroll(shell)
+    property_scroll = property_area.verticalScrollBar() if property_area is not None else None
 
     checks = [
         ScrollMetricCheck(

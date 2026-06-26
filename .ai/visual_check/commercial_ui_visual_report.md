@@ -1,6 +1,6 @@
 # Commercial UI Visual Report
 
-- Generated: 2026-06-26 08:41:44
+- Generated: 2026-06-26 16:06:22
 - Default screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_default.png`
 - Top header screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_top_header.png`
 - Maximized screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_maximized.png`
@@ -11,15 +11,22 @@
 
 | Check | Expected | Actual | Status |
 |-------|----------|--------|--------|
-| custom_title_bar | frameless + title bar visible | custom=True, height=52px | PASS |
-| title_bar_height | 48–58 px | 52px | PASS |
+| custom_title_bar | frameless + title bar visible | custom=True, height=56px | PASS |
+| title_bar_height | 48–58 px | 56px | PASS |
 | bottom_dock_height | >= 200 px | 200px | PASS |
 | log_view_height | >= 100 px | 140px | PASS |
 | statistics_panel_height | >= 100 px | 192px | PASS |
-| canvas_size | height >= 240px | 616x350px | PASS |
+| canvas_size | height >= 240px | 616x346px | PASS |
 | colorbar_adjacent | gap <= 12 px | 2px | PASS |
 | right_panel_width | 340–380 px | 350px | PASS |
 | left_panel_width | 220–280 px | 230px | PASS |
+| workflow_panel_height | <= 360 px | 257px | PASS |
+| device_status_panel_height | >= 220 px on default desktop layout | 341px | PASS |
+| property_tab_bar_fixed | tab bar visible after content scroll | True | PASS |
+| numeric_field_line_edit_width | >= 48 px | 52px | PASS |
+| numeric_field_total_width | >= 88 px | 88px | PASS |
+| scan_action_buttons_layout | start/pause/stop present with no overlap | count=3, overlap=False | PASS |
+| realtime_toolbar_button_text | no "..." labels and width >= 44 px | min_width=52px, ellipsis=False | PASS |
 | center_canvas_priority | canvas >= 1.6x right, >= 2.0x left, area >= 50% | right=1.76x, left=2.68x, area=81% | PASS |
 | workspace_wider_than_right_panel | workspace > right panel | 676px > 350px | PASS |
 | toolbar_no_overflow | toolbar fits layout | overflow=False | PASS |
@@ -45,13 +52,14 @@
 | canvas_axis_legend | axis legend visible | visible=True | PASS |
 | canvas_cursor_hud | cursor HUD visible | visible=True | PASS |
 | minimap_title_visible | MiniMap title "全局视图" | 全局视图 | PASS |
-| brand_logo_exists | NFS logo square >= 40px | logo=True, size=42x42 | PASS |
+| brand_logo_exists | NFS logo square >= 40px | logo=True, size=44x44 | PASS |
 | brand_title_hierarchy | CN title + EN subtitle + version badge | title=True, subtitle=True, badge=True, hierarchy=True | PASS |
 | brand_not_flat_text | brand is not a single flat text row | flat=False | PASS |
-| top_header_compact | header height 48-58px | 52px | PASS |
+| top_header_compact | header height 48-58px | 56px | PASS |
 | toolbar_icon_mode | icon-above-text tool buttons | count=13, icon_mode=True | PASS |
 | toolbar_no_placeholder_dots | no ellipsis placeholder buttons | 0 | PASS |
 | toolbar_primary_actions_visible | connect/start/stop visible | True | PASS |
+| toolbar_primary_text_not_elided | 8 primary toolbar captions visible and complete | count=8, intact=True | PASS |
 | right_status_aligned | auth + window controls on top-right | auth=True, aligned=True | PASS |
 | frameless_titlebar_still_active | custom frameless shell | True | PASS |
 | top_header_integrated | toolbar embedded in top header | parent=commercialTopHeader | PASS |
@@ -68,7 +76,7 @@
 | property_scrollbar_width | >= 12px when visible | 14px | PASS |
 | log_scrollbar_width | >= 12px when scrollable | 14px | PASS |
 | log_area_scrollable | log content scrollable | range=5 | PASS |
-| property_area_scrollable | property panel scrollable | range=532 | PASS |
+| property_area_scrollable | property panel scrollable | range=544 | PASS |
 | device_status_scrollable_or_compact | device scroll visible when needed | width=14px | PASS |
 | wheel_interaction | wheel step changes scroll value | True | PASS |
 | handle_position_interaction | handle position can be set smoothly | True | PASS |
@@ -86,15 +94,22 @@
 
 | Check | Expected | Actual | Status |
 |-------|----------|--------|--------|
-| custom_title_bar | frameless + title bar visible | custom=True, height=52px | PASS |
-| title_bar_height | 48–58 px | 52px | PASS |
+| custom_title_bar | frameless + title bar visible | custom=True, height=56px | PASS |
+| title_bar_height | 48–58 px | 56px | PASS |
 | bottom_dock_height | >= 200 px | 200px | PASS |
 | log_view_height | >= 100 px | 140px | PASS |
 | statistics_panel_height | >= 100 px | 192px | PASS |
-| canvas_size | height >= 240px | 616x350px | PASS |
+| canvas_size | height >= 240px | 616x346px | PASS |
 | colorbar_adjacent | gap <= 12 px | 2px | PASS |
 | right_panel_width | 340–380 px | 350px | PASS |
 | left_panel_width | 220–280 px | 230px | PASS |
+| workflow_panel_height | <= 360 px | 257px | PASS |
+| device_status_panel_height | >= 220 px on default desktop layout | 341px | PASS |
+| property_tab_bar_fixed | tab bar visible after content scroll | True | PASS |
+| numeric_field_line_edit_width | >= 48 px | 52px | PASS |
+| numeric_field_total_width | >= 88 px | 88px | PASS |
+| scan_action_buttons_layout | start/pause/stop present with no overlap | count=3, overlap=False | PASS |
+| realtime_toolbar_button_text | no "..." labels and width >= 44 px | min_width=52px, ellipsis=False | PASS |
 | center_canvas_priority | canvas >= 1.6x right, >= 2.0x left, area >= 50% | right=1.76x, left=2.68x, area=81% | PASS |
 | workspace_wider_than_right_panel | workspace > right panel | 676px > 350px | PASS |
 | toolbar_no_overflow | toolbar fits layout | overflow=False | PASS |
@@ -120,13 +135,14 @@
 | canvas_axis_legend | axis legend visible | visible=True | PASS |
 | canvas_cursor_hud | cursor HUD visible | visible=True | PASS |
 | minimap_title_visible | MiniMap title "全局视图" | 全局视图 | PASS |
-| brand_logo_exists | NFS logo square >= 40px | logo=True, size=42x42 | PASS |
+| brand_logo_exists | NFS logo square >= 40px | logo=True, size=44x44 | PASS |
 | brand_title_hierarchy | CN title + EN subtitle + version badge | title=True, subtitle=True, badge=True, hierarchy=True | PASS |
 | brand_not_flat_text | brand is not a single flat text row | flat=False | PASS |
-| top_header_compact | header height 48-58px | 52px | PASS |
+| top_header_compact | header height 48-58px | 56px | PASS |
 | toolbar_icon_mode | icon-above-text tool buttons | count=13, icon_mode=True | PASS |
 | toolbar_no_placeholder_dots | no ellipsis placeholder buttons | 0 | PASS |
 | toolbar_primary_actions_visible | connect/start/stop visible | True | PASS |
+| toolbar_primary_text_not_elided | 8 primary toolbar captions visible and complete | count=8, intact=True | PASS |
 | right_status_aligned | auth + window controls on top-right | auth=True, aligned=True | PASS |
 | frameless_titlebar_still_active | custom frameless shell | True | PASS |
 | top_header_integrated | toolbar embedded in top header | parent=commercialTopHeader | PASS |

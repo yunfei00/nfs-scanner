@@ -58,5 +58,5 @@ class NFSIconToolButton(QToolButton):
         font = self.font()
         font.setPixelSize(11)
         self.setFont(font)
-        self.setFixedSize(52, 48)
+        self.setFixedSize(68, 52)
         self.clicked.connect(self.clicked_action.emit)

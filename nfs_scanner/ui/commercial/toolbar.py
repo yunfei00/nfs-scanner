@@ -8,6 +8,8 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QMenu, QStyle, QToolButton, Q
 from .widgets.icon_tool_button import NFSIconToolButton
 
 _COMPACT_WIDTH_THRESHOLD = 1120
+_TOOL_BUTTON_WIDTH = 68
+_TOOLBAR_CHROME_WIDTH = 96
 
 
 class CommercialToolbar(QWidget):
@@ -30,9 +32,10 @@ class CommercialToolbar(QWidget):
         super().__init__(parent)
         self.setObjectName("commercialToolbar")
         self.setProperty("targetStyleMode", "true")
-        self.setMinimumHeight(48)
-        self.setMaximumHeight(48)
+        self.setMinimumHeight(52)
+        self.setMaximumHeight(52)
         self._tool_buttons: list[NFSIconToolButton] = []
+        self._overflow_candidates: list[NFSIconToolButton] = []
         self._start_scan_button: NFSIconToolButton | None = None
         self._pause_scan_button: NFSIconToolButton | None = None
         self._stop_scan_button: NFSIconToolButton | None = None
@@ -80,6 +83,8 @@ class CommercialToolbar(QWidget):
                 root.addWidget(self._separator())
                 root.addSpacing(12)
             button = self._make_button(icon, caption, slot, **options)
+            if index in (6, 7, 8, 11, 12):
+                self._overflow_candidates.append(button)
             if caption == "连接设备":
                 self._connect_device_button = button
             elif caption == "开始扫描":
@@ -156,20 +161,25 @@ class CommercialToolbar(QWidget):
         self.set_export_enabled(False)
 
     def update_compact_mode(self, window_width: int) -> None:
-        """Keep all toolbar actions visible; overflow menu only on very narrow widths."""
+        """Keep primary actions readable; move secondary mock actions to overflow."""
 
         for button in self._tool_buttons:
             button.setVisible(True)
-        narrow = window_width <= 960
+
+        overflow_active = window_width <= 960 or self._measure_overflow(window_width)
+        if overflow_active:
+            for button in self._overflow_candidates:
+                button.setVisible(False)
         if self._overflow_button is not None:
-            self._overflow_button.setVisible(narrow)
+            self._overflow_button.setVisible(overflow_active)
         self._layout_overflow = self._measure_overflow(window_width)
 
     def has_layout_overflow(self) -> bool:
         return self._layout_overflow
 
     def _measure_overflow(self, window_width: int) -> bool:
-        required = len(self._tool_buttons) * 52 + 80
+        visible_count = sum(1 for button in self._tool_buttons if button.isVisible())
+        required = visible_count * _TOOL_BUTTON_WIDTH + _TOOLBAR_CHROME_WIDTH
         available = max(window_width - 520, 400)
         return required > available
 

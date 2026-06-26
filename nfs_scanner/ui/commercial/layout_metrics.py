@@ -42,6 +42,15 @@ class CommercialLayoutMetrics:
     screen_available_width: int = 0
     screen_available_height: int = 0
     is_maximized: bool = False
+    workflow_panel_height: int = 0
+    device_status_panel_height: int = 0
+    property_tab_bar_visible_after_scroll: bool = False
+    numeric_field_line_edit_min_width: int = 0
+    numeric_field_total_min_width: int = 0
+    action_buttons_count: int = 0
+    action_buttons_overlap: bool = False
+    realtime_toolbar_min_button_width: int = 0
+    realtime_toolbar_has_ellipsis: bool = False
     scroll_usability: dict = field(default_factory=dict)
     checks: list[LayoutMetricCheck] = field(default_factory=list)
 
@@ -62,7 +71,10 @@ def _between(value: int, low: int, high: int) -> bool:
 def collect_layout_metrics(shell: QMainWindow) -> CommercialLayoutMetrics:
     """Measure key widget geometries from a visible commercial shell."""
 
+    from PySide6.QtWidgets import QScrollArea, QTabWidget, QToolButton
+
     from nfs_scanner.ui.commercial.main_shell import CommercialMainShell
+    from nfs_scanner.ui.commercial.widgets import NFSNumericField
 
     if not isinstance(shell, CommercialMainShell):
         raise TypeError("Expected CommercialMainShell instance")
@@ -95,7 +107,68 @@ def collect_layout_metrics(shell: QMainWindow) -> CommercialLayoutMetrics:
         window_width=shell.width(),
         window_height=shell.height(),
         is_maximized=shell.is_custom_maximized() or shell.isMaximized(),
+        workflow_panel_height=shell.workflow_panel.height(),
     )
+
+    device_area = shell.findChild(QScrollArea, "commercialDeviceScroll")
+    if device_area is not None:
+        metrics.device_status_panel_height = device_area.height()
+
+    property_tabs = shell.property_panel.findChild(QTabWidget, "commercialPropertyTabs")
+    if property_tabs is not None:
+        current_page = property_tabs.currentWidget()
+        if isinstance(current_page, QScrollArea):
+            scroll_bar = current_page.verticalScrollBar()
+            previous = scroll_bar.value()
+            scroll_bar.setValue(scroll_bar.maximum())
+            QApplication.processEvents()
+            tab_bar = property_tabs.tabBar()
+            tab_rect = tab_bar.geometry()
+            metrics.property_tab_bar_visible_after_scroll = (
+                tab_bar.isVisible()
+                and tab_rect.top() >= 0
+                and tab_rect.bottom() <= property_tabs.height()
+            )
+            scroll_bar.setValue(previous)
+            QApplication.processEvents()
+
+    numeric_fields = shell.property_panel.findChildren(NFSNumericField)
+    if numeric_fields:
+        metrics.numeric_field_line_edit_min_width = min(
+            field.line_edit().minimumWidth() for field in numeric_fields
+        )
+        metrics.numeric_field_total_min_width = min(field.minimumWidth() for field in numeric_fields)
+
+    action_buttons = [
+        shell.property_panel._start_scan_button,
+        shell.property_panel._pause_scan_button,
+        shell.property_panel._stop_scan_button,
+    ]
+    metrics.action_buttons_count = sum(button is not None for button in action_buttons)
+    pause_button = shell.property_panel._pause_scan_button
+    previous_pause_visible = pause_button.isVisible() if pause_button is not None else False
+    previous_pause_text = pause_button.text() if pause_button is not None else ""
+    if pause_button is not None:
+        shell.property_panel.set_pause_button_state(visible=True, paused=False)
+        QApplication.processEvents()
+    visible_action_buttons = [button for button in action_buttons if button is not None and button.isVisible()]
+    metrics.action_buttons_overlap = any(
+        left.geometry().intersects(right.geometry())
+        for index, left in enumerate(visible_action_buttons)
+        for right in visible_action_buttons[index + 1 :]
+    )
+    if pause_button is not None:
+        pause_button.setVisible(previous_pause_visible)
+        pause_button.setText(previous_pause_text)
+        QApplication.processEvents()
+
+    realtime_buttons = shell.workspace.realtime_view().findChildren(QToolButton, "realtimeCanvasToolButton")
+    if realtime_buttons:
+        metrics.realtime_toolbar_min_button_width = min(button.width() for button in realtime_buttons)
+        metrics.realtime_toolbar_has_ellipsis = any(
+            button.text().strip() in {"...", "…"} or "..." in button.text()
+            for button in realtime_buttons
+        )
 
     screen = shell.screen() or QApplication.primaryScreen()
     if screen is not None:
@@ -104,6 +177,7 @@ def collect_layout_metrics(shell: QMainWindow) -> CommercialLayoutMetrics:
         metrics.screen_available_height = available.height()
 
     shell.toolbar.update_compact_mode(shell.width())
+    metrics.toolbar_overflow = shell.toolbar.has_layout_overflow()
 
     log_view = shell.bottom_dock.log_view_widget()
     shell.bottom_dock.switch_to_logs_tab()
@@ -201,6 +275,58 @@ def _build_checks(metrics: CommercialLayoutMetrics) -> list[LayoutMetricCheck]:
             expected="220–280 px",
             actual=f"{metrics.left_panel_width}px",
             passed=_between(metrics.left_panel_width, 220, 280),
+        ),
+        LayoutMetricCheck(
+            name="workflow_panel_height",
+            expected="<= 360 px",
+            actual=f"{metrics.workflow_panel_height}px",
+            passed=metrics.workflow_panel_height <= 360,
+        ),
+        LayoutMetricCheck(
+            name="device_status_panel_height",
+            expected=">= 220 px on default desktop layout",
+            actual=f"{metrics.device_status_panel_height}px",
+            passed=(
+                metrics.device_status_panel_height >= 220
+                if metrics.window_width >= 1500 and metrics.window_height >= 850
+                else metrics.device_status_panel_height >= 180
+            ),
+        ),
+        LayoutMetricCheck(
+            name="property_tab_bar_fixed",
+            expected="tab bar visible after content scroll",
+            actual=str(metrics.property_tab_bar_visible_after_scroll),
+            passed=metrics.property_tab_bar_visible_after_scroll,
+        ),
+        LayoutMetricCheck(
+            name="numeric_field_line_edit_width",
+            expected=">= 48 px",
+            actual=f"{metrics.numeric_field_line_edit_min_width}px",
+            passed=metrics.numeric_field_line_edit_min_width >= 48,
+        ),
+        LayoutMetricCheck(
+            name="numeric_field_total_width",
+            expected=">= 88 px",
+            actual=f"{metrics.numeric_field_total_min_width}px",
+            passed=metrics.numeric_field_total_min_width >= 88,
+        ),
+        LayoutMetricCheck(
+            name="scan_action_buttons_layout",
+            expected="start/pause/stop present with no overlap",
+            actual=f"count={metrics.action_buttons_count}, overlap={metrics.action_buttons_overlap}",
+            passed=metrics.action_buttons_count == 3 and not metrics.action_buttons_overlap,
+        ),
+        LayoutMetricCheck(
+            name="realtime_toolbar_button_text",
+            expected='no "..." labels and width >= 44 px',
+            actual=(
+                f"min_width={metrics.realtime_toolbar_min_button_width}px, "
+                f"ellipsis={metrics.realtime_toolbar_has_ellipsis}"
+            ),
+            passed=(
+                metrics.realtime_toolbar_min_button_width >= 44
+                and not metrics.realtime_toolbar_has_ellipsis
+            ),
         ),
         LayoutMetricCheck(
             name="center_canvas_priority",

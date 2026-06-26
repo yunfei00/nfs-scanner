@@ -21,15 +21,16 @@ class NFSNumericField(QWidget):
 
         self._input = QLineEdit(self)
         self._input.setObjectName("nfsNumericInput")
-        self._input.setMinimumWidth(48)
+        self._input.setMinimumWidth(52)
         self._input.textChanged.connect(self._on_text_changed)
         layout.addWidget(self._input, 1)
 
         self._unit_label = QLabel(unit, self)
         self._unit_label.setObjectName("nfsNumericUnit")
-        self._unit_label.setMinimumWidth(self._unit_width(unit))
+        self._unit_label.setFixedWidth(self._unit_width(unit))
         layout.addWidget(self._unit_label, 0)
 
+        self.setMinimumWidth(88)
         self.setMinimumHeight(28)
         self.set_valid(True)
 
@@ -39,11 +40,19 @@ class NFSNumericField(QWidget):
 
         if not unit:
             return 0
+        if unit in {"mm", "ms", "次"}:
+            return 24
+        if unit == "pts":
+            return 32
+        if unit == "MHz":
+            return 36
+        if unit == "mm/min":
+            return 48
         if len(unit) <= 2:
             return 24
         if len(unit) <= 3:
-            return 32
-        return 46
+            return 36
+        return 48
 
     def _on_text_changed(self, _text: str) -> None:
         self.valueChanged.emit()
@@ -56,7 +65,7 @@ class NFSNumericField(QWidget):
 
     def set_unit(self, unit: str) -> None:
         self._unit_label.setText(unit)
-        self._unit_label.setMinimumWidth(self._unit_width(unit))
+        self._unit_label.setFixedWidth(self._unit_width(unit))
 
     def set_valid(self, valid: bool) -> None:
         state = "valid" if valid else "invalid"
