@@ -212,6 +212,52 @@ class RealtimeView(QWidget):
         self.color_bar.setVisible(visible)
         self.canvas_action_requested.emit("热力图显示" if visible else "热力图隐藏")
 
+    def clear_overlays(self) -> None:
+        """Clear temporary annotation/marker overlays without removing base layers."""
+
+        annotation_layer = self.layer_manager.ensure_layer(LayerKind.ANNOTATION)
+        marker_layer = self.layer_manager.ensure_layer(LayerKind.MARKER)
+        if hasattr(annotation_layer, "clear_items"):
+            annotation_layer.clear_items()
+        if hasattr(marker_layer, "clear_items"):
+            marker_layer.clear_items()
+        else:
+            marker_layer.build_mock()
+        self.canvas_action_requested.emit("清除覆盖")
+
+    def mock_region_align(self) -> None:
+        """Simulate ROI alignment by refreshing annotation layer."""
+
+        annotation_layer = self.layer_manager.ensure_layer(LayerKind.ANNOTATION)
+        annotation_layer.build_mock()
+        marker_layer = self.layer_manager.ensure_layer(LayerKind.MARKER)
+        marker_layer.build_mock()
+        self.canvas_action_requested.emit("区域对齐")
+        self.mini_map.update()
+
+    def set_layer_visible(self, layer_key: str, visible: bool) -> None:
+        mapping = {
+            "pcb": LayerKind.PHOTO,
+            "heatmap": LayerKind.HEATMAP,
+            "path": LayerKind.PATH,
+            "marker": LayerKind.MARKER,
+            "grid": LayerKind.ANNOTATION,
+        }
+        kind = mapping.get(layer_key)
+        if kind is None:
+            if layer_key == "minimap":
+                self.mini_map.setVisible(visible)
+            return
+        self.layer_manager.ensure_layer(kind).set_visible(visible)
+        if layer_key == "heatmap":
+            self.color_bar.setVisible(visible)
+
+    def current_tool_name(self) -> str:
+        return self._current_tool
+
+    def capture_screenshot(self, path: str) -> None:
+        self.grab().save(path)
+
     def eventFilter(self, watched, event) -> bool:
         if watched is self.canvas.viewport():
             if event.type() == QEvent.Type.Resize:

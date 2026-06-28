@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QSlider,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -55,6 +56,11 @@ class CommercialPropertyPanel(QScrollArea):
     frequency_config_applied = Signal(dict)
     display_lut_changed = Signal(str)
     scan_mode_changed = Signal(str)
+    display_opacity_changed = Signal(int)
+    layer_visibility_changed = Signal(str, bool)
+    display_reset_view_requested = Signal()
+    scan_param_template_changed = Signal(str)
+    instrument_config_saved = Signal(str)
 
     _DEBOUNCE_MS = 250
     _COMPACT_FIELD_WIDTH = 80
@@ -125,6 +131,7 @@ class CommercialPropertyPanel(QScrollArea):
         layout.setSpacing(8)
 
         layout.addWidget(self._build_region_section(page))
+        layout.addWidget(self._build_param_template_section(page))
         layout.addWidget(self._build_stats_grid(page))
         layout.addWidget(self._build_scan_settings_section(page))
         layout.addWidget(self._build_action_buttons(page))
@@ -208,6 +215,75 @@ class CommercialPropertyPanel(QScrollArea):
             grid.setColumnMinimumWidth(column, self._COMPACT_FIELD_WIDTH)
             grid.setColumnStretch(column, 1)
         return table
+
+    def _build_param_template_section(self, parent: QWidget) -> QWidget:
+        frame, frame_layout = self._section_frame(parent, "参数模板")
+        combo = QComboBox(frame)
+        combo.addItems(["快速扫描", "标准扫描", "高密度扫描"])
+        combo.currentTextChanged.connect(self._on_scan_param_template_changed)
+        self._param_template_combo = combo
+        frame_layout.addWidget(combo)
+        return frame
+
+    def _on_scan_param_template_changed(self, name: str) -> None:
+        templates = {
+            "快速扫描": {
+                "x_start": "0",
+                "y_start": "0",
+                "x_stop": "40",
+                "y_stop": "30",
+                "x_step": "10",
+                "y_step": "10",
+                "dwell_ms": "20",
+                "speed_mm_min": "800",
+            },
+            "标准扫描": {
+                "x_start": "0",
+                "y_start": "0",
+                "x_stop": "180",
+                "y_stop": "140",
+                "x_step": "2",
+                "y_step": "2",
+                "dwell_ms": "50",
+                "speed_mm_min": "600",
+            },
+            "高密度扫描": {
+                "x_start": "0",
+                "y_start": "0",
+                "x_stop": "100",
+                "y_stop": "80",
+                "x_step": "1",
+                "y_step": "1",
+                "dwell_ms": "80",
+                "speed_mm_min": "400",
+            },
+        }
+        values = templates.get(name)
+        if values is not None:
+            for key, value in values.items():
+                field = self._field_map.get(key)
+                if field is not None:
+                    field.setText(value)
+        self.scan_param_template_changed.emit(name)
+        self._emit_scan_config()
+
+    def apply_param_template(self, name: str) -> None:
+        """Public entry for toolbar param template action."""
+
+        if self._param_template_combo is not None:
+            index = self._param_template_combo.findText(name)
+            if index >= 0:
+                self._param_template_combo.setCurrentIndex(index)
+                return
+        self._on_scan_param_template_changed(name)
+
+    def focus_scan_tab(self) -> None:
+        if self._tabs is not None:
+            self._tabs.setCurrentIndex(0)
+
+    def focus_instrument_tab(self) -> None:
+        if self._tabs is not None:
+            self._tabs.setCurrentIndex(2)
 
     def _build_region_section(self, parent: QWidget) -> QWidget:
         frame, frame_layout = self._section_frame(parent, "扫描区域")
@@ -390,10 +466,35 @@ class CommercialPropertyPanel(QScrollArea):
         heatmap_checkbox.toggled.connect(self.heatmap_visibility_changed.emit)
         self._display_heatmap_checkbox = heatmap_checkbox
         lut_combo = QComboBox(frame)
-        lut_combo.addItems(list(COMMON_LUT_NAMES))
+        lut_combo.addItems(["Turbo", "Viridis", "Jet", "Gray"] + [n for n in COMMON_LUT_NAMES if n not in {"Turbo", "Viridis", "Jet", "Gray"}])
         lut_combo.currentTextChanged.connect(self.display_lut_changed.emit)
+        opacity_slider = QSlider(Qt.Orientation.Horizontal, frame)
+        opacity_slider.setRange(20, 90)
+        opacity_slider.setValue(60)
+        opacity_slider.valueChanged.connect(self.display_opacity_changed.emit)
+        self._display_opacity_slider = opacity_slider
+        layer_specs = (
+            ("pcb", "显示 PCB"),
+            ("heatmap", "显示热力图"),
+            ("path", "显示扫描路径"),
+            ("marker", "显示 Marker"),
+            ("minimap", "显示 MiniMap"),
+            ("grid", "显示网格"),
+        )
+        self._layer_checkboxes: dict[str, QCheckBox] = {}
+        for key, label in layer_specs:
+            checkbox = QCheckBox(label, frame)
+            checkbox.setChecked(True)
+            checkbox.toggled.connect(lambda checked, layer=key: self.layer_visibility_changed.emit(layer, checked))
+            self._layer_checkboxes[key] = checkbox
+            frame_layout.addWidget(checkbox)
         frame_layout.addWidget(heatmap_checkbox)
-        frame_layout.addWidget(self._labeled_row(frame, "色图", lut_combo))
+        frame_layout.addWidget(self._labeled_row(frame, "色图 LUT", lut_combo))
+        frame_layout.addWidget(self._labeled_row(frame, "透明度", opacity_slider))
+        reset_button = QPushButton("Reset View", frame)
+        reset_button.setObjectName("nfsSecondaryButton")
+        reset_button.clicked.connect(self.display_reset_view_requested.emit)
+        frame_layout.addWidget(reset_button)
         layout.addWidget(frame)
         layout.addStretch(1)
         return page
@@ -402,13 +503,71 @@ class CommercialPropertyPanel(QScrollArea):
         page = QWidget(parent)
         layout = QVBoxLayout(page)
         layout.setContentsMargins(8, 8, 16, 8)
-        frame, frame_layout = self._section_frame(page, "仪表设置")
-        device_combo = QComboBox(frame)
-        device_combo.addItems(["TCPIP-SCPI", "USB-TMC", "Mock-Spectrum"])
-        frame_layout.addWidget(self._labeled_row(frame, "设备类型", device_combo))
-        layout.addWidget(frame)
+
+        spec_frame, spec_layout = self._section_frame(page, "频谱仪 Mock 配置")
+        self._inst_start_mhz = NFSNumericField("MHz", spec_frame)
+        self._inst_start_mhz.setText("1500")
+        self._inst_stop_mhz = NFSNumericField("MHz", spec_frame)
+        self._inst_stop_mhz.setText("2000")
+        self._inst_points = NFSNumericField("pts", spec_frame)
+        self._inst_points.setText("1001")
+        self._inst_rbw = NFSNumericField("kHz", spec_frame)
+        self._inst_rbw.setText("100")
+        self._inst_trace = QComboBox(spec_frame)
+        self._inst_trace.addItems(["Trace 1", "Trace 2", "Max Hold"])
+        for caption, widget in (
+            ("起始频率", self._inst_start_mhz),
+            ("终止频率", self._inst_stop_mhz),
+            ("点数", self._inst_points),
+            ("RBW", self._inst_rbw),
+            ("Trace", self._inst_trace),
+        ):
+            spec_layout.addWidget(self._labeled_row(spec_frame, caption, widget))
+
+        cam_frame, cam_layout = self._section_frame(page, "相机 Mock 配置")
+        self._inst_resolution = QComboBox(cam_frame)
+        self._inst_resolution.addItems(["640x480", "1280x720", "1920x1080"])
+        self._inst_fps = NFSNumericField("fps", cam_frame)
+        self._inst_fps.setText("30")
+        self._inst_exposure = NFSNumericField("ms", cam_frame)
+        self._inst_exposure.setText("16")
+        for caption, widget in (
+            ("分辨率", self._inst_resolution),
+            ("帧率", self._inst_fps),
+            ("曝光", self._inst_exposure),
+        ):
+            cam_layout.addWidget(self._labeled_row(cam_frame, caption, widget))
+
+        motion_frame, motion_layout = self._section_frame(page, "运动平台 Mock 配置")
+        self._inst_port = QComboBox(motion_frame)
+        self._inst_port.addItems(["COM6", "COM7", "MOCK://"])
+        self._inst_baud = NFSNumericField("", motion_frame)
+        self._inst_baud.setText("115200")
+        self._inst_speed = NFSNumericField("mm/min", motion_frame)
+        self._inst_speed.setText("600")
+        for caption, widget in (
+            ("端口", self._inst_port),
+            ("波特率", self._inst_baud),
+            ("安全速度", self._inst_speed),
+        ):
+            motion_layout.addWidget(self._labeled_row(motion_frame, caption, widget))
+
+        save_button = QPushButton("保存 Mock 配置", page)
+        save_button.setObjectName("nfsPrimaryButton")
+        save_button.setToolTip("MOCK CONFIG ONLY — 不访问真实硬件")
+        save_button.clicked.connect(self._save_instrument_mock_config)
+        layout.addWidget(spec_frame)
+        layout.addWidget(cam_frame)
+        layout.addWidget(motion_frame)
+        layout.addWidget(save_button)
         layout.addStretch(1)
         return page
+
+    def _save_instrument_mock_config(self) -> None:
+        self.instrument_config_saved.emit(
+            f"spectrum {self._inst_start_mhz.text()}-{self._inst_stop_mhz.text()} MHz, "
+            f"camera {self._inst_resolution.currentText()}, motion {self._inst_port.currentText()}"
+        )
 
     @staticmethod
     def _labeled_row(parent: QWidget, caption: str, widget: QWidget) -> QWidget:
