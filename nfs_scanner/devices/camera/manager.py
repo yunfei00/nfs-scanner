@@ -12,7 +12,7 @@ from PySide6.QtGui import QImage
 
 from .constants import DEFAULT_FPS, DEFAULT_FOURCC, DEFAULT_HEIGHT, DEFAULT_WIDTH, SNAPSHOT_DIR_NAME
 from .enumeration import enumerate_cameras, find_default_camera
-from .models import CameraInfo, CameraProfile, CameraState
+from .models import CameraEnumerationResult, CameraInfo, CameraProfile, CameraState
 from .opencv_camera import OpenCVCameraDevice
 from .qt_image import bgr_frame_to_qimage
 from .worker import CameraWorker
@@ -32,6 +32,7 @@ class CameraManager:
         self._last_error = ""
         self._last_frame: NDArray[np.uint8] | None = None
         self._last_qimage = QImage()
+        self._last_enumeration: CameraEnumerationResult | None = None
 
     @property
     def state(self) -> CameraState:
@@ -62,11 +63,25 @@ class CameraManager:
     def list_devices(self) -> list[CameraInfo]:
         """Enumerate cameras without opening them."""
 
-        return enumerate_cameras()
+        result = enumerate_cameras()
+        self._last_enumeration = result
+        return result.devices
+
+    @property
+    def last_enumeration(self) -> CameraEnumerationResult | None:
+        return self._last_enumeration
+
+    @property
+    def enumeration_warning(self) -> str:
+        if self._last_enumeration is None:
+            return ""
+        return self._last_enumeration.warning_message
 
     def default_device(self) -> CameraInfo | None:
         """Return the preferred default camera when available."""
 
+        if self._last_enumeration is not None:
+            return find_default_camera(self._last_enumeration.devices)
         return find_default_camera(self.list_devices())
 
     def open(self, device: CameraInfo, profile: CameraProfile | None = None) -> bool:

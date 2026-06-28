@@ -71,6 +71,70 @@ ffplay -version
 
 详细命令见 [camera_ffmpeg_check.md](./camera_ffmpeg_check.md)。
 
+## 为什么 OpenCV 只能看到 Camera 0 / Camera 1
+
+OpenCV 在 Windows 下通过 DirectShow 打开相机时，API 形式是：
+
+```python
+cv2.VideoCapture(0, cv2.CAP_DSHOW)
+cv2.VideoCapture(1, cv2.CAP_DSHOW)
+```
+
+它只暴露 **数字索引**，不会直接返回 DirectShow 的友好设备名。因此如果只用 OpenCV 探测，UI 只能显示：
+
+```text
+Camera 0 (#0)
+Camera 1 (#1)
+```
+
+用户无法区分 **笔记本内置相机** 与 **外接 LRCP  F1080P**。
+
+## 为什么 Windows 下需要 FFmpeg 辅助枚举
+
+FFmpeg 的 DirectShow 列表命令：
+
+```powershell
+ffmpeg -list_devices true -f dshow -i dummy
+```
+
+会输出真实设备名与 Alternative name，例如：
+
+```text
+"Integrated Webcam"
+    Alternative name "@device_pnp_\\?\usb#vid_0bda&pid_5520&mi_00#..."
+
+"LRCP  F1080P"
+    Alternative name "@device_pnp_\\?\usb#vid_1bcf&pid_2cc8&mi_00#..."
+```
+
+NFS Scanner 在 Windows 下 **优先使用 FFmpeg 解析上述信息**，再与 OpenCV 索引按顺序配对，UI 显示格式例如：
+
+```text
+Integrated Webcam (#0, VID_0BDA&PID_5520)
+LRCP  F1080P (#1, VID_1BCF&PID_2CC8, Recommended)
+```
+
+若 FFmpeg 不可用，则回退到 OpenCV 索引枚举，并在 UI 提示：
+
+```text
+FFmpeg not found, device names unavailable.
+```
+
+## 如何区分内置相机与外接 LRCP
+
+| 设备 | DirectShow 名称 | VID/PID |
+|------|-----------------|---------|
+| 笔记本内置 | `Integrated Webcam` | `VID_0BDA&PID_5520` |
+| 外接 LRCP | `LRCP  F1080P`（双空格） | `VID_1BCF&PID_2CC8` |
+
+软件默认选中规则：
+
+1. 名称包含 `LRCP`
+2. 或 VID/PID 为 `VID_1BCF&PID_2CC8`
+3. 若都找不到，回退到 `#0`
+
+推荐始终选择 **LRCP  F1080P / VID_1BCF&PID_2CC8** 作为近场扫描外接相机。
+
 ## 如何列出相机设备
 
 ### 方式 1：FFmpeg（推荐，可看到完整 DirectShow 名称）

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
@@ -42,13 +42,15 @@ class VisionView(QWidget):
         self._worker = None
         self._preview_active = False
         self._devices_loaded = False
+        self._source_pixmap: QPixmap | None = None
         self._setup_ui()
-        self._update_controls()
+        self._sync_status()
 
     def showEvent(self, event) -> None:  # noqa: N802 - Qt API name
         if not self._devices_loaded:
             self._refresh_devices()
             self._devices_loaded = True
+        self._update_preview_layout()
         super().showEvent(event)
 
     def _setup_ui(self) -> None:
@@ -75,13 +77,14 @@ class VisionView(QWidget):
         body.setSpacing(8)
 
         controls_card = NFSCard("相机控制", self)
-        controls_card.setMaximumWidth(320)
+        controls_card.setMaximumWidth(340)
         form = QFormLayout()
         form.setContentsMargins(0, 0, 0, 0)
         form.setSpacing(8)
 
         self._device_combo = QComboBox(controls_card.body)
         self._device_combo.setObjectName("visionDeviceCombo")
+        self._device_combo.currentIndexChanged.connect(self._update_device_details)
         form.addRow("设备", self._device_combo)
 
         self._resolution_combo = QComboBox(controls_card.body)
@@ -103,6 +106,12 @@ class VisionView(QWidget):
         form.addRow("编码", self._fourcc_label)
 
         controls_card.body_layout.addLayout(form)
+
+        self._device_details = QLabel("", controls_card.body)
+        self._device_details.setObjectName("visionDeviceDetails")
+        self._device_details.setWordWrap(True)
+        self._device_details.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        controls_card.body_layout.addWidget(self._device_details)
 
         button_row = QHBoxLayout()
         self._refresh_button = NFSSecondaryButton("刷新设备", controls_card.body)
@@ -139,25 +148,55 @@ class VisionView(QWidget):
         preview_layout.setContentsMargins(0, 0, 0, 0)
         preview_layout.setSpacing(0)
 
-        scroll = QScrollArea(preview_card.body)
-        scroll.setObjectName("visionPreviewScroll")
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-        scroll.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._preview_scroll = QScrollArea(preview_card.body)
+        self._preview_scroll.setObjectName("visionPreviewScroll")
+        self._preview_scroll.setWidgetResizable(True)
+        self._preview_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        self._preview_scroll.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._preview_scroll.viewport().installEventFilter(self)
 
-        self._preview_label = QLabel(scroll)
+        self._preview_label = QLabel(self._preview_scroll)
         self._preview_label.setObjectName("visionPreviewLabel")
         self._preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._preview_label.setMinimumSize(640, 360)
         self._preview_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._preview_label.setText("尚未开始预览")
         self._preview_label.setProperty("placeholder", True)
-        scroll.setWidget(self._preview_label)
-        preview_layout.addWidget(scroll, 1)
+        self._preview_scroll.setWidget(self._preview_label)
+        preview_layout.addWidget(self._preview_scroll, 1)
         body.addWidget(preview_card, 1)
 
         root.addLayout(body, 1)
         self._device_combo.addItem("首次打开本页或点击「刷新设备」", None)
+        self._update_device_details()
+
+    def eventFilter(self, watched, event) -> bool:  # noqa: N802 - Qt API name
+        if watched is self._preview_scroll.viewport() and event.type() == QEvent.Type.Resize:
+            self._update_preview_layout()
+        return super().eventFilter(watched, event)
+
+    def _preview_target_size(self):
+        viewport = self._preview_scroll.viewport()
+        return viewport.size()
+
+    def _update_preview_layout(self) -> None:
+        target = self._preview_target_size()
+        if target.width() <= 0 or target.height() <= 0:
+            return
+        self._preview_label.setMinimumSize(target)
+        if self._source_pixmap is not None and not self._source_pixmap.isNull():
+            self._render_preview(self._source_pixmap)
+
+    def _render_preview(self, source: QPixmap) -> None:
+        target = self._preview_target_size()
+        if target.width() <= 0 or target.height() <= 0:
+            return
+        scaled = source.scaled(
+            target,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        self._preview_label.setPixmap(scaled)
 
     def _platform_hint(self) -> str:
         if sys.platform != "win32":
@@ -180,11 +219,17 @@ class VisionView(QWidget):
                 return
 
     def _refresh_devices(self) -> None:
+        self._device_combo.blockSignals(True)
         self._device_combo.clear()
         devices = self._manager.list_devices()
+        warning = self._manager.enumeration_warning
         if not devices:
             self._device_combo.addItem("未检测到相机", None)
-            self._set_message("未检测到可用相机。请检查 USB 连接或 FFmpeg/OpenCV 环境。")
+            self._device_details.setText("")
+            message = "未检测到可用相机。请检查 USB 连接或 FFmpeg/OpenCV 环境。"
+            if warning:
+                message = f"{message}\n{warning}"
+            self._set_message(message)
         else:
             default = self._manager.default_device()
             selected_index = 0
@@ -193,8 +238,20 @@ class VisionView(QWidget):
                 if default is not None and device.index == default.index and device.name == default.name:
                     selected_index = index
             self._device_combo.setCurrentIndex(selected_index)
-            self._set_message(f"已发现 {len(devices)} 个相机设备。")
+            message = f"已发现 {len(devices)} 个相机设备。"
+            if warning:
+                message = f"{message}\n{warning}"
+            self._set_message(message)
+        self._device_combo.blockSignals(False)
+        self._update_device_details()
         self._update_controls()
+
+    def _update_device_details(self) -> None:
+        device = self._selected_device()
+        if device is None:
+            self._device_details.setText("当前选择设备：\n(未选择)")
+            return
+        self._device_details.setText(device.details_text())
 
     def _selected_device(self) -> CameraInfo | None:
         data = self._device_combo.currentData()
@@ -222,13 +279,14 @@ class VisionView(QWidget):
         profile = self._selected_profile()
         if not self._manager.open(device, profile):
             self._set_error(self._manager.last_error or "打开相机失败。")
-            self._update_status(CameraState.ERROR)
+            self._sync_status()
             return
 
+        self._sync_status()
         worker = self._manager.start_preview()
         if worker is None:
             self._set_error(self._manager.last_error or "启动预览失败。")
-            self._update_status(CameraState.ERROR)
+            self._sync_status()
             return
 
         self._worker = worker
@@ -236,8 +294,9 @@ class VisionView(QWidget):
         worker.error_occurred.connect(self._on_worker_error)
         self._preview_active = True
         self._preview_label.setText("")
+        self._preview_label.setProperty("placeholder", False)
         self._set_message(f"预览中: {device.name} · {profile.resolution_label} @ {profile.fps}fps")
-        self._update_status(CameraState.PREVIEWING)
+        self._sync_status()
         self._update_controls()
 
     def _stop_preview(self) -> None:
@@ -248,9 +307,11 @@ class VisionView(QWidget):
         self._manager.stop_preview()
         self._manager.close()
         self._preview_active = False
+        self._source_pixmap = None
         if self._preview_label.pixmap() is None:
             self._preview_label.setText("预览已停止")
-        self._update_status(CameraState.DISCONNECTED)
+            self._preview_label.setProperty("placeholder", True)
+        self._sync_status()
         self._update_controls()
 
     def _take_snapshot(self) -> None:
@@ -268,16 +329,15 @@ class VisionView(QWidget):
         pixmap = QPixmap.fromImage(image)
         if pixmap.isNull():
             return
-        scaled = pixmap.scaled(
-            self._preview_label.size(),
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        )
-        self._preview_label.setPixmap(scaled)
+        self._source_pixmap = pixmap
+        self._render_preview(pixmap)
+        if self._preview_active:
+            self._sync_status()
 
     def _on_worker_error(self, message: str) -> None:
         self._set_error(message)
         self._stop_preview()
+        self._sync_status()
 
     def _set_message(self, message: str) -> None:
         self._message_label.setStyleSheet("")
@@ -291,10 +351,19 @@ class VisionView(QWidget):
         self._status_badge.setText(state.label_zh)
         self._status_badge.set_status(state.badge_status)
 
+    def _sync_status(self) -> None:
+        if self._manager.state == CameraState.ERROR:
+            self._update_status(CameraState.ERROR)
+        elif self._preview_active or self._manager.state == CameraState.PREVIEWING:
+            self._update_status(CameraState.PREVIEWING)
+        elif self._manager.state == CameraState.CONNECTED:
+            self._update_status(CameraState.CONNECTED)
+        else:
+            self._update_status(CameraState.DISCONNECTED)
+
     def _update_controls(self) -> None:
         supported = sys.platform == "win32" and CameraManager.is_supported()
-        has_device = self._selected_device() is not None
-        previewing = self._preview_active
+        previewing = self._preview_active or self._manager.state == CameraState.PREVIEWING
         for widget in (
             self._device_combo,
             self._resolution_combo,
@@ -305,24 +374,12 @@ class VisionView(QWidget):
         ):
             widget.setEnabled(supported and not previewing)
         self._stop_button.setEnabled(supported and previewing)
-        if not supported:
-            self._update_status(CameraState.DISCONNECTED)
-        elif previewing:
-            self._update_status(CameraState.PREVIEWING)
-        elif has_device:
-            self._update_status(CameraState.DISCONNECTED)
+        self._sync_status()
 
     def closeEvent(self, event) -> None:  # noqa: N802 - Qt API name
         self._stop_preview()
         super().closeEvent(event)
 
     def resizeEvent(self, event) -> None:  # noqa: N802 - Qt API name
-        pixmap = self._preview_label.pixmap()
-        if pixmap is not None and not pixmap.isNull():
-            scaled = pixmap.scaled(
-                self._preview_label.size(),
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
-            )
-            self._preview_label.setPixmap(scaled)
+        self._update_preview_layout()
         super().resizeEvent(event)

@@ -43,11 +43,42 @@ class CameraInfo:
 
     index: int
     name: str
+    alternative_name: str = ""
+    vid_pid: str = ""
+    recommended: bool = False
+    names_from_ffmpeg: bool = True
+    backend: str = "DirectShow"
 
     def display_name(self) -> str:
-        """Return a user-facing label including the DirectShow index."""
+        """Return a user-facing combo-box label."""
 
-        return f"{self.name} (#{self.index})"
+        label = f"{self.name} (#{self.index}"
+        if self.vid_pid:
+            label += f", {self.vid_pid}"
+        if self.recommended:
+            label += ", Recommended"
+        label += ")"
+        return label
+
+    def details_text(self) -> str:
+        """Return multi-line details for the selected device panel."""
+
+        lines = [
+            "当前选择设备：",
+            f"Name: {self.name}",
+            f"Index: {self.index}",
+        ]
+        if self.vid_pid:
+            lines.append(f"VID/PID: {self.vid_pid}")
+        elif self.alternative_name:
+            lines.append(f"Alternative: {self.alternative_name}")
+        else:
+            lines.append("VID/PID: (unknown)")
+        lines.append(f"Backend: {self.backend}")
+        lines.append(f"Recommended: {'Yes' if self.recommended else 'No'}")
+        if not self.names_from_ffmpeg:
+            lines.append("Note: FFmpeg names unavailable; showing OpenCV index only.")
+        return "\n".join(lines)
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,3 +93,20 @@ class CameraProfile:
     @property
     def resolution_label(self) -> str:
         return f"{self.width}x{self.height}"
+
+
+@dataclass(frozen=True, slots=True)
+class CameraEnumerationResult:
+    """Outcome of one camera enumeration pass."""
+
+    devices: list[CameraInfo]
+    ffmpeg_available: bool = False
+    used_ffmpeg_names: bool = False
+
+    @property
+    def warning_message(self) -> str:
+        if self.ffmpeg_available and self.used_ffmpeg_names:
+            return ""
+        if not self.ffmpeg_available:
+            return "FFmpeg not found, device names unavailable."
+        return ""

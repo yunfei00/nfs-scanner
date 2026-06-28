@@ -14,8 +14,12 @@ import numpy as np
 # ``nfs_scanner.devices`` during test module loading.
 import nfs_scanner.ui.commercial.views.vision_view  # noqa: F401
 
-from nfs_scanner.devices.camera.constants import DEFAULT_CAMERA_NAME, DEFAULT_FOURCC, DEFAULT_FPS
-from nfs_scanner.devices.camera.enumeration import enumerate_cameras, find_default_camera
+from nfs_scanner.devices.camera.constants import DEFAULT_CAMERA_NAME, DEFAULT_FOURCC, DEFAULT_FPS, DEFAULT_VID_PID
+from nfs_scanner.devices.camera.enumeration import (
+    _parse_ffmpeg_dshow_devices,
+    enumerate_cameras,
+    find_default_camera,
+)
 from nfs_scanner.devices.camera.manager import CameraManager
 from nfs_scanner.devices.camera.mock_camera import MockCameraDevice
 from nfs_scanner.devices.camera.models import CameraInfo, CameraProfile
@@ -58,21 +62,65 @@ class CameraUtilityTestCase(unittest.TestCase):
 
 
 class CameraEnumerationTestCase(unittest.TestCase):
+    _SAMPLE_FFMPEG_OUTPUT = """
+[dshow @ 000] DirectShow video devices (some may be both video and audio devices)
+[dshow @ 000]   "Integrated Webcam"
+[dshow @ 000]     Alternative name "@device_pnp_\\\\?\\usb#vid_0bda&pid_5520&mi_00#..."
+[dshow @ 000]   "LRCP  F1080P"
+[dshow @ 000]     Alternative name "@device_pnp_\\\\?\\usb#vid_1bcf&pid_2cc8&mi_00#..."
+[dshow @ 000] DirectShow audio devices
+[dshow @ 000]   "Microphone"
+"""
+
+    def test_parse_ffmpeg_dshow_devices(self) -> None:
+        records = _parse_ffmpeg_dshow_devices(self._SAMPLE_FFMPEG_OUTPUT)
+        self.assertEqual(len(records), 2)
+        self.assertEqual(records[0].name, "Integrated Webcam")
+        self.assertIn("vid_0bda&pid_5520", records[0].alternative_name.lower())
+        self.assertEqual(records[1].name, "LRCP  F1080P")
+        self.assertIn("vid_1bcf&pid_2cc8", records[1].alternative_name.lower())
+
     def test_enumerate_cameras_never_raises(self) -> None:
-        devices = enumerate_cameras(max_index=2)
-        self.assertIsInstance(devices, list)
-        if devices:
-            self.assertIsInstance(devices[0], CameraInfo)
+        result = enumerate_cameras(max_index=2)
+        self.assertIsInstance(result.devices, list)
+        if result.devices:
+            self.assertIsInstance(result.devices[0], CameraInfo)
 
     def test_find_default_camera_prefers_lrcp_name(self) -> None:
         devices = [
-            CameraInfo(index=0, name="Other Camera"),
-            CameraInfo(index=1, name=DEFAULT_CAMERA_NAME),
+            CameraInfo(index=0, name="Integrated Webcam", vid_pid="VID_0BDA&PID_5520"),
+            CameraInfo(index=1, name=DEFAULT_CAMERA_NAME, vid_pid=DEFAULT_VID_PID, recommended=True),
         ]
         selected = find_default_camera(devices)
         self.assertIsNotNone(selected)
         assert selected is not None
         self.assertEqual(selected.name, DEFAULT_CAMERA_NAME)
+
+    def test_find_default_camera_prefers_vid_pid(self) -> None:
+        devices = [
+            CameraInfo(index=0, name="Integrated Webcam", vid_pid="VID_0BDA&PID_5520"),
+            CameraInfo(
+                index=1,
+                name="External USB Camera",
+                vid_pid=DEFAULT_VID_PID,
+                recommended=True,
+            ),
+        ]
+        selected = find_default_camera(devices)
+        assert selected is not None
+        self.assertEqual(selected.vid_pid, DEFAULT_VID_PID)
+
+    def test_camera_info_display_name(self) -> None:
+        device = CameraInfo(
+            index=1,
+            name=DEFAULT_CAMERA_NAME,
+            vid_pid=DEFAULT_VID_PID,
+            recommended=True,
+        )
+        self.assertEqual(
+            device.display_name(),
+            f"{DEFAULT_CAMERA_NAME} (#1, {DEFAULT_VID_PID}, Recommended)",
+        )
 
 
 class CameraManagerTestCase(unittest.TestCase):

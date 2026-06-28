@@ -5,21 +5,54 @@ from __future__ import annotations
 import re
 import subprocess
 import sys
+from dataclasses import dataclass
 from typing import Iterable
 
-from .constants import DEFAULT_CAMERA_NAME
-from .models import CameraInfo
+from .constants import (
+    DEFAULT_CAMERA_NAME,
+    DEFAULT_VID_PID,
+    DEFAULT_VID_PID_TOKEN,
+)
+from .models import CameraEnumerationResult, CameraInfo
 from ._opencv_import import opencv_available, require_opencv
 
 
-_DSHOW_DEVICE_PATTERN = re.compile(r'^\s*"([^"]+)"\s*\(video\)', re.MULTILINE)
+_VID_PID_PATTERN = re.compile(r"vid_([0-9a-f]{4})&pid_([0-9a-f]{4})", re.IGNORECASE)
+_ALT_NAME_PATTERN = re.compile(r'Alternative name\s+"([^"]+)"', re.IGNORECASE)
 
 
-def _list_dshow_names_via_ffmpeg() -> list[str]:
-    """Return DirectShow video device names using FFmpeg, if available."""
+@dataclass(slots=True)
+class _DShowDeviceRecord:
+    name: str
+    alternative_name: str = ""
+
+
+def _extract_vid_pid(*parts: str) -> str:
+    """Extract ``VID_XXXX&PID_YYYY`` from DirectShow alternative names."""
+
+    for part in parts:
+        if not part:
+            continue
+        match = _VID_PID_PATTERN.search(part)
+        if match:
+            return f"VID_{match.group(1).upper()}&PID_{match.group(2).upper()}"
+    return ""
+
+
+def _is_recommended_device(name: str, alternative_name: str, vid_pid: str) -> bool:
+    if name == DEFAULT_CAMERA_NAME or "LRCP" in name.upper():
+        return True
+    if vid_pid == DEFAULT_VID_PID:
+        return True
+    combined = f"{name} {alternative_name}".lower()
+    return DEFAULT_VID_PID_TOKEN in combined
+
+
+def _run_ffmpeg_list_devices() -> tuple[bool, str]:
+    """Run FFmpeg DirectShow device listing and return stderr/stdout text."""
 
     if sys.platform != "win32":
-        return []
+        return False, ""
     try:
         completed = subprocess.run(
             [
@@ -39,10 +72,16 @@ def _list_dshow_names_via_ffmpeg() -> list[str]:
             check=False,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
-        return []
+        return False, ""
 
     text = (completed.stderr or "") + (completed.stdout or "")
-    names: list[str] = []
+    return True, text
+
+
+def _parse_ffmpeg_dshow_devices(text: str) -> list[_DShowDeviceRecord]:
+    """Parse FFmpeg DirectShow listing into video device records."""
+
+    records: list[_DShowDeviceRecord] = []
     in_video_section = False
     for line in text.splitlines():
         if "DirectShow video devices" in line:
@@ -52,14 +91,27 @@ def _list_dshow_names_via_ffmpeg() -> list[str]:
             break
         if not in_video_section:
             continue
+
         stripped = line.strip()
-        if stripped.startswith('"') and stripped.endswith('"'):
-            names.append(stripped[1:-1])
+        if not stripped:
             continue
-        match = _DSHOW_DEVICE_PATTERN.search(line)
-        if match:
-            names.append(match.group(1))
-    return names
+
+        if "Alternative name" in stripped:
+            if records:
+                alt_match = _ALT_NAME_PATTERN.search(stripped)
+                if alt_match:
+                    records[-1].alternative_name = alt_match.group(1)
+                else:
+                    alt_value = stripped.split("Alternative name", 1)[-1].strip().strip('"')
+                    if alt_value:
+                        records[-1].alternative_name = alt_value
+            continue
+
+        name_match = re.search(r'"([^"]+)"', stripped)
+        if name_match and "Alternative name" not in stripped:
+            records.append(_DShowDeviceRecord(name=name_match.group(1)))
+
+    return records
 
 
 def _probe_opencv_indices(max_index: int = 10) -> list[int]:
@@ -80,49 +132,141 @@ def _probe_opencv_indices(max_index: int = 10) -> list[int]:
     return indices
 
 
-def _merge_names_with_indices(names: Iterable[str], indices: Iterable[int]) -> list[CameraInfo]:
-    """Pair FFmpeg names with OpenCV indices in enumeration order."""
+def _build_camera_info(
+    *,
+    index: int,
+    name: str,
+    alternative_name: str = "",
+    names_from_ffmpeg: bool,
+) -> CameraInfo:
+    vid_pid = _extract_vid_pid(alternative_name, name)
+    recommended = _is_recommended_device(name, alternative_name, vid_pid)
+    return CameraInfo(
+        index=index,
+        name=name,
+        alternative_name=alternative_name,
+        vid_pid=vid_pid,
+        recommended=recommended,
+        names_from_ffmpeg=names_from_ffmpeg,
+    )
 
-    name_list = list(names)
+
+def _merge_ffmpeg_with_indices(
+    records: Iterable[_DShowDeviceRecord],
+    indices: Iterable[int],
+) -> list[CameraInfo]:
+    record_list = list(records)
     index_list = list(indices)
-    if not index_list:
-        return [CameraInfo(index=0, name=DEFAULT_CAMERA_NAME)]
+    if not record_list and not index_list:
+        return []
+
+    if record_list and not index_list:
+        index_list = list(range(len(record_list)))
 
     devices: list[CameraInfo] = []
     for position, index in enumerate(index_list):
-        if position < len(name_list):
-            devices.append(CameraInfo(index=index, name=name_list[position]))
+        if position < len(record_list):
+            record = record_list[position]
+            devices.append(
+                _build_camera_info(
+                    index=index,
+                    name=record.name,
+                    alternative_name=record.alternative_name,
+                    names_from_ffmpeg=True,
+                )
+            )
         else:
-            devices.append(CameraInfo(index=index, name=f"Camera {index}"))
+            devices.append(
+                _build_camera_info(
+                    index=index,
+                    name=f"Camera {index}",
+                    names_from_ffmpeg=False,
+                )
+            )
     return devices
 
 
-def enumerate_cameras(*, max_index: int = 10) -> list[CameraInfo]:
+def _enumerate_opencv_fallback(*, max_index: int) -> list[CameraInfo]:
+    indices = _probe_opencv_indices(max_index=max_index)
+    return [
+        _build_camera_info(
+            index=index,
+            name=f"Camera {index}",
+            names_from_ffmpeg=False,
+        )
+        for index in indices
+    ]
+
+
+def enumerate_cameras(*, max_index: int = 10) -> CameraEnumerationResult:
     """Enumerate local cameras without keeping any device open."""
 
     if sys.platform != "win32":
-        return []
+        return CameraEnumerationResult(devices=[], ffmpeg_available=False, used_ffmpeg_names=False)
 
-    names = _list_dshow_names_via_ffmpeg()
+    ffmpeg_available, ffmpeg_text = _run_ffmpeg_list_devices()
+    records = _parse_ffmpeg_dshow_devices(ffmpeg_text) if ffmpeg_available and ffmpeg_text else []
     indices = _probe_opencv_indices(max_index=max_index)
-    devices = _merge_names_with_indices(names, indices)
 
-    if not devices and names:
-        devices = [CameraInfo(index=0, name=name) for name in names]
+    if records:
+        devices = _merge_ffmpeg_with_indices(records, indices)
+        if devices:
+            return CameraEnumerationResult(
+                devices=devices,
+                ffmpeg_available=ffmpeg_available,
+                used_ffmpeg_names=True,
+            )
 
-    if not devices:
-        devices = [CameraInfo(index=0, name=DEFAULT_CAMERA_NAME)]
+    fallback_devices = _enumerate_opencv_fallback(max_index=max_index)
+    if fallback_devices:
+        return CameraEnumerationResult(
+            devices=fallback_devices,
+            ffmpeg_available=ffmpeg_available,
+            used_ffmpeg_names=False,
+        )
 
-    return devices
+    if records:
+        devices = [
+            _build_camera_info(
+                index=position,
+                name=record.name,
+                alternative_name=record.alternative_name,
+                names_from_ffmpeg=True,
+            )
+            for position, record in enumerate(records)
+        ]
+        return CameraEnumerationResult(
+            devices=devices,
+            ffmpeg_available=ffmpeg_available,
+            used_ffmpeg_names=True,
+        )
+
+    return CameraEnumerationResult(
+        devices=[
+            _build_camera_info(
+                index=0,
+                name=DEFAULT_CAMERA_NAME,
+                names_from_ffmpeg=False,
+            )
+        ],
+        ffmpeg_available=ffmpeg_available,
+        used_ffmpeg_names=False,
+    )
 
 
 def find_default_camera(devices: list[CameraInfo]) -> CameraInfo | None:
-    """Return the preferred LRCP  F1080P device when present."""
+    """Return the preferred LRCP / VID_1BCF&PID_2CC8 device when present."""
 
+    for device in devices:
+        if device.recommended:
+            return device
     for device in devices:
         if device.name == DEFAULT_CAMERA_NAME:
             return device
-    for device in devices:
-        if DEFAULT_CAMERA_NAME.replace("  ", " ") in device.name.replace("  ", " "):
+        if "LRCP" in device.name.upper():
+            return device
+        if device.vid_pid == DEFAULT_VID_PID:
+            return device
+        if DEFAULT_VID_PID_TOKEN in device.alternative_name.lower():
             return device
     return devices[0] if devices else None
