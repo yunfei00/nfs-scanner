@@ -562,7 +562,15 @@ Needs Review: yes/no
 - Impact: visual + QA PASS；Header 未改。
 - Needs Review: no
 
-### 2026-06-26 - Commercial Demo v0.4 Final Acceptance Pass
+### 2026-06-28 - Commercial Demo v0.5 Full Mock Feature Completion
+
+- Date: 2026-06-28
+- Task: commercial-demo-v0.5-full-mock-feature-completion
+- Decision: 一次性补齐商业 UI 全部可见 mock 入口（工具栏/属性页/3D/表格/Data/Report/帮助自检/统一导出）；QA mock_features 全 PASS；冻结 v0.5。
+- Reason: 用户要求完整可演示商业 Demo，不接真实设备、不微调 Header。
+- Impact: 155 tests + visual + QA PASS；MockArtifactService 统一 ~/.nfs_scanner 导出路径。
+- Needs Review: no
+
 
 - Date: 2026-06-26
 - Task: commercial-demo-v0.4-final-acceptance

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-26T22:28:05",
+  "generated_at": "2026-06-28T09:14:56",
   "default": {
     "uses_custom_title_bar": true,
     "title_bar_height": 54,
@@ -88,7 +88,7 @@
         {
           "name": "property_area_scrollable",
           "expected": "property panel scrollable",
-          "actual": "range=463",
+          "actual": "range=547",
           "passed": true
         },
         {
@@ -278,7 +278,7 @@
       {
         "name": "top_toolbar_icon_mode",
         "expected": ">= 12 toolbar actions",
-        "actual": "13",
+        "actual": "14",
         "passed": true
       },
       {
@@ -434,7 +434,7 @@
       {
         "name": "toolbar_custom_icons_used",
         "expected": "all toolbar buttons use customToolIcon",
-        "actual": "custom=13/13",
+        "actual": "custom=14/14",
         "passed": true
       },
       {
@@ -500,7 +500,7 @@
       {
         "name": "toolbar_icon_mode",
         "expected": "icon-above-text tool buttons",
-        "actual": "count=13, icon_mode=True",
+        "actual": "count=14, icon_mode=True",
         "passed": true
       },
       {
@@ -590,7 +590,7 @@
       {
         "name": "property_area_scrollable",
         "expected": "property panel scrollable",
-        "actual": "range=463",
+        "actual": "range=547",
         "passed": true
       },
       {
@@ -720,7 +720,7 @@
         {
           "name": "property_area_scrollable",
           "expected": "property panel scrollable",
-          "actual": "range=463",
+          "actual": "range=547",
           "passed": true
         },
         {
@@ -910,7 +910,7 @@
       {
         "name": "top_toolbar_icon_mode",
         "expected": ">= 12 toolbar actions",
-        "actual": "13",
+        "actual": "14",
         "passed": true
       },
       {
@@ -1066,7 +1066,7 @@
       {
         "name": "toolbar_custom_icons_used",
         "expected": "all toolbar buttons use customToolIcon",
-        "actual": "custom=13/13",
+        "actual": "custom=14/14",
         "passed": true
       },
       {
@@ -1132,7 +1132,7 @@
       {
         "name": "toolbar_icon_mode",
         "expected": "icon-above-text tool buttons",
-        "actual": "count=13, icon_mode=True",
+        "actual": "count=14, icon_mode=True",
         "passed": true
       },
       {
@@ -1222,7 +1222,7 @@
       {
         "name": "property_area_scrollable",
         "expected": "property panel scrollable",
-        "actual": "range=463",
+        "actual": "range=547",
         "passed": true
       },
       {

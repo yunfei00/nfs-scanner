@@ -1,6 +1,6 @@
 # Commercial UI Visual Report
 
-- Generated: 2026-06-26 22:28:05
+- Generated: 2026-06-28 09:14:56
 - Default screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_default.png`
 - Top header screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_top_header.png`
 - Maximized screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_maximized.png`
@@ -37,7 +37,7 @@
 | default_window_within_screen | window <= available screen | 1280x720 <= 1280x720 | PASS |
 | target_style_mode | targetStyleMode enabled | true | PASS |
 | logo_area_exists | NFS logo block visible | visible=True | PASS |
-| top_toolbar_icon_mode | >= 12 toolbar actions | 13 | PASS |
+| top_toolbar_icon_mode | >= 12 toolbar actions | 14 | PASS |
 | workflow_timeline_mode | >= 7 timeline steps | 7 | PASS |
 | right_compact_grid_form | property tabs + scan region grid/table | tabs=True, rows=1 | PASS |
 | bottom_dock_three_panel_mode | tri-panel dock visible | visible=True | PASS |
@@ -63,7 +63,7 @@
 | brand_logo_exists | NFS logo square >= 40px | logo=True, size=44x44 | PASS |
 | brand_logo_widget_used | NFSLogoWidget or brandLogoWidget property | widget=True, prop=True | PASS |
 | brand_logo_not_plain_label | logo is not a plain QLabel text block | plain_label=False | PASS |
-| toolbar_custom_icons_used | all toolbar buttons use customToolIcon | custom=13/13 | PASS |
+| toolbar_custom_icons_used | all toolbar buttons use customToolIcon | custom=14/14 | PASS |
 | toolbar_no_qt_default_icon_mode | Qt standard icons not used for toolbar actions | True | PASS |
 | auth_status_lightweight | lightweight auth label, not large chip | label_hint=84x16 | PASS |
 | brand_logo_blue_enough | brandLogoBlue property on logo tile | brandLogoBlue=True | PASS |
@@ -74,7 +74,7 @@
 | top_header_height_consistent | 48–58px | 54px | PASS |
 | toolbar_button_text_not_overlapping | visible toolbar buttons do not overlap | count=10, min_gap>=2px | PASS |
 | toolbar_caption_readable | short readable captions, width >= 56px | count=10, width=60px | PASS |
-| toolbar_icon_mode | icon-above-text tool buttons | count=13, icon_mode=True | PASS |
+| toolbar_icon_mode | icon-above-text tool buttons | count=14, icon_mode=True | PASS |
 | toolbar_no_placeholder_dots | no ellipsis placeholder buttons | 0 | PASS |
 | primary_actions_visible | connect/start/stop/export/report visible | True | PASS |
 | toolbar_primary_actions_visible | connect/start/stop visible | True | PASS |
@@ -98,7 +98,7 @@
 | property_scrollbar_width | >= 12px when visible | 14px | PASS |
 | log_scrollbar_width | >= 12px when scrollable | 14px | PASS |
 | log_area_scrollable | log content scrollable | range=6 | PASS |
-| property_area_scrollable | property panel scrollable | range=463 | PASS |
+| property_area_scrollable | property panel scrollable | range=547 | PASS |
 | device_status_scrollable_or_compact | device scroll visible when needed | width=0px | PASS |
 | wheel_interaction | wheel step changes scroll value | True | PASS |
 | handle_position_interaction | handle position can be set smoothly | True | PASS |
@@ -142,7 +142,7 @@
 | maximized_window | custom maximized == True | True | PASS |
 | target_style_mode | targetStyleMode enabled | true | PASS |
 | logo_area_exists | NFS logo block visible | visible=True | PASS |
-| top_toolbar_icon_mode | >= 12 toolbar actions | 13 | PASS |
+| top_toolbar_icon_mode | >= 12 toolbar actions | 14 | PASS |
 | workflow_timeline_mode | >= 7 timeline steps | 7 | PASS |
 | right_compact_grid_form | property tabs + scan region grid/table | tabs=True, rows=1 | PASS |
 | bottom_dock_three_panel_mode | tri-panel dock visible | visible=True | PASS |
@@ -168,7 +168,7 @@
 | brand_logo_exists | NFS logo square >= 40px | logo=True, size=44x44 | PASS |
 | brand_logo_widget_used | NFSLogoWidget or brandLogoWidget property | widget=True, prop=True | PASS |
 | brand_logo_not_plain_label | logo is not a plain QLabel text block | plain_label=False | PASS |
-| toolbar_custom_icons_used | all toolbar buttons use customToolIcon | custom=13/13 | PASS |
+| toolbar_custom_icons_used | all toolbar buttons use customToolIcon | custom=14/14 | PASS |
 | toolbar_no_qt_default_icon_mode | Qt standard icons not used for toolbar actions | True | PASS |
 | auth_status_lightweight | lightweight auth label, not large chip | label_hint=84x16 | PASS |
 | brand_logo_blue_enough | brandLogoBlue property on logo tile | brandLogoBlue=True | PASS |
@@ -179,7 +179,7 @@
 | top_header_height_consistent | 48–58px | 54px | PASS |
 | toolbar_button_text_not_overlapping | visible toolbar buttons do not overlap | count=10, min_gap>=2px | PASS |
 | toolbar_caption_readable | short readable captions, width >= 56px | count=10, width=60px | PASS |
-| toolbar_icon_mode | icon-above-text tool buttons | count=13, icon_mode=True | PASS |
+| toolbar_icon_mode | icon-above-text tool buttons | count=14, icon_mode=True | PASS |
 | toolbar_no_placeholder_dots | no ellipsis placeholder buttons | 0 | PASS |
 | primary_actions_visible | connect/start/stop/export/report visible | True | PASS |
 | toolbar_primary_actions_visible | connect/start/stop visible | True | PASS |
