@@ -51,7 +51,7 @@ class _SimDeviceAdapter:
             elif self.kind == "spectrum":
                 summary = "100 MHz - 6 GHz / RBW 100 kHz"
             elif self.kind == "camera":
-                summary = "3840x2160 / 30 fps"
+                summary = "1920x1080 / MJPEG / 30 fps"
             else:
                 summary = "Simulation device"
         return DeviceStateModel(

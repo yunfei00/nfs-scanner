@@ -4,18 +4,7 @@ from __future__ import annotations
 
 import sys
 
-from PySide6.QtCore import QEvent, Qt
-from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import (
-    QComboBox,
-    QFormLayout,
-    QHBoxLayout,
-    QLabel,
-    QScrollArea,
-    QSizePolicy,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget
 
 from nfs_scanner.devices.camera.constants import (
     DEFAULT_CAMERA_NAME,
@@ -23,13 +12,13 @@ from nfs_scanner.devices.camera.constants import (
     DEFAULT_FPS,
     DEFAULT_HEIGHT,
     DEFAULT_WIDTH,
-    FPS_OPTIONS,
-    MJPEG_RESOLUTIONS,
 )
 from nfs_scanner.devices.camera.manager import CameraManager
 from nfs_scanner.devices.camera.models import CameraInfo, CameraProfile, CameraState
 
-from ..widgets import NFSCard, NFSPrimaryButton, NFSDangerButton, NFSSecondaryButton, NFSStatusBadge
+from ..widgets import NFSStatusBadge
+from ..widgets.camera_control_panel import CameraControlPanel
+from ..widgets.camera_preview_panel import CameraPreviewPanel
 
 
 class VisionView(QWidget):
@@ -38,11 +27,11 @@ class VisionView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("visionView")
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._manager = CameraManager()
         self._worker = None
         self._preview_active = False
         self._devices_loaded = False
-        self._source_pixmap: QPixmap | None = None
         self._setup_ui()
         self._sync_status()
 
@@ -50,13 +39,12 @@ class VisionView(QWidget):
         if not self._devices_loaded:
             self._refresh_devices()
             self._devices_loaded = True
-        self._update_preview_layout()
         super().showEvent(event)
 
     def _setup_ui(self) -> None:
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
-        root.setSpacing(8)
+        root.setSpacing(6)
 
         header = QWidget(self)
         header_layout = QHBoxLayout(header)
@@ -74,129 +62,22 @@ class VisionView(QWidget):
 
         body = QHBoxLayout()
         body.setContentsMargins(8, 0, 8, 8)
-        body.setSpacing(8)
+        body.setSpacing(10)
 
-        controls_card = NFSCard("相机控制", self)
-        controls_card.setMaximumWidth(340)
-        form = QFormLayout()
-        form.setContentsMargins(0, 0, 0, 0)
-        form.setSpacing(8)
+        self._control_panel = CameraControlPanel(self)
+        self._control_panel.set_hint(self._platform_hint())
+        self._control_panel.refresh_clicked.connect(self._refresh_devices)
+        self._control_panel.start_preview_clicked.connect(self._start_preview)
+        self._control_panel.stop_preview_clicked.connect(self._stop_preview)
+        self._control_panel.snapshot_clicked.connect(self._take_snapshot)
+        self._control_panel.device_changed.connect(self._update_device_details)
+        body.addWidget(self._control_panel)
 
-        self._device_combo = QComboBox(controls_card.body)
-        self._device_combo.setObjectName("visionDeviceCombo")
-        self._device_combo.currentIndexChanged.connect(self._update_device_details)
-        form.addRow("设备", self._device_combo)
-
-        self._resolution_combo = QComboBox(controls_card.body)
-        self._resolution_combo.setObjectName("visionResolutionCombo")
-        for width, height in MJPEG_RESOLUTIONS:
-            self._resolution_combo.addItem(f"{width}x{height}", (width, height))
-        self._select_default_resolution()
-        form.addRow("分辨率", self._resolution_combo)
-
-        self._fps_combo = QComboBox(controls_card.body)
-        self._fps_combo.setObjectName("visionFpsCombo")
-        for fps in FPS_OPTIONS:
-            self._fps_combo.addItem(f"{fps} fps", fps)
-        self._select_default_fps()
-        form.addRow("帧率", self._fps_combo)
-
-        self._fourcc_label = QLabel(DEFAULT_FOURCC, controls_card.body)
-        self._fourcc_label.setObjectName("nfsMutedLabel")
-        form.addRow("编码", self._fourcc_label)
-
-        controls_card.body_layout.addLayout(form)
-
-        self._device_details = QLabel("", controls_card.body)
-        self._device_details.setObjectName("visionDeviceDetails")
-        self._device_details.setWordWrap(True)
-        self._device_details.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        controls_card.body_layout.addWidget(self._device_details)
-
-        button_row = QHBoxLayout()
-        self._refresh_button = NFSSecondaryButton("刷新设备", controls_card.body)
-        self._refresh_button.clicked.connect(self._refresh_devices)
-        button_row.addWidget(self._refresh_button)
-        controls_card.body_layout.addLayout(button_row)
-
-        action_row = QHBoxLayout()
-        self._start_button = NFSPrimaryButton("开始预览", controls_card.body)
-        self._start_button.clicked.connect(self._start_preview)
-        self._stop_button = NFSDangerButton("停止预览", controls_card.body)
-        self._stop_button.clicked.connect(self._stop_preview)
-        self._snapshot_button = NFSSecondaryButton("拍照", controls_card.body)
-        self._snapshot_button.clicked.connect(self._take_snapshot)
-        action_row.addWidget(self._start_button)
-        action_row.addWidget(self._stop_button)
-        action_row.addWidget(self._snapshot_button)
-        controls_card.body_layout.addLayout(action_row)
-
-        self._hint_label = QLabel(self._platform_hint(), controls_card.body)
-        self._hint_label.setObjectName("nfsMutedLabel")
-        self._hint_label.setWordWrap(True)
-        controls_card.body_layout.addWidget(self._hint_label)
-
-        self._message_label = QLabel("", controls_card.body)
-        self._message_label.setObjectName("nfsMutedLabel")
-        self._message_label.setWordWrap(True)
-        controls_card.body_layout.addWidget(self._message_label)
-
-        body.addWidget(controls_card)
-
-        preview_card = NFSCard("实时画面", self)
-        preview_layout = QVBoxLayout(preview_card.body)
-        preview_layout.setContentsMargins(0, 0, 0, 0)
-        preview_layout.setSpacing(0)
-
-        self._preview_scroll = QScrollArea(preview_card.body)
-        self._preview_scroll.setObjectName("visionPreviewScroll")
-        self._preview_scroll.setWidgetResizable(True)
-        self._preview_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-        self._preview_scroll.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._preview_scroll.viewport().installEventFilter(self)
-
-        self._preview_label = QLabel(self._preview_scroll)
-        self._preview_label.setObjectName("visionPreviewLabel")
-        self._preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._preview_label.setMinimumSize(640, 360)
-        self._preview_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self._preview_label.setText("尚未开始预览")
-        self._preview_label.setProperty("placeholder", True)
-        self._preview_scroll.setWidget(self._preview_label)
-        preview_layout.addWidget(self._preview_scroll, 1)
-        body.addWidget(preview_card, 1)
+        self._preview_panel = CameraPreviewPanel(self)
+        body.addWidget(self._preview_panel, 1)
 
         root.addLayout(body, 1)
-        self._device_combo.addItem("首次打开本页或点击「刷新设备」", None)
         self._update_device_details()
-
-    def eventFilter(self, watched, event) -> bool:  # noqa: N802 - Qt API name
-        if watched is self._preview_scroll.viewport() and event.type() == QEvent.Type.Resize:
-            self._update_preview_layout()
-        return super().eventFilter(watched, event)
-
-    def _preview_target_size(self):
-        viewport = self._preview_scroll.viewport()
-        return viewport.size()
-
-    def _update_preview_layout(self) -> None:
-        target = self._preview_target_size()
-        if target.width() <= 0 or target.height() <= 0:
-            return
-        self._preview_label.setMinimumSize(target)
-        if self._source_pixmap is not None and not self._source_pixmap.isNull():
-            self._render_preview(self._source_pixmap)
-
-    def _render_preview(self, source: QPixmap) -> None:
-        target = self._preview_target_size()
-        if target.width() <= 0 or target.height() <= 0:
-            return
-        scaled = source.scaled(
-            target,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        )
-        self._preview_label.setPixmap(scaled)
 
     def _platform_hint(self) -> str:
         if sys.platform != "win32":
@@ -205,98 +86,100 @@ class VisionView(QWidget):
             return "未检测到 OpenCV。请执行: pip install opencv-python"
         return f"默认设备: {DEFAULT_CAMERA_NAME} · MJPEG {DEFAULT_WIDTH}x{DEFAULT_HEIGHT} @ {DEFAULT_FPS}fps"
 
-    def _select_default_resolution(self) -> None:
-        for index in range(self._resolution_combo.count()):
-            value = self._resolution_combo.itemData(index)
-            if value == (DEFAULT_WIDTH, DEFAULT_HEIGHT):
-                self._resolution_combo.setCurrentIndex(index)
-                return
-
-    def _select_default_fps(self) -> None:
-        for index in range(self._fps_combo.count()):
-            if self._fps_combo.itemData(index) == DEFAULT_FPS:
-                self._fps_combo.setCurrentIndex(index)
-                return
+    def _current_status_label(self) -> str:
+        if self._manager.state == CameraState.ERROR:
+            return "Error"
+        if self._preview_active or self._manager.state == CameraState.PREVIEWING:
+            return "Previewing"
+        if self._manager.state == CameraState.CONNECTED:
+            return "Connected"
+        return "Disconnected"
 
     def _refresh_devices(self) -> None:
-        self._device_combo.blockSignals(True)
-        self._device_combo.clear()
+        combo = self._control_panel.device_combo
+        combo.blockSignals(True)
+        combo.clear()
         devices = self._manager.list_devices()
         warning = self._manager.enumeration_warning
         if not devices:
-            self._device_combo.addItem("未检测到相机", None)
-            self._device_details.setText("")
+            combo.addItem("未检测到相机", None)
+            self._control_panel.set_device_details("")
             message = "未检测到可用相机。请检查 USB 连接或 FFmpeg/OpenCV 环境。"
             if warning:
                 message = f"{message}\n{warning}"
-            self._set_message(message)
+            self._control_panel.set_message(message)
         else:
             default = self._manager.default_device()
             selected_index = 0
             for index, device in enumerate(devices):
-                self._device_combo.addItem(device.display_name(), device)
+                combo.addItem(device.display_name(), device)
                 if default is not None and device.index == default.index and device.name == default.name:
                     selected_index = index
-            self._device_combo.setCurrentIndex(selected_index)
+            combo.setCurrentIndex(selected_index)
             message = f"已发现 {len(devices)} 个相机设备。"
             if warning:
                 message = f"{message}\n{warning}"
-            self._set_message(message)
-        self._device_combo.blockSignals(False)
+            self._control_panel.set_message(message)
+        combo.blockSignals(False)
         self._update_device_details()
         self._update_controls()
 
     def _update_device_details(self) -> None:
         device = self._selected_device()
         if device is None:
-            self._device_details.setText("当前选择设备：\n(未选择)")
+            self._control_panel.set_device_details("当前选择设备：\n(未选择)")
             return
-        self._device_details.setText(device.details_text())
+        text = device.details_text().replace("当前选择设备：", "当前选择设备:")
+        text = f"{text}\nStatus: {self._current_status_label()}"
+        self._control_panel.set_device_details(text)
 
     def _selected_device(self) -> CameraInfo | None:
-        data = self._device_combo.currentData()
+        data = self._control_panel.device_combo.currentData()
         return data if isinstance(data, CameraInfo) else None
 
     def _selected_profile(self) -> CameraProfile:
-        width, height = self._resolution_combo.currentData()
-        fps = int(self._fps_combo.currentData())
+        width, height = self._control_panel.resolution_combo.currentData()
+        fps = int(self._control_panel.fps_combo.currentData())
         return CameraProfile(width=int(width), height=int(height), fps=fps, fourcc=DEFAULT_FOURCC)
 
     def _start_preview(self) -> None:
         if sys.platform != "win32":
-            self._set_error("当前平台不支持 DirectShow 相机预览。")
+            self._control_panel.set_message("当前平台不支持 DirectShow 相机预览。", error=True)
             return
         if not CameraManager.is_supported():
-            self._set_error("未安装 OpenCV。请执行: pip install opencv-python")
+            self._control_panel.set_message("未安装 OpenCV。请执行: pip install opencv-python", error=True)
             return
 
         device = self._selected_device()
         if device is None:
-            self._set_error("请先选择有效相机设备。")
+            self._control_panel.set_message("请先选择有效相机设备。", error=True)
             return
 
         self._stop_preview()
         profile = self._selected_profile()
         if not self._manager.open(device, profile):
-            self._set_error(self._manager.last_error or "打开相机失败。")
+            self._control_panel.set_message(self._manager.last_error or "打开相机失败。", error=True)
             self._sync_status()
+            self._update_device_details()
             return
 
         self._sync_status()
+        self._update_device_details()
         worker = self._manager.start_preview()
         if worker is None:
-            self._set_error(self._manager.last_error or "启动预览失败。")
+            self._control_panel.set_message(self._manager.last_error or "启动预览失败。", error=True)
             self._sync_status()
+            self._update_device_details()
             return
 
         self._worker = worker
         worker.frame_ready.connect(self._on_frame_ready)
         worker.error_occurred.connect(self._on_worker_error)
         self._preview_active = True
-        self._preview_label.setText("")
-        self._preview_label.setProperty("placeholder", False)
-        self._set_message(f"预览中: {device.name} · {profile.resolution_label} @ {profile.fps}fps")
+        self._preview_panel.show_placeholder("")
+        self._control_panel.set_message(f"预览中: {device.name} · {profile.resolution_label} @ {profile.fps}fps")
         self._sync_status()
+        self._update_device_details()
         self._update_controls()
 
     def _stop_preview(self) -> None:
@@ -307,45 +190,31 @@ class VisionView(QWidget):
         self._manager.stop_preview()
         self._manager.close()
         self._preview_active = False
-        self._source_pixmap = None
-        if self._preview_label.pixmap() is None:
-            self._preview_label.setText("预览已停止")
-            self._preview_label.setProperty("placeholder", True)
+        self._preview_panel.show_placeholder("预览已停止")
         self._sync_status()
+        self._update_device_details()
         self._update_controls()
 
     def _take_snapshot(self) -> None:
         if not self._preview_active and self._manager.state == CameraState.DISCONNECTED:
-            self._set_error("请先开始预览，或确保相机已连接。")
+            self._control_panel.set_message("请先开始预览，或确保相机已连接。", error=True)
             return
         path = self._manager.capture_snapshot()
         if path is None:
-            self._set_error(self._manager.last_error or "拍照失败。")
+            self._control_panel.set_message(self._manager.last_error or "拍照失败。", error=True)
             return
-        self._set_message(f"已保存: {path}")
+        self._control_panel.set_message(f"已保存: {path}")
 
     def _on_frame_ready(self, image) -> None:
         self._manager.remember_qimage(image)
-        pixmap = QPixmap.fromImage(image)
-        if pixmap.isNull():
-            return
-        self._source_pixmap = pixmap
-        self._render_preview(pixmap)
+        self._preview_panel.set_frame_image(image)
         if self._preview_active:
             self._sync_status()
+            self._update_device_details()
 
     def _on_worker_error(self, message: str) -> None:
-        self._set_error(message)
+        self._control_panel.set_message(message, error=True)
         self._stop_preview()
-        self._sync_status()
-
-    def _set_message(self, message: str) -> None:
-        self._message_label.setStyleSheet("")
-        self._message_label.setText(message)
-
-    def _set_error(self, message: str) -> None:
-        self._message_label.setProperty("error", True)
-        self._message_label.setText(message)
 
     def _update_status(self, state: CameraState) -> None:
         self._status_badge.setText(state.label_zh)
@@ -364,22 +233,9 @@ class VisionView(QWidget):
     def _update_controls(self) -> None:
         supported = sys.platform == "win32" and CameraManager.is_supported()
         previewing = self._preview_active or self._manager.state == CameraState.PREVIEWING
-        for widget in (
-            self._device_combo,
-            self._resolution_combo,
-            self._fps_combo,
-            self._refresh_button,
-            self._start_button,
-            self._snapshot_button,
-        ):
-            widget.setEnabled(supported and not previewing)
-        self._stop_button.setEnabled(supported and previewing)
+        self._control_panel.set_controls_enabled(supported=supported, previewing=previewing)
         self._sync_status()
 
     def closeEvent(self, event) -> None:  # noqa: N802 - Qt API name
         self._stop_preview()
         super().closeEvent(event)
-
-    def resizeEvent(self, event) -> None:  # noqa: N802 - Qt API name
-        self._update_preview_layout()
-        super().resizeEvent(event)

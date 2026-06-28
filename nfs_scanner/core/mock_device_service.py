@@ -17,6 +17,9 @@ def _badge_for_status(status: DeviceConnectionStatus) -> tuple[str, str]:
     return mapping.get(status, ("未知", "disconnected"))
 
 
+_CAMERA_SUMMARY = "1920x1080 / MJPEG / 30 fps"
+
+
 class MockDeviceService(DeviceServiceProtocol):
     """In-memory device registry with fake connect/disconnect actions."""
 
@@ -50,13 +53,13 @@ class MockDeviceService(DeviceServiceProtocol):
                 device_id="camera-001",
                 kind="camera",
                 display_name="相机",
-                model="USB3.0",
-                address="USB-CAM-001",
+                model="LRCP  F1080P",
+                address="DirectShow",
                 connection_status="disconnected",
                 status_label="未连接",
                 badge_status="disconnected",
-                summary="3840x2160 / 30 fps",
-                last_message="Waiting for mock connect",
+                summary=_CAMERA_SUMMARY,
+                last_message="未连接 — 请使用「相机 / 视觉」预览",
             ),
             "vna-001": DeviceSummary(
                 device_id="vna-001",
@@ -87,8 +90,8 @@ class MockDeviceService(DeviceServiceProtocol):
             summary = "100 MHz - 6 GHz / RBW 100 kHz"
             message = "Mock spectrum session opened (no VISA)"
         elif device.kind == "camera":
-            summary = "3840x2160 / 30 fps"
-            message = "Mock camera stream started (no USB capture)"
+            summary = _CAMERA_SUMMARY
+            message = "Mock camera armed — use 相机/视觉 for USB preview"
         elif device.kind == "vna":
             summary = "S11 / S21 / 100 MHz - 6 GHz"
             message = "Mock VNA trace source connected (no VISA)"
@@ -127,7 +130,7 @@ class MockDeviceService(DeviceServiceProtocol):
         elif device.kind == "spectrum":
             summary = "100 MHz - 6 GHz / RBW 100 kHz"
         elif device.kind == "camera":
-            summary = "3840x2160 / 30 fps"
+            summary = _CAMERA_SUMMARY
         elif device.kind == "vna":
             summary = "S11 / S21 mock trace source"
         updated = replace(

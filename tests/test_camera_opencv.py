@@ -166,7 +166,7 @@ class VisionViewSmokeTestCase(unittest.TestCase):
             self.assertEqual(view.objectName(), "visionView")
             view._refresh_devices()
             app.processEvents()
-            self.assertGreaterEqual(view._device_combo.count(), 1)
+            self.assertGreaterEqual(view._control_panel.device_combo.count(), 1)
         finally:
             view.close()
             app.processEvents()

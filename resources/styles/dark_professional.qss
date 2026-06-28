@@ -1168,6 +1168,46 @@ QWidget#realtimeCanvasToolbar {
     padding: 2px;
 }
 
+/* --- Camera / Vision workspace --- */
+
+QWidget#visionView {
+    background-color: transparent;
+}
+
+QWidget#cameraControlPanel,
+QScrollArea#cameraControlScroll {
+    background-color: transparent;
+    border: none;
+}
+
+QFrame#visionPreviewFrame {
+    background-color: #05080F;
+    border: 1px solid #243247;
+    border-radius: 6px;
+}
+
+QLabel#visionPreviewLabel {
+    background-color: #05080F;
+    color: #69788D;
+    border: none;
+    padding: 8px;
+}
+
+QLabel#visionPreviewLabel[placeholder="true"] {
+    color: #69788D;
+    font-size: 14px;
+}
+
+QPlainTextEdit#visionDeviceDetails {
+    background-color: #111A2B;
+    color: #CBD5E1;
+    border: 1px solid #243247;
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 12px;
+    font-family: "Consolas", "Cascadia Mono", monospace;
+}
+
 QToolButton#realtimeCanvasToolButton {
     background-color: #172235;
     border: 1px solid #243247;
