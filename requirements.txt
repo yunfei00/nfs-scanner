@@ -3,3 +3,4 @@ numpy>=2.0,<3.0
 matplotlib>=3.9,<4.0
 pyqtgraph>=0.13,<0.14
 pyvisa>=1.14,<2.0
+opencv-python>=4.10,<5.0

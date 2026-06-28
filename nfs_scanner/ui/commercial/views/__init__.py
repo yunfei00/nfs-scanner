@@ -6,6 +6,7 @@ from .device_center_view import DeviceCenterView
 from .realtime_view import RealtimeView
 from .report_view import ReportView
 from .view_3d import ThreeDView
+from .vision_view import VisionView
 
 __all__ = [
     "DataTableView",
@@ -14,4 +15,5 @@ __all__ = [
     "RealtimeView",
     "ReportView",
     "ThreeDView",
+    "VisionView",
 ]

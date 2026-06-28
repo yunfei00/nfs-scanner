@@ -55,6 +55,52 @@ Mock / Dry Run / No Hardware Control / Real Device Disabled
 
 ---
 
+## Camera / Vision（商业版可选功能）
+
+商业版 UI 提供 **相机 / 视觉** 工作区，用于 USB UVC 相机预览与拍照。这是 **可选功能**：
+
+- 启动时 **不会** 自动连接相机
+- **不会** 影响 Mock Demo、Dry Run、Mock 扫描闭环
+- 仅在用户手动点击「开始预览」后才打开设备
+
+### 启动方式
+
+```powershell
+pip install -r requirements.txt
+$env:NFS_SCANNER_UI="commercial"
+python -m nfs_scanner.main
+```
+
+启动后切换到 **相机 / 视觉** 标签页。
+
+### 默认相机参数
+
+| 参数 | 默认值 |
+|------|--------|
+| 设备名 | `LRCP  F1080P`（双空格） |
+| 编码 | MJPEG |
+| 分辨率 | 1920x1080 |
+| 帧率 | 30 fps |
+
+拍照保存目录：`outputs/camera/camera_YYYYMMDD_HHMMSS.jpg`
+
+详细说明见 [docs/camera.md](docs/camera.md) 与 [docs/camera_ffmpeg_check.md](docs/camera_ffmpeg_check.md)。
+
+### 相机测试
+
+```bash
+python -m unittest tests.test_camera_opencv -v
+```
+
+真实 USB 联调（Windows）：
+
+```powershell
+$env:NFS_SCANNER_CAMERA_TEST="1"
+python -m unittest tests.test_camera_opencv.CameraHardwareTestCase -v
+```
+
+---
+
 ## 默认旧版 UI
 
 旧版 UI 仍然保留，并且仍是默认入口：
@@ -272,6 +318,7 @@ NFS_SCANNER_REAL_DEVICES=1
 - Rohde & Schwarz ZNA67；
 - Motion Platform；
 - Camera；
+- **Camera / Vision（USB 预览，商业版可选）**；
 - Mock / Dry Run Simulator。
 
 当前商业版默认使用 Mock / Dry Run，不访问真实硬件。

@@ -204,6 +204,9 @@ cython_debug/
 # Runtime instrument discovery cache (see config/instrument_devices.example.json)
 config/instrument_devices.json
 
+# Runtime camera snapshots
+outputs/camera/
+
 # Marimo
 marimo/_static/
 marimo/_lsp/

@@ -14,6 +14,7 @@ from .views import (
     RealtimeView,
     ReportView,
     ThreeDView,
+    VisionView,
 )
 
 WORKSPACE_TABS: tuple[tuple[str, type], ...] = (
@@ -23,6 +24,7 @@ WORKSPACE_TABS: tuple[tuple[str, type], ...] = (
     ("数据表格", DataTableView),
     ("报告中心", ReportView),
     ("设备中心", DeviceCenterView),
+    ("相机 / 视觉", VisionView),
 )
 
 
@@ -35,6 +37,7 @@ class CommercialWorkspace(QWidget):
     DATA_TABLE_TAB_INDEX = 3
     REPORT_VIEW_TAB_INDEX = 4
     DEVICE_CENTER_TAB_INDEX = 5
+    VISION_TAB_INDEX = 6
 
     def __init__(
         self,
@@ -134,6 +137,14 @@ class CommercialWorkspace(QWidget):
         widget = self.tab_widget.widget(self.DEVICE_CENTER_TAB_INDEX)
         if not isinstance(widget, DeviceCenterView):
             raise RuntimeError("Device center tab is not a DeviceCenterView instance")
+        return widget
+
+    def vision_view(self) -> VisionView:
+        """Return the camera / vision workspace tab."""
+
+        widget = self.tab_widget.widget(self.VISION_TAB_INDEX)
+        if not isinstance(widget, VisionView):
+            raise RuntimeError("Vision tab is not a VisionView instance")
         return widget
 
     def bind_report_analysis(self, analysis) -> None:
