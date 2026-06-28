@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+import tempfile
 
 from PySide6.QtWidgets import QApplication, QPushButton, QToolButton
 
+from nfs_scanner.core.project import NewProjectRequest
 from nfs_scanner.core.integration_safety import is_real_device_control_allowed
 from nfs_scanner.ui.commercial.main_shell import CommercialMainShell
 
@@ -91,10 +93,17 @@ def run_v1_completion_checks(shell: CommercialMainShell) -> list[QACheck]:
     )
 
     # Project lifecycle
-    shell._on_new_project()
-    app.processEvents()
-    shell._on_save_project()
-    app.processEvents()
+    with tempfile.TemporaryDirectory() as tmp:
+        shell._on_new_project(
+            request=NewProjectRequest(
+                project_name="V1LifecycleProject",
+                base_dir=Path(tmp),
+                template="标准扫描",
+            )
+        )
+        app.processEvents()
+        shell._on_save_project()
+        app.processEvents()
     session = shell._services.project.current_session()
     project_ok = session is not None and session.storage_status == "saved"
     project_file = None

@@ -112,6 +112,11 @@ class MockAnalysisService:
         self._tasks = [task for task in self._tasks if task.task_id != task_id]
         return len(self._tasks) < before
 
+    def clear_all_tasks(self) -> None:
+        """Remove all historical tasks (empty project workspace)."""
+
+        self._tasks = []
+
     def clear_history(self) -> None:
         """Clear all mock tasks except built-in demo defaults."""
 

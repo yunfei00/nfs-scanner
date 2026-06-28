@@ -9,9 +9,11 @@ from pathlib import Path
 from PySide6.QtCore import QEvent, Qt, QTimer
 from PySide6.QtGui import QResizeEvent, QShowEvent
 from PySide6.QtWidgets import (
+    QDialog,
     QFrame,
     QHBoxLayout,
     QMainWindow,
+    QMessageBox,
     QScrollArea,
     QSizeGrip,
     QSizePolicy,
@@ -20,6 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from nfs_scanner.core.project import NewProjectRequest
 from nfs_scanner.core.artifact_service import ArtifactService
 from nfs_scanner.core.demo_session import DemoServiceBundle, DemoSessionController
 from nfs_scanner.core.mock_artifact_service import MockArtifactService
@@ -27,6 +30,7 @@ from nfs_scanner.core.mock_point_data import demo_sample_rows, export_table_json
 from nfs_scanner.core.mock_scan_runtime import MockScanRuntimeService
 
 from .demo_help_dialog import DemoHelpDialog
+from .dialogs.new_project_dialog import NewProjectDialog
 
 from .action_handlers import build_action_registry
 from .actions import CommercialActionRegistry
@@ -609,16 +613,94 @@ class CommercialMainShell(QMainWindow):
         md_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
         self.bottom_dock.append_log_line(f"Mock Self Check 完成: {md_path}", level="QA")
 
-    def _on_new_project(self) -> None:
-        session = self._services.project.new_project()
+    def _confirm_dirty_project_if_needed(self) -> bool:
+        """Prompt to save when the active project has unsaved changes."""
+
+        if not self._services.project.is_dirty:
+            return True
+        reply = QMessageBox.question(
+            self,
+            "未保存的项目",
+            "当前项目有未保存的更改。是否在新建前保存？",
+            QMessageBox.StandardButton.Save
+            | QMessageBox.StandardButton.Discard
+            | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Save,
+        )
+        if reply == QMessageBox.StandardButton.Cancel:
+            return False
+        if reply == QMessageBox.StandardButton.Save:
+            self._on_save_project()
+        return True
+
+    def _on_new_project(self, request: NewProjectRequest | None = None) -> None:
+        """Formal new project workflow with dialog, directory, and UI sync."""
+
+        if request is None:
+            if not self._confirm_dirty_project_if_needed():
+                return
+            dialog = NewProjectDialog(
+                self,
+                default_base_dir=Path.home() / ".nfs_scanner" / "projects",
+            )
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                self.bottom_dock.append_log_line("PROJECT new cancelled", level="PROJECT")
+                return
+            request = dialog.request()
+            if request is None:
+                return
+
+        try:
+            model, project_root = self._services.project.create_project(request)
+            project_file = project_root / "project.nfsproj"
+        except (ValueError, PermissionError, OSError) as error:
+            QMessageBox.warning(self, "新建项目", str(error))
+            self.bottom_dock.append_log_line(f"PROJECT new failed: {error}", level="PROJECT")
+            return
+
+        self._apply_new_project_ui(model, project_root, template=request.template)
+        self.bottom_dock.append_log_line("PROJECT new created", level="PROJECT")
+        self.bottom_dock.append_log_line("PROJECT saved", level="PROJECT")
+        self.bottom_dock.append_log_line(f"project path: {project_root}", level="PROJECT")
+
+    def _apply_new_project_ui(self, model, project_root: Path, *, template: str) -> None:
+        """Reset workspace state after a successful new project creation."""
+
         self._report_exported = False
         self._report_exported_for_task_id = None
         self._current_task_id = None
         self._selected_history_task_id = None
         self._completed_scan_registered = False
-        self.property_panel.clear_target_presentation()
-        self.bottom_dock.append_log_line(f"新建项目: {session.name}", level="PROJECT")
+        self._region_aligned = False
+
+        self.mock_scan.stop()
+        self.mock_scan.reset()
+
+        for result in self._services.device_provider.disconnect_all():
+            pass
+        self.device_status_panel.refresh_devices()
+        self.workspace.device_center_view().refresh_devices()
+
+        self.workspace.data_view().analysis_service.clear_all_tasks()
+        self.workspace.data_view().refresh_tasks()
+        self.workspace.report_view().refresh_tasks()
+        self.workspace.data_table_view().refresh_from_tasks()
+
+        self.property_panel.apply_scan_config_dict(model.scan_config)
+
+        region = self.property_panel.current_scan_region()
+        path_config = self.property_panel.current_scan_path_config()
+        self.mock_scan.configure(region, path_config)
+        self.workspace.realtime_view().update_path_preview(region, path_config)
+        self.workspace.realtime_view().clear_overlays()
+        self.property_panel.emit_current_scan_config()
+        self.bottom_dock.seed_idle_demo_stats()
+
+        session = self._services.project.current_session()
         self._refresh_project_ui()
+        if session is not None:
+            self.status_bar_widget.update_project_session(session)
+            self.status_bar_widget.update_storage_saved(str(project_root / "project.nfsproj"))
         self._sync_demo_state()
 
     def _on_open_project(self) -> None:

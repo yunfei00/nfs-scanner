@@ -7,7 +7,7 @@ from typing import Any, Literal
 from uuid import uuid4
 
 StorageStatus = Literal["unsaved", "saved"]
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = "1.0"
 
 _DEFAULT_PROJECT_NAME = "Near Field Scan Project"
 
@@ -29,9 +29,13 @@ class ProjectSession:
 class ProjectModel:
     """Full project payload persisted to project.nfsproj."""
 
-    schema_version: int = SCHEMA_VERSION
+    schema_version: str = SCHEMA_VERSION
     project_id: str = field(default_factory=lambda: f"proj-{uuid4().hex[:8]}")
     project_name: str = _DEFAULT_PROJECT_NAME
+    customer_name: str = ""
+    sample_name: str = ""
+    description: str = ""
+    project_root: str = ""
     created_at: str = ""
     updated_at: str = ""
     scan_config: dict[str, Any] = field(default_factory=dict)
@@ -49,8 +53,12 @@ class ProjectModel:
             "schema_version": self.schema_version,
             "project_id": self.project_id,
             "project_name": self.project_name,
+            "customer_name": self.customer_name,
+            "sample_name": self.sample_name,
+            "description": self.description,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
+            "project_root": self.project_root,
             "scan_config": self.scan_config,
             "display_config": self.display_config,
             "instrument_config": self.instrument_config,
@@ -64,10 +72,15 @@ class ProjectModel:
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> ProjectModel:
+        raw_version = payload.get("schema_version", SCHEMA_VERSION)
         return cls(
-            schema_version=int(payload.get("schema_version", SCHEMA_VERSION)),
+            schema_version=str(raw_version),
             project_id=str(payload.get("project_id", f"proj-{uuid4().hex[:8]}")),
             project_name=str(payload.get("project_name", _DEFAULT_PROJECT_NAME)),
+            customer_name=str(payload.get("customer_name", "")),
+            sample_name=str(payload.get("sample_name", "")),
+            description=str(payload.get("description", "")),
+            project_root=str(payload.get("project_root", "")),
             created_at=str(payload.get("created_at", "")),
             updated_at=str(payload.get("updated_at", "")),
             scan_config=dict(payload.get("scan_config") or {}),

@@ -2,14 +2,23 @@
 
 from __future__ import annotations
 
+import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from .create_request import NewProjectRequest
 from .model import ProjectModel, ProjectSession
 from .recent import RecentProjectService
 from .serializer import ProjectSerializer
+from .templates import (
+    build_scan_config_for_template,
+    default_device_config,
+    default_display_config,
+    default_instrument_config,
+)
 
 _PROJECTS_ROOT = Path.home() / ".nfs_scanner" / "projects"
 _DEMO_PROJECT_DIR = _PROJECTS_ROOT / "DemoNearFieldScan"
@@ -41,21 +50,120 @@ class ProjectService:
     def model(self) -> ProjectModel | None:
         return self._model
 
-    def new_project(self, *, name: str = _DEMO_PROJECT_NAME) -> ProjectSession:
-        safe_name = _sanitize_dir_name(name)
-        project_dir = _PROJECTS_ROOT / safe_name
+    @staticmethod
+    def sanitize_project_name(name: str) -> str:
+        """Make a filesystem-safe directory name from a project name."""
+
+        cleaned = name.strip()
+        cleaned = re.sub(r'[<>:"/\\|?*]', "_", cleaned)
+        cleaned = cleaned.replace(" ", "_")
+        cleaned = re.sub(r"_+", "_", cleaned).strip("_")
+        return cleaned or "Project"
+
+    @staticmethod
+    def make_unique_project_dir(base_dir: Path, name: str) -> Path:
+        """Return a non-existing project directory under base_dir."""
+
+        base_dir.mkdir(parents=True, exist_ok=True)
+        safe = ProjectService.sanitize_project_name(name)
+        candidate = base_dir / safe
+        if not candidate.exists():
+            return candidate
         suffix = 1
-        while project_dir.exists():
-            project_dir = _PROJECTS_ROOT / f"{safe_name}_{suffix}"
+        while (base_dir / f"{safe}_{suffix}").exists():
             suffix += 1
-        ProjectSerializer.ensure_project_structure(project_dir)
-        model = ProjectModel.default_new(name=name)
+        if suffix <= 99:
+            return base_dir / f"{safe}_{suffix}"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        return base_dir / f"{safe}_{timestamp}"
+
+    @staticmethod
+    def safe_write_json(path: Path, data: dict[str, Any]) -> None:
+        """Atomically write JSON; do not destroy existing file on failure."""
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.replace(path)
+
+    @staticmethod
+    def create_project_directories(project_root: Path) -> None:
+        ProjectSerializer.ensure_project_structure(project_root)
+
+    @staticmethod
+    def build_default_project(request: NewProjectRequest, *, project_root: Path) -> ProjectModel:
+        """Build a new ProjectModel from user request and scan template."""
+
+        now = _now_text()
+        template = request.template if request.template else "标准扫描"
+        scan_config = build_scan_config_for_template(template)
+        return ProjectModel(
+            project_name=request.project_name.strip(),
+            customer_name=request.customer_name.strip(),
+            sample_name=request.sample_name.strip(),
+            description=request.description.strip(),
+            project_root=str(project_root),
+            created_at=now,
+            updated_at=now,
+            scan_config=scan_config,
+            display_config=default_display_config(),
+            instrument_config=default_instrument_config(),
+            device_config=default_device_config(),
+            workflow_state={
+                "current_step": 1,
+                "step_1_completed": True,
+                "step_2_pending": True,
+                "scan_template": template,
+            },
+            task_index=[],
+            report_index=[],
+            export_index=[],
+            recent_ui_state={},
+        )
+
+    def write_project_file(self, project_root: Path, model: ProjectModel) -> Path:
         model.updated_at = _now_text()
-        ProjectSerializer.save(project_dir, model)
+        model.project_root = str(project_root)
+        path = ProjectSerializer.project_file_path(project_root)
+        self.safe_write_json(path, model.to_dict())
+        return path
+
+    def create_project(self, request: NewProjectRequest) -> tuple[ProjectModel, Path]:
+        """Create full project directory, project.nfsproj, and activate session."""
+
+        if not request.project_name.strip():
+            raise ValueError("项目名称不能为空")
+        base_dir = Path(request.base_dir)
+        if not base_dir.exists():
+            base_dir.mkdir(parents=True, exist_ok=True)
+        if not os_access_writable(base_dir):
+            raise PermissionError(f"保存路径不可写: {base_dir}")
+
+        project_root = self.make_unique_project_dir(base_dir, request.project_name)
+        self.create_project_directories(project_root)
+        model = self.build_default_project(request, project_root=project_root)
+        project_file = self.write_project_file(project_root, model)
+
         self._model = model
-        self._project_dir = project_dir
-        self._dirty = True
-        return self._session_from_model(model, project_dir, storage_status="unsaved")
+        self._project_dir = project_root
+        self._dirty = False
+        self._recent.record_open(
+            project_id=model.project_id,
+            project_name=model.project_name,
+            project_file=project_file,
+        )
+        return model, project_root
+
+    def new_project(self, *, name: str = _DEMO_PROJECT_NAME) -> ProjectSession:
+        """Legacy quick-new entry; prefer create_project for formal workflow."""
+
+        request = NewProjectRequest(
+            project_name=name,
+            base_dir=_PROJECTS_ROOT,
+            template="标准扫描",
+        )
+        model, project_root = self.create_project(request)
+        return self._session_from_model(model, project_root, storage_status="saved")
 
     def open_project(self, project_file: Path) -> ProjectSession:
         if not project_file.is_file():
@@ -114,7 +222,7 @@ class ProjectService:
 
     def save_as(self, *, name: str) -> Path:
         source_dir = self._require_dir()
-        safe_name = _sanitize_dir_name(name)
+        safe_name = self.sanitize_project_name(name)
         dest_dir = _PROJECTS_ROOT / safe_name
         suffix = 1
         while dest_dir.exists():
@@ -184,8 +292,6 @@ class ProjectService:
 
     def register_export(self, *, export_type: str, path: str, mark_dirty: bool = True) -> None:
         model = self._require_model()
-        from datetime import datetime
-
         model.export_index.insert(
             0,
             {
@@ -254,7 +360,11 @@ class ProjectService:
         )
 
 
-def _sanitize_dir_name(name: str) -> str:
-    cleaned = "".join(ch if ch.isalnum() or ch in ("-", "_", " ") else "_" for ch in name.strip())
-    cleaned = cleaned.replace(" ", "")
-    return cleaned or "Project"
+def os_access_writable(path: Path) -> bool:
+    try:
+        test = path / ".nfs_write_test"
+        test.write_text("ok", encoding="utf-8")
+        test.unlink(missing_ok=True)
+        return True
+    except OSError:
+        return False

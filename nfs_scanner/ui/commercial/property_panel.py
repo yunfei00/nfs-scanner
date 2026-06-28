@@ -267,6 +267,42 @@ class CommercialPropertyPanel(QScrollArea):
         self.scan_param_template_changed.emit(name)
         self._emit_scan_config()
 
+    def apply_scan_config_dict(self, scan_config: dict) -> None:
+        """Load scan region/path fields from project scan_config."""
+
+        region = scan_config.get("region") or {}
+        path = scan_config.get("path") or {}
+        values = {
+            "x_start": str(region.get("x_start", 0)),
+            "y_start": str(region.get("y_start", 0)),
+            "x_stop": str(region.get("x_stop", 100)),
+            "y_stop": str(region.get("y_stop", 100)),
+            "z_height": str(region.get("z_height", 5)),
+            "x_step": str(region.get("x_step", path.get("step_x", 5))),
+            "y_step": str(region.get("y_step", path.get("step_y", 5))),
+            "dwell_ms": str(path.get("dwell_ms", 100)),
+            "speed_mm_min": str(path.get("speed_mm_min", 600)),
+        }
+        for key, value in values.items():
+            field = self._field_map.get(key)
+            if field is not None:
+                field.setText(value)
+        mode = path.get("scan_mode", "snake")
+        if self._mode_combo is not None:
+            index = self._mode_combo.findText("Snake" if mode == "snake" else "Raster")
+            if index >= 0:
+                self._mode_combo.setCurrentIndex(index)
+        template = scan_config.get("template")
+        if template and self._param_template_combo is not None:
+            index = self._param_template_combo.findText(str(template))
+            if index >= 0:
+                self._param_template_combo.blockSignals(True)
+                self._param_template_combo.setCurrentIndex(index)
+                self._param_template_combo.blockSignals(False)
+        self.clear_target_presentation()
+        self._debounce_timer.stop()
+        self._emit_scan_config()
+
     def apply_param_template(self, name: str) -> None:
         """Public entry for toolbar param template action."""
 

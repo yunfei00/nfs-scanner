@@ -4,15 +4,15 @@ Last updated: 2026-06-28
 
 ## Current Stage
 
-**Commercial V1 — Functional Complete (Simulation Provider)**
+**Commercial V1 — New Project Complete**
 
-商业 UI 按正式商用流程实现；底层为 SimulationDeviceProvider / SimulationScanProvider。v0.5 Mock Demo 已冻结，V1 在其上正式化项目/设备/扫描/Action Registry。
+正式「新建项目」已实现：对话框 + 完整工程目录 + `project.nfsproj` 自动保存。
 
 ## Next Stage
 
-**Real Device Integration Sprint R01**（须安全评审，禁止自动进入真实控制代码）
+**Commercial V1 — Open / Save Project**（后续 Sprint，本轮未实现）
 
-规划文档：`docs/real-device-integration/`
+Real Device Integration 仍须 R01 安全评审后启动。
 
 ## Constraints
 
@@ -32,7 +32,8 @@ Last updated: 2026-06-28
 
 | Sprint | Status |
 |--------|--------|
-| Commercial V1 Functional Completion | **complete** ✅ |
+| Commercial V1 New Project | **complete** ✅ |
+| Commercial V1 (other) | active |
 | Commercial Demo v0.5 | frozen ✅ |
 | Real Device R01–R10 | **planning only** 📋 |
 | Real Motion Control | **blocked** until R01 safety review |

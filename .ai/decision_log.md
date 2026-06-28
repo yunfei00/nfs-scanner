@@ -580,6 +580,15 @@ Needs Review: yes/no
 - Impact: 155 tests + visual + QA PASS；MockArtifactService 统一 ~/.nfs_scanner 导出路径。
 - Needs Review: no
 
+### 2026-06-28 - Commercial V1 New Project
+
+- Date: 2026-06-28
+- Task: commercial-v1-project-new
+- Decision: 实现正式新建项目：NewProjectDialog + ProjectService.create_project() + 完整目录与 project.nfsproj 自动保存。
+- Reason: 用户要求新建创建真实工程而非 mock 日志；本轮不实现打开/保存大重构。
+- Impact: 扫描模板写入 scan_config；workflow/状态栏同步；未接真实设备。
+- Needs Review: no
+
 ### 2026-06-28 - Commercial V1 Functional Completion
 
 - Date: 2026-06-28

@@ -6,6 +6,9 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
 
+import tempfile
+
+from nfs_scanner.core.project import NewProjectRequest
 from nfs_scanner.core.mock_scan_runtime import MockScanRuntimeService
 from nfs_scanner.core.scan_config import ScanPathConfig, ScanRegion
 from nfs_scanner.ui.commercial.main_shell import CommercialMainShell
@@ -80,16 +83,25 @@ def run_functional_demo_flow(shell: CommercialMainShell) -> tuple[list[QACheck],
     app = QApplication.instance()
     assert app is not None
 
-    # New project
-    shell._on_new_project()
-    app.processEvents()
+    # New project (programmatic — bypass dialog)
+    with tempfile.TemporaryDirectory() as tmp:
+        shell._on_new_project(
+            request=NewProjectRequest(
+                project_name="FunctionalNewProject",
+                base_dir=Path(tmp),
+                template="标准扫描",
+            )
+        )
+        app.processEvents()
     session = shell._services.project.current_session()
     checks.append(
         _check(
             "new_project_updates_status",
             "project label reflects new session",
             shell.status_bar_widget.project_label.text(),
-            session is not None and session.name in shell.status_bar_widget.project_label.text(),
+            session is not None
+            and "FunctionalNewProject" in shell.status_bar_widget.project_label.text()
+            and session.storage_status == "saved",
         )
     )
 
