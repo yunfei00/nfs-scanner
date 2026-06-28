@@ -20,6 +20,7 @@ _SHORT_LABELS: dict[str, str] = {
     "保存项目": "保存",
     "连接设备": "连接",
     "开始扫描": "开始",
+    "暂停扫描": "暂停",
     "停止扫描": "停止",
     "拍照": "拍照",
     "区域对齐": "对齐",
@@ -31,7 +32,7 @@ _SHORT_LABELS: dict[str, str] = {
 }
 
 # Only these mock/aux actions may move into overflow.
-_OVERFLOW_SECONDARY = frozenset({"拍照", "区域对齐", "清除覆盖"})
+_OVERFLOW_SECONDARY = frozenset({"拍照", "区域对齐", "清除覆盖", "暂停扫描"})
 
 
 class CommercialToolbar(QWidget):
@@ -62,6 +63,7 @@ class CommercialToolbar(QWidget):
         self._separators: list[QFrame] = []
         self._start_scan_button: NFSIconToolButton | None = None
         self._pause_scan_button: NFSIconToolButton | None = None
+        self._pause_scan_button: NFSIconToolButton | None = None
         self._stop_scan_button: NFSIconToolButton | None = None
         self._export_button: NFSIconToolButton | None = None
         self._report_button: NFSIconToolButton | None = None
@@ -89,15 +91,16 @@ class CommercialToolbar(QWidget):
                 ("停止扫描", "停止扫描", self.scan_stop_requested.emit, {"danger": True}),
             ],
             [
-                ("拍照", "拍照", lambda: self.mock_action_requested.emit("拍照"), {"mock_disabled": True}),
-                ("区域对齐", "区域对齐", lambda: self.mock_action_requested.emit("区域对齐"), {"mock_disabled": True}),
-                ("清除覆盖", "清除覆盖", lambda: self.mock_action_requested.emit("清除覆盖"), {"mock_disabled": True}),
+                ("拍照", "拍照", lambda: self.mock_action_requested.emit("拍照"), {}),
+                ("区域对齐", "区域对齐", lambda: self.mock_action_requested.emit("区域对齐"), {}),
+                ("清除覆盖", "清除覆盖", lambda: self.mock_action_requested.emit("清除覆盖"), {}),
+                ("暂停扫描", "暂停扫描", self.scan_pause_toggle_requested.emit, {}),
             ],
             [
                 ("导出数据", "导出数据", self.export_data_requested.emit, {}),
                 ("导出报告", "导出报告", self.report_center_requested.emit, {}),
-                ("参数模板", "参数模板", lambda: self.mock_action_requested.emit("参数模板"), {"mock_disabled": True}),
-                ("帮助", "帮助", lambda: self.mock_action_requested.emit("帮助"), {"mock_disabled": True}),
+                ("参数模板", "参数模板", lambda: self.mock_action_requested.emit("参数模板"), {}),
+                ("帮助", "帮助", lambda: self.mock_action_requested.emit("帮助"), {}),
             ],
         ]
 
@@ -146,8 +149,10 @@ class CommercialToolbar(QWidget):
             if caption not in _OVERFLOW_SECONDARY:
                 continue
             action = menu.addAction(caption)
-            action.setToolTip("Mock 功能：点击写入反馈日志")
+            action.setToolTip("Mock 功能")
             action.triggered.connect(slot)
+        reset_action = menu.addAction("Reset Demo")
+        reset_action.triggered.connect(self.demo_reset_requested.emit)
         self._overflow_button.setMenu(menu)
         root.addStretch(1)
         root.addWidget(self._overflow_button)
@@ -255,6 +260,10 @@ class CommercialToolbar(QWidget):
     ) -> None:
         if self._start_scan_button is not None:
             self._start_scan_button.setEnabled(start_enabled)
+        if self._pause_scan_button is not None:
+            self._pause_scan_button.setEnabled(pause_enabled)
+            self._pause_scan_button.setText(pause_label)
+            self._pause_scan_button.setToolTip(pause_label)
         if self._stop_scan_button is not None:
             self._stop_scan_button.setEnabled(stop_enabled)
 

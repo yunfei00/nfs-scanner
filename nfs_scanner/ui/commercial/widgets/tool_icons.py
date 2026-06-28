@@ -157,6 +157,13 @@ def _draw_help(painter: QPainter, size: int, tone: str, *, disabled: bool) -> No
     painter.drawPoint(11, 15)
 
 
+def _draw_pause(painter: QPainter, size: int, tone: str, *, disabled: bool) -> None:
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(_color(tone, disabled=disabled))
+    painter.drawRect(8, 8, 3, 8)
+    painter.drawRect(13, 8, 3, 8)
+
+
 def _draw_overflow(painter: QPainter, size: int, tone: str, *, disabled: bool) -> None:
     painter.setPen(_pen(tone, disabled=disabled, width=1.8))
     painter.drawLine(7, 9, 15, 9)
@@ -170,6 +177,7 @@ _DRAWERS = {
     "save": _draw_disk,
     "connect": _draw_plug,
     "start": _draw_play,
+    "pause": _draw_pause,
     "stop": _draw_stop,
     "camera": _draw_camera,
     "align": _draw_target,
@@ -187,6 +195,7 @@ _ACTION_ICON_KEYS: dict[str, str] = {
     "保存项目": "save",
     "连接设备": "connect",
     "开始扫描": "start",
+    "暂停扫描": "pause",
     "停止扫描": "stop",
     "拍照": "camera",
     "区域对齐": "align",
