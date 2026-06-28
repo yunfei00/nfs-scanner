@@ -24,6 +24,8 @@ class DeviceSummary:
     badge_status: str
     summary: str
     last_message: str = ""
+    last_updated: str = ""
+    dry_run_enabled: bool = True
 
 
 @runtime_checkable

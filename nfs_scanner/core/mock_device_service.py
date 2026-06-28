@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import datetime
 
 from .device_service import DeviceConnectionStatus, DeviceServiceProtocol, DeviceSummary
 
@@ -17,6 +18,10 @@ def _badge_for_status(status: DeviceConnectionStatus) -> tuple[str, str]:
     return mapping.get(status, ("未知", "disconnected"))
 
 
+def _timestamp() -> str:
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
 _CAMERA_SUMMARY = "1920x1080 / MJPEG / 30 fps"
 
 
@@ -24,6 +29,7 @@ class MockDeviceService(DeviceServiceProtocol):
     """In-memory device registry with fake connect/disconnect actions."""
 
     def __init__(self) -> None:
+        now = _timestamp()
         self._devices: dict[str, DeviceSummary] = {
             "motion-001": DeviceSummary(
                 device_id="motion-001",
@@ -31,11 +37,13 @@ class MockDeviceService(DeviceServiceProtocol):
                 display_name="运动平台",
                 model="GRBL / Serial",
                 address="COM6 @ 115200",
-                connection_status="connected",
-                status_label="已连接",
-                badge_status="connected",
-                summary="X=45.20 Y=32.80 Z=5.00",
-                last_message="Mock motion platform ready",
+                connection_status="disconnected",
+                status_label="未连接",
+                badge_status="disconnected",
+                summary="X=0.00 Y=0.00 Z=0.00",
+                last_message="Simulation standby — 未连接",
+                last_updated=now,
+                dry_run_enabled=True,
             ),
             "spectrum-001": DeviceSummary(
                 device_id="spectrum-001",
@@ -47,7 +55,9 @@ class MockDeviceService(DeviceServiceProtocol):
                 status_label="未连接",
                 badge_status="disconnected",
                 summary="100 MHz - 6 GHz / RBW 100 kHz",
-                last_message="Waiting for mock connect",
+                last_message="Simulation standby — 未连接",
+                last_updated=now,
+                dry_run_enabled=True,
             ),
             "camera-001": DeviceSummary(
                 device_id="camera-001",
@@ -60,6 +70,8 @@ class MockDeviceService(DeviceServiceProtocol):
                 badge_status="disconnected",
                 summary=_CAMERA_SUMMARY,
                 last_message="未连接 — 请使用「相机 / 视觉」预览",
+                last_updated=now,
+                dry_run_enabled=True,
             ),
             "vna-001": DeviceSummary(
                 device_id="vna-001",
@@ -71,7 +83,9 @@ class MockDeviceService(DeviceServiceProtocol):
                 status_label="未连接",
                 badge_status="disconnected",
                 summary="S11 / S21 mock trace source",
-                last_message="Waiting for mock connect",
+                last_message="Simulation standby — 未连接",
+                last_updated=now,
+                dry_run_enabled=True,
             ),
         }
 
@@ -82,19 +96,19 @@ class MockDeviceService(DeviceServiceProtocol):
         device = self._require_device(device_id)
         label, badge = _badge_for_status("connected")
         summary = device.summary
-        message = f"Mock connected: {device.display_name}"
+        message = f"DEVICE {device.kind} connected (simulation)"
         if device.kind == "motion":
             summary = "X=45.20 Y=32.80 Z=5.00"
-            message = "Mock motion platform connected (no serial I/O)"
+            message = "DEVICE motion connected — DRY RUN, no serial I/O"
         elif device.kind == "spectrum":
             summary = "100 MHz - 6 GHz / RBW 100 kHz"
-            message = "Mock spectrum session opened (no VISA)"
+            message = "DEVICE spectrum connected — DRY RUN, no VISA"
         elif device.kind == "camera":
             summary = _CAMERA_SUMMARY
-            message = "Mock camera armed — use 相机/视觉 for USB preview"
+            message = "DEVICE camera connected — simulation armed, no USB open"
         elif device.kind == "vna":
             summary = "S11 / S21 / 100 MHz - 6 GHz"
-            message = "Mock VNA trace source connected (no VISA)"
+            message = "DEVICE vna connected — DRY RUN, no VISA"
         updated = replace(
             device,
             connection_status="connected",
@@ -102,6 +116,7 @@ class MockDeviceService(DeviceServiceProtocol):
             badge_status=badge,
             summary=summary,
             last_message=message,
+            last_updated=_timestamp(),
         )
         self._devices[device_id] = updated
         return updated
@@ -114,7 +129,8 @@ class MockDeviceService(DeviceServiceProtocol):
             connection_status="disconnected",
             status_label=label,
             badge_status=badge,
-            last_message=f"Mock disconnected: {device.display_name}",
+            last_message=f"DEVICE {device.kind} disconnected (simulation)",
+            last_updated=_timestamp(),
         )
         self._devices[device_id] = updated
         return updated
@@ -140,17 +156,31 @@ class MockDeviceService(DeviceServiceProtocol):
             badge_status=badge,
             summary=summary,
             last_message=f"Mock reset: {device.display_name}",
+            last_updated=_timestamp(),
         )
         self._devices[device_id] = updated
         return updated
 
     def refresh_status(self) -> list[DeviceSummary]:
+        ts = _timestamp()
         for device_id, device in list(self._devices.items()):
             self._devices[device_id] = replace(
                 device,
-                last_message=f"Mock status refreshed at {device.display_name}",
+                last_message=f"Mock status refreshed: {device.display_name}",
+                last_updated=ts,
             )
         return self.list_devices()
+
+    def refresh_device(self, device_id: str) -> DeviceSummary:
+        device = self._require_device(device_id)
+        ts = _timestamp()
+        updated = replace(
+            device,
+            last_message=f"Mock status refreshed: {device.display_name}",
+            last_updated=ts,
+        )
+        self._devices[device_id] = updated
+        return updated
 
     def update_motion_connection_state(
         self,
@@ -174,6 +204,7 @@ class MockDeviceService(DeviceServiceProtocol):
             badge_status=badge_status,
             summary=summary,
             last_message=last_message,
+            last_updated=_timestamp(),
         )
         self._devices[device_id] = updated
         return updated

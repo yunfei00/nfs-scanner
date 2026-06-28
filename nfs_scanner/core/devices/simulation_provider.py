@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from nfs_scanner.core.mock_device_service import MockDeviceService
 
 from .protocols import DeviceCommandResult, DeviceProviderProtocol, DeviceStateModel
+
+CORE_DEVICE_IDS = ("motion-001", "spectrum-001", "camera-001")
 
 
 @dataclass
@@ -97,43 +100,47 @@ class SimulationDeviceProvider(DeviceProviderProtocol):
             self._command_log = self._command_log[-200:]
 
     def connect_all(self) -> list[DeviceCommandResult]:
+        self._log("DRY RUN - NO HARDWARE CONTROL")
         results: list[DeviceCommandResult] = []
-        for device in self._mock.list_devices():
-            if device.device_id in self._adapters:
-                results.append(self._connect_one(device.device_id))
-            else:
-                updated = self._mock.connect_device(device.device_id)
-                result = DeviceCommandResult(True, updated.last_message, dry_run=True)
-                self._log(f"[DRY RUN CONNECT] {result.message}")
-                results.append(result)
+        for device_id in CORE_DEVICE_IDS:
+            if device_id in self._adapters or self._mock._devices.get(device_id):
+                results.append(self.connect_device(device_id))
         return results
 
     def disconnect_all(self) -> list[DeviceCommandResult]:
         results: list[DeviceCommandResult] = []
         for device in self._mock.list_devices():
-            if device.device_id in self._adapters:
-                results.append(self._disconnect_one(device.device_id))
-            else:
-                updated = self._mock.disconnect_device(device.device_id)
-                result = DeviceCommandResult(True, updated.last_message, dry_run=True)
-                self._log(f"[DRY RUN DISCONNECT] {result.message}")
-                results.append(result)
+            if device.device_id in CORE_DEVICE_IDS or device.device_id in self._adapters:
+                results.append(self.disconnect_device(device.device_id))
         return results
 
     def refresh_all(self) -> list[DeviceCommandResult]:
-        self._mock.refresh_status()
         results: list[DeviceCommandResult] = []
-        for adapter in self._adapters.values():
-            result = adapter.refresh()
-            self._log(f"[DRY RUN] {result.message}")
-            results.append(result)
+        for device_id in CORE_DEVICE_IDS:
+            results.append(self.refresh_device(device_id))
         return results
+
+    def connect_device(self, device_id: str) -> DeviceCommandResult:
+        return self._connect_one(device_id)
+
+    def disconnect_device(self, device_id: str) -> DeviceCommandResult:
+        return self._disconnect_one(device_id)
+
+    def refresh_device(self, device_id: str) -> DeviceCommandResult:
+        device = self._mock.refresh_device(device_id)
+        adapter = self._adapters.get(device_id)
+        if adapter is not None:
+            adapter.last_message = device.last_message
+        result = DeviceCommandResult(True, device.last_message, dry_run=True)
+        self._log(f"[DRY RUN REFRESH] {result.message}")
+        return result
 
     def test_connection(self, device_id: str) -> DeviceCommandResult:
         adapter = self._require(device_id)
         result = adapter.test_connection()
+        self._mock.refresh_device(device_id)
         self._log(f"[DRY RUN TEST] {result.message}")
-        return result
+        return DeviceCommandResult(True, result.message, dry_run=True)
 
     def configure(self, device_id: str, config: dict) -> DeviceCommandResult:
         adapter = self._require(device_id)
@@ -145,21 +152,21 @@ class SimulationDeviceProvider(DeviceProviderProtocol):
         return [a.to_state() for a in self._adapters.values()]
 
     def _connect_one(self, device_id: str) -> DeviceCommandResult:
-        self._mock.connect_device(device_id)
-        adapter = self._require(device_id)
-        device = next(d for d in self._mock.list_devices() if d.device_id == device_id)
-        adapter.connected = True
-        adapter.last_message = device.last_message
+        device = self._mock.connect_device(device_id)
+        adapter = self._adapters.get(device_id)
+        if adapter is not None:
+            adapter.connected = True
+            adapter.last_message = device.last_message
         result = DeviceCommandResult(True, device.last_message, dry_run=True)
         self._log(f"[DRY RUN CONNECT] {result.message}")
         return result
 
     def _disconnect_one(self, device_id: str) -> DeviceCommandResult:
-        self._mock.disconnect_device(device_id)
-        adapter = self._require(device_id)
-        device = next(d for d in self._mock.list_devices() if d.device_id == device_id)
-        adapter.connected = False
-        adapter.last_message = device.last_message
+        device = self._mock.disconnect_device(device_id)
+        adapter = self._adapters.get(device_id)
+        if adapter is not None:
+            adapter.connected = False
+            adapter.last_message = device.last_message
         result = DeviceCommandResult(True, device.last_message, dry_run=True)
         self._log(f"[DRY RUN DISCONNECT] {result.message}")
         return result

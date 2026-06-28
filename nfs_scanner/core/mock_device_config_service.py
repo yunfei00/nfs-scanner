@@ -56,18 +56,55 @@ class MockDeviceConfigService:
     def save_all_to_json(self) -> Path:
         """Persist current mock configs to ~/.nfs_scanner/mock_exports/config/."""
 
-        payload = {
-            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "mock_only": True,
-            "motion": {key: asdict(value) for key, value in self._motion.items()},
-            "spectrum": {key: asdict(value) for key, value in self._spectrum.items()},
-            "camera": {key: asdict(value) for key, value in self._camera.items()},
-        }
+        payload = self.export_project_payload()
         filename = MockArtifactService.build_filename(
             artifact_type="mock_device_config",
             extension="json",
         )
         return MockArtifactService.export_json("config", filename, payload)
+
+    def export_project_payload(self) -> dict[str, object]:
+        """Serialize all device configs for project.nfsproj persistence."""
+
+        return {
+            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "mock_only": True,
+            "simulation_mode": True,
+            "real_device_enabled": False,
+            "motion": {key: asdict(value) for key, value in self._motion.items()},
+            "spectrum": {key: asdict(value) for key, value in self._spectrum.items()},
+            "camera": {key: asdict(value) for key, value in self._camera.items()},
+        }
+
+    def import_project_payload(self, payload: dict[str, object] | None) -> None:
+        """Restore device configs from a project file without connecting hardware."""
+
+        if not payload:
+            return
+        for device_id, raw in (payload.get("motion") or {}).items():
+            if isinstance(raw, dict):
+                self.set_motion(device_id, MotionDeviceConfig(**self._motion_fields(raw)))
+        for device_id, raw in (payload.get("spectrum") or {}).items():
+            if isinstance(raw, dict):
+                self.set_spectrum(device_id, SpectrumDeviceConfig(**self._spectrum_fields(raw)))
+        for device_id, raw in (payload.get("camera") or {}).items():
+            if isinstance(raw, dict):
+                self.set_camera(device_id, CameraDeviceConfig(**self._camera_fields(raw)))
+
+    @staticmethod
+    def _motion_fields(raw: dict[str, object]) -> dict[str, object]:
+        allowed = {"port", "baudrate", "protocol", "timeout", "connection_mode"}
+        return {key: raw[key] for key in allowed if key in raw}
+
+    @staticmethod
+    def _spectrum_fields(raw: dict[str, object]) -> dict[str, object]:
+        allowed = {"resource", "ip", "port", "model"}
+        return {key: raw[key] for key in allowed if key in raw}
+
+    @staticmethod
+    def _camera_fields(raw: dict[str, object]) -> dict[str, object]:
+        allowed = {"camera_index", "resolution", "fps"}
+        return {key: raw[key] for key in allowed if key in raw}
 
     def summary_for_device(self, device_id: str, kind: str) -> str:
         if kind == "motion":
