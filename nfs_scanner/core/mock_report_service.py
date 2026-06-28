@@ -8,6 +8,7 @@ from typing import Any
 
 from .mock_analysis_service import MockAnalysisService
 from .mock_project_service import MockProjectService
+from .project import ProjectService
 
 _DEFAULT_REPORT_DIR = Path.home() / ".nfs_scanner" / "reports"
 
@@ -18,7 +19,7 @@ class MockReportService:
     def __init__(
         self,
         analysis: MockAnalysisService,
-        project: MockProjectService | None = None,
+        project: MockProjectService | ProjectService | None = None,
     ) -> None:
         self._analysis = analysis
         self._project = project
