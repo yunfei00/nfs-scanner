@@ -39,7 +39,7 @@ def _render_markdown(result: QAResult) -> str:
     else:
         lines.append("- (none)")
 
-    for category in ("startup", "visual", "functional", "interaction", "safety", "external"):
+    for category in ("startup", "visual", "functional", "mock_features", "interaction", "safety", "external"):
         section_checks = [item for item in result.checks if item.category == category]
         if not section_checks:
             continue

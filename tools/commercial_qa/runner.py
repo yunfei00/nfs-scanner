@@ -16,6 +16,7 @@ from nfs_scanner.ui.commercial.main_shell import CommercialMainShell
 from .auto_fix import apply_runtime_mitigations, has_blocked_failures
 from .acceptance import run_acceptance_checks
 from .functional import run_functional_demo_flow
+from .mock_features import run_mock_feature_checks
 from .models import QACheck, QAResult
 from .report import write_qa_reports
 from .safety import run_static_safety_checks, verify_dry_run_only, verify_no_real_spectrum_camera
@@ -94,14 +95,19 @@ def _capture_view_screenshots(shell: CommercialMainShell, app: QApplication) -> 
         "device_center": shell.workspace.DEVICE_CENTER_TAB_INDEX,
         "data_view": shell.workspace.DATA_VIEW_TAB_INDEX,
         "report_center": shell.workspace.REPORT_VIEW_TAB_INDEX,
+        "three_d_view": shell.workspace.THREE_D_TAB_INDEX,
+        "data_table": shell.workspace.DATA_TABLE_TAB_INDEX,
     }
     paths: dict[str, str] = {}
     for name, tab_index in mapping.items():
         shell.workspace.switch_to_tab(tab_index)
         app.processEvents()
         path = SCREENSHOT_DIR / f"{name}.png"
+        final_path = SCREENSHOT_DIR / f"{name}_final.png"
         _save_screenshot(shell, path)
+        _save_screenshot(shell, final_path)
         paths[name] = path.as_posix()
+        paths[f"{name}_final"] = final_path.as_posix()
     shell.workspace.switch_to_tab(shell.workspace.REALTIME_TAB_INDEX)
     app.processEvents()
     return paths
@@ -205,7 +211,28 @@ def run_commercial_qa(*, include_external: bool = True, round_number: int = 1) -
         acceptance_checks = run_acceptance_checks(shell)
         result.checks.extend(acceptance_checks)
 
-        reset_path = SCREENSHOT_DIR / "reset_demo.png"
+        mock_feature_checks = run_mock_feature_checks(shell)
+        result.checks.extend(mock_feature_checks)
+
+        shell.property_panel._tabs.setCurrentIndex(1)
+        app.processEvents()
+        display_path = SCREENSHOT_DIR / "display_settings_final.png"
+        _save_screenshot(shell, display_path)
+        result.screenshots["display_settings_final"] = display_path.as_posix()
+
+        shell.property_panel._tabs.setCurrentIndex(2)
+        app.processEvents()
+        instrument_path = SCREENSHOT_DIR / "instrument_settings_final.png"
+        _save_screenshot(shell, instrument_path)
+        result.screenshots["instrument_settings_final"] = instrument_path.as_posix()
+
+        shell._run_mock_self_check()
+        app.processEvents()
+        self_check_path = SCREENSHOT_DIR / "self_check_final.png"
+        _save_screenshot(shell, self_check_path)
+        result.screenshots["self_check_final"] = self_check_path.as_posix()
+
+        reset_path = SCREENSHOT_DIR / "reset_demo_final.png"
         _save_screenshot(shell, reset_path)
         result.screenshots["reset_demo"] = reset_path.as_posix()
 

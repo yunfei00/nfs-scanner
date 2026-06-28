@@ -1,6 +1,6 @@
 # Commercial Demo QA Report
 
-- Generated: 2026-06-26 22:26:55
+- Generated: 2026-06-28 09:13:55
 - Round: 1
 - Overall: **PASS**
 
@@ -10,10 +10,21 @@
 - `top_header`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/top_header.png`
 - `commercial_top_header`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/commercial_top_header.png`
 - `realtime_view`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/realtime_view.png`
+- `realtime_view_final`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/realtime_view_final.png`
 - `device_center`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/device_center.png`
+- `device_center_final`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/device_center_final.png`
 - `data_view`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/data_view.png`
+- `data_view_final`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/data_view_final.png`
 - `report_center`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/report_center.png`
-- `reset_demo`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/reset_demo.png`
+- `report_center_final`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/report_center_final.png`
+- `three_d_view`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/three_d_view.png`
+- `three_d_view_final`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/three_d_view_final.png`
+- `data_table`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/data_table.png`
+- `data_table_final`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/data_table_final.png`
+- `display_settings_final`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/display_settings_final.png`
+- `instrument_settings_final`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/instrument_settings_final.png`
+- `self_check_final`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/self_check_final.png`
+- `reset_demo`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/reset_demo_final.png`
 - `stopped_scan`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/stopped_scan.png`
 - `reset_after_report`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/reset_after_report.png`
 - `button_state_matrix`: `D:/code_2026/nfs-scanner/.ai/qa/latest/screenshots/button_state_matrix.png`
@@ -58,7 +69,7 @@
 | maximized_canvas_wider_than_right_panel | workspace > right panel | 676px > 350px | PASS |
 | maximized_bottom_dock_height | >= 200px | 200px | PASS |
 | maximized_log_view_height | >= 100px | 140px | PASS |
-| maximized_log_visible_lines | >= 6 visible lines | estimated=16 | PASS |
+| maximized_log_visible_lines | >= 6 visible lines | estimated=44 | PASS |
 | maximized_statistics_panel_height | >= 100px | 192px | PASS |
 | maximized_status_bar_visible | status bar visible | True | PASS |
 | maximized_maximized_window_capture | custom maximized == True | True | PASS |
@@ -81,12 +92,32 @@
 | stop_scan_stopped | runtime status == stopped | stopped | PASS |
 | scan_completes_or_stops | runtime status completed or stopped | completed | PASS |
 | data_view_mock_task | data view lists mock scan tasks | 3 | PASS |
-| data_view_export_mock_json | data export creates mock json | C:\Users\yunfei\.nfs_scanner\mock_exports\data\mock_data_mock-ef1e1d0d_20260626_222658.json | PASS |
+| data_view_export_mock_json | data export creates mock json | C:\Users\yunfei\.nfs_scanner\mock_exports\data\mock_data_demo_mock-32901625_20260628_091358.json | PASS |
 | report_center_preview | report preview populated | Demo Near Field Scan | PASS |
-| mock_report_export | markdown/txt report file created | C:\Users\yunfei\.nfs_scanner\reports\report_mock-ef1e1d0d_20260626_222658.md | PASS |
+| mock_report_export | markdown/txt report file created | C:\Users\yunfei\.nfs_scanner\reports\report_mock-32901625_20260628_091358.md | PASS |
 | mock_report_multi_format_export | html/pdf/png mock report files created | .html, .pdf, .png | PASS |
 | mock_self_check_report | local mock self-check report created | .ai\qa\latest\commercial_mock_self_check.json | PASS |
 | reset_demo_restores_state | runtime idle and demo reset applied | status=configured, tasks 3->2 | PASS |
+
+## Mock_Features — PASS
+
+| Check | Expected | Actual | Status |
+|-------|----------|--------|--------|
+| toolbar_photo_feedback | snapshot path logged | True | PASS |
+| toolbar_region_align | region aligned | True | PASS |
+| toolbar_clear_overlay | clear overlays invoked | ok | PASS |
+| property_scan_template | scan template applied | 快速扫描 | PASS |
+| property_instrument_config | instrument config saved | saved | PASS |
+| tab_three_d_view_non_empty | view has content | three_d_view | PASS |
+| tab_data_table_view_non_empty | view has content | data_table_view | PASS |
+| display_opacity_applied | opacity changed | 45 | PASS |
+| data_table_csv_export | csv export path emitted | exported | PASS |
+| report_center_preview_available | preview populated | Demo Near Field Scan | PASS |
+| self_check_runnable | self check json exists | .ai/qa/latest/commercial_mock_self_check.json | PASS |
+| functional_mock_features | scan completes after mock feature checks | completed | PASS |
+| all_visible_actions_have_feedback | toolbar actions tested | 12 | PASS |
+| all_tabs_non_empty | 3d and table checked | ok | PASS |
+| all_exports_created | photo + table export | ok | PASS |
 
 ## Interaction — PASS
 
@@ -97,8 +128,8 @@
 | left_scrollbar_width | >= 12px when visible | 14px | PASS |
 | property_scrollbar_width | >= 12px when visible | 14px | PASS |
 | log_scrollbar_width | >= 12px when scrollable | 14px | PASS |
-| log_area_scrollable | log content scrollable | range=11 | PASS |
-| property_area_scrollable | property panel scrollable | range=463 | PASS |
+| log_area_scrollable | log content scrollable | range=39 | PASS |
+| property_area_scrollable | property panel scrollable | range=176 | PASS |
 | device_status_scrollable_or_compact | device scroll visible when needed | width=0px | PASS |
 | wheel_interaction | wheel step changes scroll value | True | PASS |
 | handle_position_interaction | handle position can be set smoothly | True | PASS |
