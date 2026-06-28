@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from nfs_scanner.core.mock_analysis_service import MockAnalysisService, MockScanTaskRecord
+from nfs_scanner.core.mock_artifact_service import MockArtifactService
 
 from ..lut_presets import COMMON_LUT_NAMES
 from ..scroll_helpers import configure_abstract_scroll_area
@@ -141,7 +142,13 @@ class DataView(QWidget):
         toolbar_layout.addWidget(self._lut_combo)
         export_button = NFSSecondaryButton("导出数据", toolbar)
         export_button.clicked.connect(self.export_selected_task)
+        delete_button = NFSSecondaryButton("删除任务", toolbar)
+        delete_button.clicked.connect(self.delete_selected_task)
+        clear_button = NFSSecondaryButton("清空历史", toolbar)
+        clear_button.clicked.connect(self.clear_history_tasks)
         toolbar_layout.addWidget(export_button)
+        toolbar_layout.addWidget(delete_button)
+        toolbar_layout.addWidget(clear_button)
         toolbar_layout.addStretch(1)
 
         summary_card = NFSCard("分析摘要", analysis_column)
@@ -152,7 +159,11 @@ class DataView(QWidget):
             ("point_count", "点数"),
             ("peak_frequency", "峰值频率"),
             ("peak_amplitude", "峰值幅度"),
+            ("min_amplitude", "最小幅度"),
+            ("max_amplitude", "最大幅度"),
             ("mean_amplitude", "平均幅度"),
+            ("scan_area", "扫描面积"),
+            ("path_length", "路径长度"),
             ("heatmap_grid", "热力图网格"),
         ):
             label_widget = QLabel(label, summary_card.body)
@@ -215,7 +226,11 @@ class DataView(QWidget):
             "point_count": str(summary.point_count),
             "peak_frequency": summary.peak_frequency,
             "peak_amplitude": summary.peak_amplitude,
+            "min_amplitude": "-68.2 dBm",
+            "max_amplitude": summary.peak_amplitude,
             "mean_amplitude": summary.mean_amplitude,
+            "scan_area": f"{task.area_mm2:.1f} mm²",
+            "path_length": f"{max(task.point_count, 1) * 2} mm (mock)",
             "heatmap_grid": summary.heatmap_grid,
         }
         for key, label in self._summary_labels.items():
@@ -242,10 +257,13 @@ class DataView(QWidget):
         if task is None:
             self.status_message.emit("EXPORT", f"Unknown mock data task: {task_id}")
             return None
-        output_dir = Path.home() / ".nfs_scanner" / "mock_exports" / "data"
-        output_dir.mkdir(parents=True, exist_ok=True)
+        output_dir = MockArtifactService.category_dir("data")
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        path = output_dir / f"mock_data_{task.task_id}_{timestamp}.json"
+        path = output_dir / MockArtifactService.build_filename(
+            artifact_type="mock_data",
+            task_id=task.task_id,
+            extension="json",
+        )
         payload = {
             "task_id": task.task_id,
             "name": task.name,
@@ -261,3 +279,22 @@ class DataView(QWidget):
         self.data_exported.emit(str(path))
         self.status_message.emit("EXPORT", f"Mock data exported: {path}")
         return path
+
+    def delete_selected_task(self) -> None:
+        if self._task_list is None:
+            return
+        item = self._task_list.currentItem()
+        if item is None:
+            self.status_message.emit("DATA", "未选择任务")
+            return
+        task_id = str(item.data(Qt.ItemDataRole.UserRole))
+        if self._analysis_service.delete_task(task_id):
+            self.refresh_tasks()
+            self.status_message.emit("DATA", f"已删除 Mock 任务: {task_id}")
+        else:
+            self.status_message.emit("DATA", f"无法删除任务: {task_id}")
+
+    def clear_history_tasks(self) -> None:
+        self._analysis_service.clear_history()
+        self.refresh_tasks()
+        self.status_message.emit("DATA", "Mock 历史任务已恢复为默认 Demo 集")
