@@ -93,6 +93,11 @@ class ReportView(QWidget):
         self._task_combo = QComboBox(toolbar)
         self._task_combo.currentIndexChanged.connect(self._refresh_preview)
         toolbar_layout.addWidget(self._task_combo, 1)
+        toolbar_layout.addWidget(QLabel("模板", toolbar))
+        self._template_combo = QComboBox(toolbar)
+        self._template_combo.addItems(["简洁版", "标准版", "客户交付版"])
+        self._template_combo.currentTextChanged.connect(self._refresh_preview)
+        toolbar_layout.addWidget(self._template_combo)
         generate_button = QPushButton("生成报告", toolbar)
         generate_button.setObjectName("nfsSecondaryButton")
         generate_button.clicked.connect(self._generate_report)
@@ -123,7 +128,8 @@ class ReportView(QWidget):
             ("path_length", "路径长度"),
             ("peak_frequency", "峰值频率"),
             ("peak_amplitude", "峰值幅度"),
-            ("safety_mode", "安全模式"),
+            ("risk_points", "风险/峰值点"),
+            ("safety_mode", "安全声明"),
         ):
             label_widget = QLabel(label, preview_card.body)
             label_widget.setObjectName("nfsMutedLabel")
@@ -155,12 +161,14 @@ class ReportView(QWidget):
 
     def _refresh_preview(self) -> None:
         task_id = self._current_task_id()
+        template = self._template_combo.currentText() if self._template_combo is not None else "标准版"
         if task_id is None:
-            return
-        try:
-            preview = self._report_service.build_preview(task_id)
-        except KeyError:
-            return
+            preview = self._report_service.build_demo_preview()
+        else:
+            try:
+                preview = self._report_service.build_preview(task_id)
+            except KeyError:
+                preview = self._report_service.build_demo_preview()
 
         scan = preview["scan"]
         project = preview["project"]
@@ -174,6 +182,7 @@ class ReportView(QWidget):
             "path_length": str(scan.get("path_length", "-")),
             "peak_frequency": str(scan.get("peak_frequency", "-")),
             "peak_amplitude": str(scan.get("peak_amplitude", "-")),
+            "risk_points": f"Peak @ {scan.get('peak_frequency', '-')} / {scan.get('peak_amplitude', '-')}",
             "safety_mode": "MOCK / DRY RUN / NO HARDWARE CONTROL",
         }
         for key, label in self._preview_labels.items():
@@ -189,7 +198,7 @@ class ReportView(QWidget):
             self._spectrum_widget.set_view_mode("frequency")
 
         if self._status_label is not None:
-            self._status_label.setText(f"预览生成于 {preview.get('generated_at', '')}")
+            self._status_label.setText(f"预览生成于 {preview.get('generated_at', '')} · 模板 {template}")
 
     def _generate_report(self) -> None:
         task_id = self._current_task_id()
@@ -204,10 +213,7 @@ class ReportView(QWidget):
         self.status_message.emit("REPORT", f"Mock report ready: {task_id}")
 
     def _export_report(self, file_format: str = "md") -> None:
-        task_id = self._current_task_id()
-        if task_id is None:
-            self.status_message.emit("REPORT", "No mock report task selected")
-            return
+        task_id = self._current_task_id() or "demo-sample"
         path = self._report_service.export_mock_report(task_id, file_format=file_format)
         path_text = str(path)
         self.report_exported.emit(path_text)
