@@ -616,6 +616,15 @@ Needs Review: yes/no
 - Impact: 验收报告写入 `.ai/reviews/commercial_v1_project_lifecycle_acceptance.md`；Real Device Sprint 仍未启动。
 - Needs Review: no
 
+### 2026-06-28 - Commercial V1 Device Lifecycle Simulation-Only
+
+- Date: 2026-06-28
+- Task: commercial-v1-device-lifecycle-acceptance
+- Decision: 设备连接/断开/刷新/配置/测试连接全部走 `SimulationDeviceProvider`；移除 Device Center 对 `HardwareModePanel` 的依赖；顶部【连接】不再分支真实硬件；无项目时仍可 Simulation 连接并提示建议新建项目；打开项目恢复 `device_config` 但不自动连硬件。
+- Reason: V1 验收要求正式 UI 流程 + Dry Run，禁止真实 I/O。
+- Impact: Device Center / 仪表设置 / 左侧状态 / Workflow 第 2 步 / project dirty / Dry Run Log 可 QA 验证；真实 Provider 后续替换即可。
+- Needs Review: no
+
 
 - Date: 2026-06-26
 - Task: commercial-demo-v0.4-final-acceptance
