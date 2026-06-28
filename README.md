@@ -73,17 +73,21 @@ NFS_SCANNER_UI=commercial
 
 ## 当前状态
 
-当前主线已经具备 **商业版 Mock Demo v0.5**（全功能 mock 补齐）：
+**Commercial Demo v0.5 已冻结**（Mock Feature Complete）。
+
+冻结文档：`.ai/releases/commercial_demo_v0_5_freeze.md`  
+Git tag：`commercial-demo-v0.5`
 
 ```text
-全部工具栏/Tab/属性页/导出/自检 → Mock 行为完整 → QA PASS
+全部工具栏/Tab/属性页/导出/自检 → Mock 行为完整 → QA PASS → 已冻结
 ```
 
 v0.4 功能验收（Reset 状态一致、Stop 不生成 task）仍然有效。
 
-验收文档：`.ai/reviews/commercial_demo_v0_5_full_mock_feature_acceptance.md`
+下一阶段为 **Real Device Integration Planning**（仅文档，未启用真实设备）：  
+`docs/real-device-integration/README.md`
 
-安全边界：
+**Mock Demo 安全声明：**
 
 - 商业版当前默认是 `Mock / Dry Run / No Hardware Control`。
 - 默认不控制真实运动平台。

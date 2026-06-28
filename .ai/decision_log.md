@@ -562,6 +562,15 @@ Needs Review: yes/no
 - Impact: visual + QA PASS；Header 未改。
 - Needs Review: no
 
+### 2026-06-28 - Commercial Demo v0.5 Freeze
+
+- Date: 2026-06-28
+- Task: commercial-demo-v0.5-freeze
+- Decision: 正式冻结 Commercial Demo v0.5；打 tag `commercial-demo-v0.5`；Mock 功能 missing=0，不再新增 Mock 或微调 Header。
+- Reason: v0.5 Full Mock Feature Completion 已完成，155 tests + visual + QA 全 PASS；需锁定演示基线再规划真实设备。
+- Impact: 新增 `.ai/releases/commercial_demo_v0_5_freeze.md` 与 `docs/real-device-integration/` 规划；后续真实设备必须 R01–R10 单独 Sprint + 安全评审。
+- Needs Review: yes（Real Device Sprint 启动前）
+
 ### 2026-06-28 - Commercial Demo v0.5 Full Mock Feature Completion
 
 - Date: 2026-06-28
