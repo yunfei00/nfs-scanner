@@ -27,6 +27,13 @@ class DemoState:
     report_exported_for_task_id: str | None = None
     storage_saved: bool = False
     has_history_tasks: bool = False
+    project_id: str | None = None
+    project_name: str | None = None
+    project_root: str | None = None
+    project_file: str | None = None
+    project_dirty: bool = False
+    project_created_at: str | None = None
+    project_updated_at: str | None = None
 
     @classmethod
     def from_runtime(
@@ -43,6 +50,13 @@ class DemoState:
         report_exported_for_task_id: str | None,
         storage_saved: bool,
         has_history_tasks: bool,
+        project_id: str | None = None,
+        project_name: str | None = None,
+        project_root: str | None = None,
+        project_file: str | None = None,
+        project_dirty: bool = False,
+        project_created_at: str | None = None,
+        project_updated_at: str | None = None,
     ) -> DemoState:
         percent = int(snapshot.progress * 100) if snapshot.total_points > 0 else 0
         status = snapshot.status
@@ -69,6 +83,13 @@ class DemoState:
             report_exported_for_task_id=report_exported_for_task_id,
             storage_saved=storage_saved,
             has_history_tasks=has_history_tasks,
+            project_id=project_id,
+            project_name=project_name,
+            project_root=project_root,
+            project_file=project_file,
+            project_dirty=project_dirty,
+            project_created_at=project_created_at,
+            project_updated_at=project_updated_at,
         )
 
     @property

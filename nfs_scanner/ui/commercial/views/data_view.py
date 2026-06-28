@@ -48,12 +48,25 @@ class DataView(QWidget):
         self._summary_labels: dict[str, QLabel] = {}
         self._heatmap_widget: MockHeatmapWidget | None = None
         self._spectrum_widget: MockSpectrumWidget | None = None
+        self._project_banner: QLabel | None = None
         self._setup_ui()
         self.refresh_tasks()
 
     @property
     def analysis_service(self) -> MockAnalysisService:
         return self._analysis_service
+
+    def update_project_context(self, project_name: str | None, project_root: str | None = None) -> None:
+        """Show active project name at the top of Data View."""
+
+        if self._project_banner is None:
+            return
+        if project_name:
+            self._project_banner.setText(f"当前项目：{project_name}")
+            self._project_banner.setToolTip(project_root or project_name)
+        else:
+            self._project_banner.setText("当前项目：未打开")
+            self._project_banner.setToolTip("")
 
     def refresh_tasks(self) -> None:
         """Reload task list from mock analysis service."""
@@ -114,6 +127,10 @@ class DataView(QWidget):
         analysis_layout = QVBoxLayout(analysis_column)
         analysis_layout.setContentsMargins(0, 0, 0, 0)
         analysis_layout.setSpacing(8)
+
+        self._project_banner = QLabel("当前项目：未打开", analysis_column)
+        self._project_banner.setObjectName("commercialViewProjectBanner")
+        analysis_layout.addWidget(self._project_banner, 0)
 
         toolbar = QWidget(analysis_column)
         toolbar_layout = QHBoxLayout(toolbar)

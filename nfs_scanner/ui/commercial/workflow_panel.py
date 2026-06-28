@@ -80,7 +80,15 @@ class _TimelineStepRow(QFrame):
         detail = QLabel(description, body)
         detail.setObjectName("nfsMutedLabel")
         detail.setVisible(False)
+        self._context_name = QLabel("", body)
+        self._context_name.setObjectName("nfsWorkflowTimelineContextName")
+        self._context_name.setVisible(False)
+        self._context_status = QLabel("", body)
+        self._context_status.setObjectName("nfsWorkflowTimelineContextStatus")
+        self._context_status.setVisible(False)
         body_layout.addLayout(header_row)
+        body_layout.addWidget(self._context_name)
+        body_layout.addWidget(self._context_status)
         body_layout.addWidget(detail)
 
         root.addWidget(rail, 0)
@@ -93,6 +101,14 @@ class _TimelineStepRow(QFrame):
     def set_progress_text(self, text: str) -> None:
         self._progress.setText(text)
         self._progress.setVisible(bool(text))
+
+    def set_context_lines(self, name: str, status: str) -> None:
+        """Show secondary project context under the step title (step 1 only)."""
+
+        self._context_name.setText(name)
+        self._context_name.setVisible(bool(name))
+        self._context_status.setText(status)
+        self._context_status.setVisible(bool(status))
 
 
 class CommercialWorkflowPanel(QWidget):
@@ -205,6 +221,27 @@ class CommercialWorkflowPanel(QWidget):
         if 0 <= index < len(self._step_states):
             return self._step_states[index]
         return "pending"
+
+    def update_project_step_context(
+        self,
+        project_name: str | None,
+        *,
+        storage_saved: bool,
+    ) -> None:
+        """Display active project name and save state on workflow step 1."""
+
+        if not self._step_rows:
+            return
+        row = self._step_rows[0]
+        if project_name:
+            row.set_context_lines(project_name, "已保存" if storage_saved else "未保存")
+        else:
+            row.set_context_lines("未创建项目", "")
+
+    def workflow_project_name(self) -> str:
+        if not self._step_rows:
+            return ""
+        return self._step_rows[0]._context_name.text()
 
     def set_scan_progress(self, index: int, text: str) -> None:
         if 0 <= index < len(self._step_rows):

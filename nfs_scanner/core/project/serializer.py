@@ -30,13 +30,19 @@ class ProjectSerializer:
         if not project_file.is_file():
             raise FileNotFoundError(f"Project file not found: {project_file}")
         payload = json.loads(project_file.read_text(encoding="utf-8"))
-        return ProjectModel.from_dict(payload)
+        model = ProjectModel.from_dict(payload)
+        project_dir = project_file.parent
+        if not model.project_root:
+            model.project_root = str(project_dir)
+        cls.ensure_project_structure(project_dir)
+        return model
 
     @classmethod
     def save(cls, project_dir: Path, model: ProjectModel) -> Path:
         cls.ensure_project_structure(project_dir)
+        model.project_root = str(project_dir)
         target = cls.project_file_path(project_dir)
-        tmp = target.with_suffix(".nfsproj.tmp")
+        tmp = target.with_suffix(target.suffix + ".tmp")
         tmp.write_text(
             json.dumps(model.to_dict(), ensure_ascii=False, indent=2),
             encoding="utf-8",
@@ -47,7 +53,7 @@ class ProjectSerializer:
     @classmethod
     def copy_project(cls, source_dir: Path, dest_dir: Path, *, new_project_id: bool = True) -> Path:
         if dest_dir.exists():
-            shutil.rmtree(dest_dir)
+            raise FileExistsError(f"Project destination already exists: {dest_dir}")
         shutil.copytree(source_dir, dest_dir)
         project_file = cls.project_file_path(dest_dir)
         if project_file.is_file():

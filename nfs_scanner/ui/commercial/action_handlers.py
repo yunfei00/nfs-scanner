@@ -22,16 +22,25 @@ def build_action_registry(shell: CommercialMainShell) -> CommercialActionRegistr
 
     # --- Project ---
     registry.register_simple(
-        "project.new", "新建项目", shell._on_new_project, category="project"
+        "project.new",
+        "新建项目",
+        lambda: shell._on_new_project(interactive=True),
+        category="project",
     )
     registry.register_simple(
-        "project.open", "打开项目", shell._on_open_project, category="project"
+        "project.open",
+        "打开项目",
+        lambda: shell._on_open_project(interactive=True),
+        category="project",
     )
     registry.register_simple(
         "project.save", "保存项目", shell._on_save_project, category="project"
     )
     registry.register_simple(
-        "project.save_as", "另存为", shell._on_save_project_as, category="project"
+        "project.save_as",
+        "另存为",
+        lambda: shell._on_save_project_as(interactive=True),
+        category="project",
     )
     registry.register_simple(
         "project.recent", "最近项目", shell._on_recent_projects, category="project"

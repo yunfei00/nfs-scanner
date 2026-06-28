@@ -10,8 +10,10 @@ from PySide6.QtCore import QEvent, Qt, QTimer
 from PySide6.QtGui import QResizeEvent, QShowEvent
 from PySide6.QtWidgets import (
     QDialog,
+    QFileDialog,
     QFrame,
     QHBoxLayout,
+    QInputDialog,
     QMainWindow,
     QMessageBox,
     QScrollArea,
@@ -47,6 +49,7 @@ from .top_header import CommercialTopHeader
 from .toolbar import CommercialToolbar
 from .workspace import CommercialWorkspace
 from .workflow_panel import CommercialWorkflowPanel
+from .widgets.project_summary_card import ProjectSummaryCard
 
 
 class CommercialMainShell(QMainWindow):
@@ -82,6 +85,7 @@ class CommercialMainShell(QMainWindow):
         self.toolbar = CommercialToolbar(self)
         self.top_header = CommercialTopHeader(self, self.toolbar, self)
         self.workflow_panel = CommercialWorkflowPanel(self)
+        self.project_summary_card = ProjectSummaryCard(self)
         self.device_status_panel = CommercialDeviceStatusPanel(self._services.devices, parent=self)
         self.workspace = CommercialWorkspace(self, services=self._services)
         self.property_panel = CommercialPropertyPanel(self)
@@ -104,6 +108,7 @@ class CommercialMainShell(QMainWindow):
         self._upper_splitter: QSplitter | None = None
         self._custom_maximized = False
         self._action_registry: CommercialActionRegistry | None = None
+        self._suppress_project_dirty = False
         self._setup_ui()
         self._apply_initial_window_size()
         self._connect_scan_preview()
@@ -124,16 +129,22 @@ class CommercialMainShell(QMainWindow):
     def _apply_target_demo_presentation(self) -> None:
         """Seed visual demo fields without faking runtime/workflow progress."""
 
-        self.property_panel.apply_target_demo_values()
-        for device_id in ("motion-001", "spectrum-001", "camera-001"):
-            self._services.devices.connect_device(device_id)
-        self.device_status_panel.refresh_devices()
-        self.workspace.apply_target_presentation()
-        realtime = self.workspace.realtime_view()
-        realtime.color_bar.set_range(-90.0, -10.0)
-        realtime.color_bar.set_lut_name("Turbo")
-        realtime.cursor_hud.update_readout(x=45.2, y=32.8, z=5.0, freq="2.450 GHz", amp="-23.45 dBm")
-        self.bottom_dock.seed_idle_demo_stats()
+        self._suppress_project_dirty = True
+        try:
+            self.property_panel.apply_target_demo_values()
+            for device_id in ("motion-001", "spectrum-001", "camera-001"):
+                self._services.devices.connect_device(device_id)
+            self.device_status_panel.refresh_devices()
+            self.workspace.apply_target_presentation()
+            realtime = self.workspace.realtime_view()
+            realtime.color_bar.set_range(-90.0, -10.0)
+            realtime.color_bar.set_lut_name("Turbo")
+            realtime.cursor_hud.update_readout(x=45.2, y=32.8, z=5.0, freq="2.450 GHz", amp="-23.45 dBm")
+            self.bottom_dock.seed_idle_demo_stats()
+        finally:
+            self._suppress_project_dirty = False
+            self.property_panel._debounce_timer.stop()
+        self._services.project.mark_clean()
         self._sync_demo_state()
 
     def _refresh_target_demo_presentation(self) -> None:
@@ -329,7 +340,7 @@ class CommercialMainShell(QMainWindow):
                     break
         state = build_demo_state(
             snapshot,
-            session=session,
+            project_service=self._services.project,
             devices_connected=devices_ready(self._services.devices),
             scan_config_valid=self.property_panel.can_start_scan(),
             current_task_id=self._current_task_id,
@@ -347,6 +358,11 @@ class CommercialMainShell(QMainWindow):
             snapshot=snapshot,
             session=session,
             last_task_name=last_task_name,
+            project_context_bar=self.top_header.brand_area,
+            project_summary_card=self.project_summary_card,
+            data_view=self.workspace.data_view(),
+            report_view=self.workspace.report_view(),
+            window=self,
         )
         buttons = state.button_states()
         paused = state.scan_state == "paused"
@@ -379,8 +395,7 @@ class CommercialMainShell(QMainWindow):
         self._report_exported = True
         self._report_exported_for_task_id = task_id
         self.bottom_dock.append_log_line(f"Mock 报告已导出: {path}", level="REPORT")
-        self.status_bar_widget.update_storage_saved(path)
-        self._sync_demo_state()
+        self._mark_project_dirty_and_refresh()
 
     def _show_help_dialog(self, tab: str = "help") -> None:
         dialog = DemoHelpDialog(self, self, initial_tab=tab)
@@ -440,41 +455,79 @@ class CommercialMainShell(QMainWindow):
             return
         self.bottom_dock.append_log_line(f"工具栏操作: {action}", level="UI")
 
-    def _on_save_project_as(self) -> None:
+    def _on_save_project_as(
+        self,
+        *,
+        new_root: Path | None = None,
+        new_name: str | None = None,
+        interactive: bool = False,
+    ) -> None:
         session = self._services.project.current_session()
-        base_name = session.name if session else "ProjectCopy"
+        if session is None:
+            QMessageBox.information(self, "另存为", "请先新建或打开项目。")
+            return
+        base_name = session.name
+        target_root = new_root
+        target_name = new_name
+        if interactive:
+            target_name, accepted = QInputDialog.getText(
+                self,
+                "项目另存为",
+                "新项目名称",
+                text=f"{base_name}_Copy",
+            )
+            if not accepted or not target_name.strip():
+                self.bottom_dock.append_log_line("项目另存为已取消", level="PROJECT")
+                return
+            selected_dir = QFileDialog.getExistingDirectory(
+                self,
+                "选择另存为父目录",
+                str(Path(session.project_dir or Path.home()).parent),
+            )
+            if not selected_dir:
+                self.bottom_dock.append_log_line("项目另存为已取消", level="PROJECT")
+                return
+            target_root = Path(selected_dir)
+        if target_name is None:
+            target_name = f"{base_name}_Copy"
+        if target_root is None:
+            target_root = Path(session.project_dir).parent if session.project_dir else Path.home() / ".nfs_scanner" / "projects"
         try:
             self._on_save_project()
-            path = self._services.project.save_as(name=f"{base_name}_Copy")
+            model = self._services.project.save_project_as(new_root=target_root, new_name=target_name)
+            path = Path(model.project_root) / "project.nfsproj"
         except RuntimeError as error:
             self.bottom_dock.append_log_line(str(error), level="PROJECT")
             return
+        except (OSError, PermissionError) as error:
+            QMessageBox.warning(self, "项目另存为", str(error))
+            self.bottom_dock.append_log_line(f"项目另存为失败: {error}", level="PROJECT")
+            return
         self.bottom_dock.append_log_line(f"项目已另存为: {path}", level="PROJECT")
         self._refresh_project_ui()
-        self.status_bar_widget.update_storage_saved(str(path))
 
     def _on_recent_projects(self) -> None:
         recent = self._services.project.list_recent()
         if not recent:
             self.bottom_dock.append_log_line("暂无最近项目", level="PROJECT")
             return
-        entry = recent[0]
+        entry = next((item for item in recent if item.exists), recent[0])
         if entry.missing:
             self.bottom_dock.append_log_line(f"最近项目不可用: {entry.project_file}", level="WARN")
             return
         try:
-            from pathlib import Path
-
-            session = self._services.project.open_project(Path(entry.project_file))
-            self.bottom_dock.append_log_line(f"已打开最近项目: {session.name}", level="PROJECT")
+            model = self._services.project.open_project(Path(entry.project_file))
+            self._apply_opened_project_ui(model)
+            self.bottom_dock.append_log_line(f"已打开最近项目: {model.project_name}", level="PROJECT")
             self._refresh_project_ui()
             self._sync_demo_state()
         except FileNotFoundError:
             self.bottom_dock.append_log_line(f"项目文件不存在: {entry.project_file}", level="WARN")
 
     def _on_close_project(self) -> None:
-        if self._services.project.is_dirty:
-            self._on_save_project()
+        if self._services.project.is_dirty():
+            if not self._confirm_dirty_project_if_needed("关闭项目"):
+                return
         self._services.project.close_project()
         self._current_task_id = None
         self.bottom_dock.append_log_line("项目已关闭", level="PROJECT")
@@ -528,6 +581,7 @@ class CommercialMainShell(QMainWindow):
         realtime = self.workspace.realtime_view()
         if hasattr(realtime, "_on_opacity_changed"):
             realtime._on_opacity_changed(value)
+        self._mark_project_dirty_and_refresh()
 
     def _on_layer_visibility_changed(self, layer: str, visible: bool) -> None:
         self.workspace.realtime_view().set_layer_visible(layer, visible)
@@ -542,6 +596,7 @@ class CommercialMainShell(QMainWindow):
         config_service = self._services.device_config
         path = config_service.save_all_to_json()
         self.bottom_dock.append_log_line(f"MOCK CONFIG ONLY 已保存: {path} ({summary})", level="DEVICE")
+        self._mark_project_dirty_and_refresh()
 
     def _on_scan_validity_changed(self, valid: bool, message: str) -> None:
         snapshot = self.mock_scan.snapshot()
@@ -573,10 +628,12 @@ class CommercialMainShell(QMainWindow):
             ),
             level="SCAN",
         )
+        self._mark_project_dirty_and_refresh()
 
     def _on_display_lut_changed(self, lut_name: str) -> None:
         self.workspace.realtime_view()._on_lut_changed(lut_name)
         self.bottom_dock.append_log_line(f"显示设置 LUT changed: {lut_name}", level="UI")
+        self._mark_project_dirty_and_refresh()
 
     def _run_mock_self_check(self) -> None:
         from nfs_scanner.ui.commercial.graphics.layers import LayerKind
@@ -613,15 +670,15 @@ class CommercialMainShell(QMainWindow):
         md_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
         self.bottom_dock.append_log_line(f"Mock Self Check 完成: {md_path}", level="QA")
 
-    def _confirm_dirty_project_if_needed(self) -> bool:
+    def _confirm_dirty_project_if_needed(self, action_label: str = "继续操作") -> bool:
         """Prompt to save when the active project has unsaved changes."""
 
-        if not self._services.project.is_dirty:
+        if not self._services.project.is_dirty():
             return True
         reply = QMessageBox.question(
             self,
             "未保存的项目",
-            "当前项目有未保存的更改。是否在新建前保存？",
+            f"当前项目有未保存的更改。是否在{action_label}前保存？",
             QMessageBox.StandardButton.Save
             | QMessageBox.StandardButton.Discard
             | QMessageBox.StandardButton.Cancel,
@@ -633,25 +690,40 @@ class CommercialMainShell(QMainWindow):
             self._on_save_project()
         return True
 
-    def _on_new_project(self, request: NewProjectRequest | None = None) -> None:
+    def _on_new_project(
+        self,
+        request: NewProjectRequest | None = None,
+        *,
+        interactive: bool = False,
+    ) -> None:
         """Formal new project workflow with dialog, directory, and UI sync."""
 
         if request is None:
-            if not self._confirm_dirty_project_if_needed():
-                return
-            dialog = NewProjectDialog(
-                self,
-                default_base_dir=Path.home() / ".nfs_scanner" / "projects",
-            )
-            if dialog.exec() != QDialog.DialogCode.Accepted:
-                self.bottom_dock.append_log_line("PROJECT new cancelled", level="PROJECT")
-                return
-            request = dialog.request()
-            if request is None:
-                return
+            if interactive:
+                if not self._confirm_dirty_project_if_needed("新建项目"):
+                    return
+                dialog = NewProjectDialog(
+                    self,
+                    default_base_dir=Path.home() / ".nfs_scanner" / "projects",
+                )
+                if dialog.exec() != QDialog.DialogCode.Accepted:
+                    self.bottom_dock.append_log_line("PROJECT new cancelled", level="PROJECT")
+                    return
+                request = dialog.request()
+                if request is None:
+                    return
+            else:
+                if self._services.project.is_dirty():
+                    self._on_save_project()
+                request = NewProjectRequest(
+                    project_name=f"QA_Project_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                    base_dir=Path.home() / ".nfs_scanner" / "projects",
+                    template="标准扫描",
+                )
 
         try:
-            model, project_root = self._services.project.create_project(request)
+            model = self._services.project.create_project(request)
+            project_root = Path(model.project_root)
             project_file = project_root / "project.nfsproj"
         except (ValueError, PermissionError, OSError) as error:
             QMessageBox.warning(self, "新建项目", str(error))
@@ -666,44 +738,101 @@ class CommercialMainShell(QMainWindow):
     def _apply_new_project_ui(self, model, project_root: Path, *, template: str) -> None:
         """Reset workspace state after a successful new project creation."""
 
-        self._report_exported = False
-        self._report_exported_for_task_id = None
-        self._current_task_id = None
-        self._selected_history_task_id = None
-        self._completed_scan_registered = False
-        self._region_aligned = False
+        self._suppress_project_dirty = True
+        try:
+            self._report_exported = False
+            self._report_exported_for_task_id = None
+            self._current_task_id = None
+            self._selected_history_task_id = None
+            self._completed_scan_registered = False
+            self._region_aligned = False
 
-        self.mock_scan.stop()
-        self.mock_scan.reset()
+            self.mock_scan.stop()
+            self.mock_scan.reset()
 
-        for result in self._services.device_provider.disconnect_all():
-            pass
-        self.device_status_panel.refresh_devices()
-        self.workspace.device_center_view().refresh_devices()
+            for result in self._services.device_provider.disconnect_all():
+                pass
+            self.device_status_panel.refresh_devices()
+            self.workspace.device_center_view().refresh_devices()
 
-        self.workspace.data_view().analysis_service.clear_all_tasks()
-        self.workspace.data_view().refresh_tasks()
-        self.workspace.report_view().refresh_tasks()
-        self.workspace.data_table_view().refresh_from_tasks()
+            self.workspace.data_view().analysis_service.clear_all_tasks()
+            self.workspace.data_view().refresh_tasks()
+            self.workspace.report_view().refresh_tasks()
+            self.workspace.data_table_view().refresh_from_tasks()
 
-        self.property_panel.apply_scan_config_dict(model.scan_config)
+            self.property_panel.apply_scan_config_dict(model.scan_config)
 
-        region = self.property_panel.current_scan_region()
-        path_config = self.property_panel.current_scan_path_config()
-        self.mock_scan.configure(region, path_config)
-        self.workspace.realtime_view().update_path_preview(region, path_config)
-        self.workspace.realtime_view().clear_overlays()
-        self.property_panel.emit_current_scan_config()
-        self.bottom_dock.seed_idle_demo_stats()
+            region = self.property_panel.current_scan_region()
+            path_config = self.property_panel.current_scan_path_config()
+            self.mock_scan.configure(region, path_config)
+            self.workspace.realtime_view().update_path_preview(region, path_config)
+            self.workspace.realtime_view().clear_overlays()
+            self.bottom_dock.seed_idle_demo_stats()
+            self.property_panel._debounce_timer.stop()
+            self._sync_demo_state()
+        finally:
+            self._suppress_project_dirty = False
 
-        session = self._services.project.current_session()
+        self._services.project.mark_clean()
         self._refresh_project_ui()
-        if session is not None:
-            self.status_bar_widget.update_project_session(session)
-            self.status_bar_widget.update_storage_saved(str(project_root / "project.nfsproj"))
+
+    def _mark_project_dirty_and_refresh(self) -> None:
+        """Mark active project unsaved and sync all project visibility widgets."""
+
+        if self._suppress_project_dirty:
+            return
+        try:
+            self._services.project.mark_dirty("ui_state_changed")
+        except RuntimeError:
+            return
+        self._refresh_project_ui()
+
+    def _on_open_project(
+        self,
+        project_file_or_dir: Path | str | None = None,
+        *,
+        interactive: bool = False,
+    ) -> None:
+        """Open a project file/directory; no hardware connection is performed."""
+
+        if project_file_or_dir is None and not interactive:
+            self._on_open_demo_project()
+            return
+
+        if not self._confirm_dirty_project_if_needed("打开项目"):
+            return
+
+        target: Path | None
+        if project_file_or_dir is not None:
+            target = Path(project_file_or_dir)
+        else:
+            file_name, _selected_filter = QFileDialog.getOpenFileName(
+                self,
+                "打开项目",
+                str(Path.home() / ".nfs_scanner" / "projects"),
+                "NFS Project (project.nfsproj);;JSON Project (*.nfsproj);;All Files (*)",
+            )
+            if not file_name:
+                self.bottom_dock.append_log_line("打开项目已取消", level="PROJECT")
+                return
+            target = Path(file_name)
+
+        try:
+            model = self._services.project.open_project(target)
+        except (FileNotFoundError, json.JSONDecodeError, OSError) as error:
+            QMessageBox.warning(self, "打开项目", str(error))
+            self.bottom_dock.append_log_line(f"打开项目失败: {error}", level="PROJECT")
+            return
+
+        self._apply_opened_project_ui(model)
+        self.bottom_dock.append_log_line(f"打开项目: {model.project_name}", level="PROJECT")
+        self.bottom_dock.append_log_line(f"project path: {model.project_root}", level="PROJECT")
+        self._refresh_project_ui()
         self._sync_demo_state()
 
-    def _on_open_project(self) -> None:
+    def _on_open_demo_project(self) -> None:
+        """Compatibility helper for older mock QA flows that expect Demo project setup."""
+
         session = self._services.project.open_mock_project()
         self._report_exported = False
         self._report_exported_for_task_id = None
@@ -722,8 +851,49 @@ class CommercialMainShell(QMainWindow):
         self._refresh_project_ui()
         self._sync_demo_state()
 
+    def _apply_opened_project_ui(self, model) -> None:
+        """Restore UI fields from a ProjectModel without touching devices."""
+
+        self._suppress_project_dirty = True
+        try:
+            self._report_exported = False
+            self._report_exported_for_task_id = None
+            self._current_task_id = None
+            self._selected_history_task_id = None
+            self._completed_scan_registered = False
+
+            self.mock_scan.stop()
+            self.mock_scan.reset()
+            self.property_panel.apply_scan_config_dict(model.scan_config)
+            self.property_panel.apply_display_config_dict(model.display_config)
+            self.property_panel.apply_instrument_config_dict(
+                model.instrument_config,
+                model.device_config,
+            )
+
+            data_view = self.workspace.data_view()
+            if hasattr(data_view.analysis_service, "load_task_index"):
+                data_view.analysis_service.load_task_index(model.task_index)
+            data_view.refresh_tasks()
+            self.workspace.report_view().refresh_tasks()
+            self.workspace.data_table_view().refresh_from_tasks()
+
+            region = self.property_panel.current_scan_region()
+            path_config = self.property_panel.current_scan_path_config()
+            self.mock_scan.configure(region, path_config)
+            self.workspace.realtime_view().update_path_preview(region, path_config)
+            self.bottom_dock.seed_idle_demo_stats()
+            self.property_panel._debounce_timer.stop()
+        finally:
+            self._suppress_project_dirty = False
+        self._services.project.mark_clean()
+
     def _on_save_project(self) -> None:
         try:
+            if self._services.project.current_session() is None:
+                QMessageBox.information(self, "保存项目", "请先新建或打开项目。")
+                self.bottom_dock.append_log_line("保存项目失败: 请先新建或打开项目", level="PROJECT")
+                return
             region = self.property_panel.current_scan_region()
             path_config = self.property_panel.current_scan_path_config()
             device_summary = [
@@ -737,6 +907,22 @@ class CommercialMainShell(QMainWindow):
             ]
             tasks = self.workspace.data_view().analysis_service.list_tasks()
             last_task_id = tasks[0].task_id if tasks else None
+            task_index = [
+                {
+                    "task_id": task.task_id,
+                    "name": task.name,
+                    "point_count": task.point_count,
+                    "completed_at": task.completed_at,
+                    "scan_mode": task.scan_mode,
+                    "peak_frequency": task.peak_frequency,
+                    "peak_amplitude": task.peak_amplitude,
+                    "area_mm2": task.area_mm2,
+                }
+                for task in tasks
+            ]
+            report_view = self.workspace.report_view()
+            report_task_id = report_view._current_task_id() if hasattr(report_view, "_current_task_id") else None
+            report_index = [{"task_id": report_task_id}] if report_task_id else []
             self._services.project.update_session_context(
                 scan_config={
                     "region": {
@@ -754,6 +940,21 @@ class CommercialMainShell(QMainWindow):
                         "speed_mm_min": path_config.speed_mm_min,
                     },
                 },
+                display_config=self.property_panel.current_display_config(),
+                instrument_config=self.property_panel.current_instrument_config(),
+                device_config=self.property_panel.current_device_config(),
+                workflow_state={
+                    "active_step_index": self.workflow_panel.active_step_index(),
+                    "project_step_state": self.workflow_panel.step_state(0),
+                    "scan_runtime_status": self.mock_scan.snapshot().status,
+                },
+                task_index=task_index,
+                report_index=report_index,
+                recent_ui_state={
+                    "workspace_tab_index": self.workspace.tab_widget.currentIndex(),
+                    "property_tab_index": self.property_panel.current_tab_index(),
+                    "window_title": self.windowTitle(),
+                },
                 device_summary=device_summary,
                 last_task_id=last_task_id,
             )
@@ -764,13 +965,8 @@ class CommercialMainShell(QMainWindow):
         session = self._services.project.current_session()
         self.bottom_dock.append_log_line(f"项目已保存: {path}", level="PROJECT")
         self._refresh_project_ui()
-        self.status_bar_widget.update_storage_saved(str(path))
-        if session is not None:
-            self.status_bar_widget.update_project_session(session)
 
     def _refresh_project_ui(self) -> None:
-        session = self._services.project.current_session()
-        self.status_bar_widget.update_project_session(session)
         self._sync_demo_state()
 
     def _on_connect_device(self) -> None:
@@ -1033,6 +1229,7 @@ class CommercialMainShell(QMainWindow):
         left_layout.setContentsMargins(8, 8, 8, 8)
         left_layout.setSpacing(8)
         left_layout.addWidget(self.workflow_panel, 0)
+        left_layout.addWidget(self.project_summary_card, 0)
 
         self.device_status_panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
         self.device_status_panel.content_height_changed.connect(self._refresh_left_area_layout)
@@ -1197,3 +1394,35 @@ class CommercialMainShell(QMainWindow):
 
     def _on_scan_config_changed(self, region, path_config) -> None:
         self.workspace.realtime_view().update_path_preview(region, path_config)
+        if self._scan_config_matches_project(region, path_config):
+            return
+        self._mark_project_dirty_and_refresh()
+
+    def _scan_config_matches_project(self, region, path_config) -> bool:
+        """Return True when UI scan params still match persisted project config."""
+
+        try:
+            saved = self._services.project.get_scan_config()
+        except RuntimeError:
+            return False
+        saved_region = saved.get("region") or {}
+        saved_path = saved.get("path") or {}
+        region_keys = ("x_start", "x_stop", "y_start", "y_stop", "z_height", "x_step", "y_step")
+        for key in region_keys:
+            if abs(float(saved_region.get(key, 0)) - getattr(region, key)) > 1e-6:
+                return False
+        path_pairs = (
+            ("scan_mode", path_config.scan_mode),
+            ("dwell_ms", path_config.dwell_ms),
+            ("speed_mm_min", path_config.speed_mm_min),
+        )
+        for key, value in path_pairs:
+            saved_value = saved_path.get(key)
+            if saved_value is None:
+                continue
+            if key == "scan_mode":
+                if str(saved_value) != str(value):
+                    return False
+            elif abs(float(saved_value) - float(value)) > 1e-6:
+                return False
+        return True

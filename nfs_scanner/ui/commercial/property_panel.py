@@ -89,6 +89,8 @@ class CommercialPropertyPanel(QScrollArea):
         self._region_combo: QComboBox | None = None
         self._heatmap_checkbox: QCheckBox | None = None
         self._display_heatmap_checkbox: QCheckBox | None = None
+        self._display_lut_combo: QComboBox | None = None
+        self._display_opacity_slider: QSlider | None = None
         self._home_after_scan_checkbox: QCheckBox | None = None
         self._last_validation_errors: list[str] = []
         self._setup_ui()
@@ -286,12 +288,16 @@ class CommercialPropertyPanel(QScrollArea):
         for key, value in values.items():
             field = self._field_map.get(key)
             if field is not None:
+                field.blockSignals(True)
                 field.setText(value)
+                field.blockSignals(False)
         mode = path.get("scan_mode", "snake")
         if self._mode_combo is not None:
             index = self._mode_combo.findText("Snake" if mode == "snake" else "Raster")
             if index >= 0:
+                self._mode_combo.blockSignals(True)
                 self._mode_combo.setCurrentIndex(index)
+                self._mode_combo.blockSignals(False)
         template = scan_config.get("template")
         if template and self._param_template_combo is not None:
             index = self._param_template_combo.findText(str(template))
@@ -302,6 +308,65 @@ class CommercialPropertyPanel(QScrollArea):
         self.clear_target_presentation()
         self._debounce_timer.stop()
         self._emit_scan_config()
+
+    def apply_display_config_dict(self, display_config: dict) -> None:
+        """Load display settings from project display_config."""
+
+        if self._display_heatmap_checkbox is not None and "heatmap_visible" in display_config:
+            self._display_heatmap_checkbox.blockSignals(True)
+            self._display_heatmap_checkbox.setChecked(bool(display_config.get("heatmap_visible")))
+            self._display_heatmap_checkbox.blockSignals(False)
+        if self._display_lut_combo is not None and display_config.get("lut"):
+            index = self._display_lut_combo.findText(str(display_config.get("lut")))
+            if index >= 0:
+                self._display_lut_combo.blockSignals(True)
+                self._display_lut_combo.setCurrentIndex(index)
+                self._display_lut_combo.blockSignals(False)
+        if self._display_opacity_slider is not None and display_config.get("opacity") is not None:
+            self._display_opacity_slider.blockSignals(True)
+            self._display_opacity_slider.setValue(int(display_config.get("opacity", 60)))
+            self._display_opacity_slider.blockSignals(False)
+        layers = display_config.get("layers") or {}
+        if isinstance(layers, dict):
+            for key, value in layers.items():
+                checkbox = getattr(self, "_layer_checkboxes", {}).get(key)
+                if checkbox is not None:
+                    checkbox.blockSignals(True)
+                    checkbox.setChecked(bool(value))
+                    checkbox.blockSignals(False)
+
+    def apply_instrument_config_dict(self, instrument_config: dict, device_config: dict | None = None) -> None:
+        """Load mock instrument/device settings from project config."""
+
+        spectrum = instrument_config.get("spectrum") or {}
+        camera = instrument_config.get("camera") or {}
+        device_config = device_config or {}
+        motion = device_config.get("motion") or {}
+
+        for widget_name, value in (
+            ("_inst_start_mhz", spectrum.get("start_mhz")),
+            ("_inst_stop_mhz", spectrum.get("stop_mhz")),
+            ("_inst_points", spectrum.get("points")),
+            ("_inst_rbw", spectrum.get("rbw_khz")),
+            ("_inst_fps", camera.get("fps")),
+            ("_inst_exposure", camera.get("exposure_ms")),
+            ("_inst_baud", motion.get("baud")),
+            ("_inst_speed", motion.get("safe_speed_mm_min")),
+        ):
+            widget = getattr(self, widget_name, None)
+            if widget is not None and value is not None:
+                widget.setText(str(value))
+
+        for combo_name, value in (
+            ("_inst_trace", spectrum.get("trace")),
+            ("_inst_resolution", camera.get("resolution")),
+            ("_inst_port", motion.get("port")),
+        ):
+            combo = getattr(self, combo_name, None)
+            if combo is not None and value:
+                index = combo.findText(str(value))
+                if index >= 0:
+                    combo.setCurrentIndex(index)
 
     def apply_param_template(self, name: str) -> None:
         """Public entry for toolbar param template action."""
@@ -514,6 +579,7 @@ class CommercialPropertyPanel(QScrollArea):
         lut_combo = QComboBox(frame)
         lut_combo.addItems(["Turbo", "Viridis", "Jet", "Gray"] + [n for n in COMMON_LUT_NAMES if n not in {"Turbo", "Viridis", "Jet", "Gray"}])
         lut_combo.currentTextChanged.connect(self.display_lut_changed.emit)
+        self._display_lut_combo = lut_combo
         opacity_slider = QSlider(Qt.Orientation.Horizontal, frame)
         opacity_slider.setRange(20, 90)
         opacity_slider.setValue(60)
@@ -849,6 +915,59 @@ class CommercialPropertyPanel(QScrollArea):
         """Stop overriding preview stats with target-screenshot demo values."""
 
         self._target_presentation_active = False
+
+    def current_tab_index(self) -> int:
+        """Return active property tab index for recent UI state."""
+
+        if self._tabs is None:
+            return 0
+        return self._tabs.currentIndex()
+
+    def current_display_config(self) -> dict[str, object]:
+        """Return current display settings for project persistence."""
+
+        return {
+            "heatmap_visible": bool(
+                self._display_heatmap_checkbox and self._display_heatmap_checkbox.isChecked()
+            ),
+            "lut": self._display_lut_combo.currentText() if self._display_lut_combo else "Turbo",
+            "opacity": self._display_opacity_slider.value() if self._display_opacity_slider else 60,
+            "layers": {
+                key: checkbox.isChecked()
+                for key, checkbox in getattr(self, "_layer_checkboxes", {}).items()
+            },
+        }
+
+    def current_instrument_config(self) -> dict[str, object]:
+        """Return current mock instrument settings for project persistence."""
+
+        return {
+            "simulation_mode": True,
+            "spectrum": {
+                "start_mhz": self._inst_start_mhz.text() if hasattr(self, "_inst_start_mhz") else "",
+                "stop_mhz": self._inst_stop_mhz.text() if hasattr(self, "_inst_stop_mhz") else "",
+                "points": self._inst_points.text() if hasattr(self, "_inst_points") else "",
+                "rbw_khz": self._inst_rbw.text() if hasattr(self, "_inst_rbw") else "",
+                "trace": self._inst_trace.currentText() if hasattr(self, "_inst_trace") else "",
+            },
+            "camera": {
+                "resolution": self._inst_resolution.currentText() if hasattr(self, "_inst_resolution") else "",
+                "fps": self._inst_fps.text() if hasattr(self, "_inst_fps") else "",
+                "exposure_ms": self._inst_exposure.text() if hasattr(self, "_inst_exposure") else "",
+            },
+        }
+
+    def current_device_config(self) -> dict[str, object]:
+        """Return current mock device settings for project persistence."""
+
+        return {
+            "motion": {
+                "port": self._inst_port.currentText() if hasattr(self, "_inst_port") else "MOCK://",
+                "baud": self._inst_baud.text() if hasattr(self, "_inst_baud") else "115200",
+                "safe_speed_mm_min": self._inst_speed.text() if hasattr(self, "_inst_speed") else "600",
+            },
+            "real_device_enabled": False,
+        }
 
     def has_horizontal_clipping(self) -> bool:
         """Return True when horizontal clipping or scroll is required."""

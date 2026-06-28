@@ -92,7 +92,7 @@ def run_v1_completion_checks(shell: CommercialMainShell) -> list[QACheck]:
         )
     )
 
-    # Project lifecycle
+    # Project lifecycle — verify while temp dir still exists (dir is deleted on exit)
     with tempfile.TemporaryDirectory() as tmp:
         shell._on_new_project(
             request=NewProjectRequest(
@@ -104,19 +104,20 @@ def run_v1_completion_checks(shell: CommercialMainShell) -> list[QACheck]:
         app.processEvents()
         shell._on_save_project()
         app.processEvents()
-    session = shell._services.project.current_session()
-    project_ok = session is not None and session.storage_status == "saved"
-    project_file = None
-    if shell._services.project.project_dir is not None:
-        project_file = shell._services.project.project_dir / "project.nfsproj"
-    checks.append(
-        _check(
-            "project_lifecycle_complete",
-            "new + save creates project.nfsproj",
-            str(project_file.exists() if project_file else False),
-            project_ok and (project_file is None or project_file.is_file()),
+        session = shell._services.project.current_session()
+        project_ok = session is not None and session.storage_status == "saved"
+        project_file = None
+        if shell._services.project.project_dir is not None:
+            project_file = shell._services.project.project_dir / "project.nfsproj"
+        project_file_ok = project_file is not None and project_file.is_file()
+        checks.append(
+            _check(
+                "project_lifecycle_complete",
+                "new + save creates project.nfsproj",
+                str(project_file_ok),
+                project_ok and project_file_ok,
+            )
         )
-    )
 
     # Device lifecycle
     shell._on_disconnect_devices()

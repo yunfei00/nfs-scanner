@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -96,9 +97,7 @@ class ProjectModel:
 
     @classmethod
     def default_new(cls, *, name: str = _DEFAULT_PROJECT_NAME) -> ProjectModel:
-        from datetime import datetime
-
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now = datetime.now().isoformat(timespec="seconds")
         return cls(
             project_name=name,
             created_at=now,

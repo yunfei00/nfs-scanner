@@ -598,6 +598,15 @@ Needs Review: yes/no
 - Impact: 160 unittest + QA PASS；另存为保留新 project_id；真实设备仅能通过 docs/real-device-integration Sprint 接入。
 - Needs Review: no（真实设备 Sprint 启动前须 R01 安全评审）
 
+### 2026-06-28 - Commercial V1 Project Lifecycle Completion
+
+- Date: 2026-06-28
+- Task: commercial-v1-project-lifecycle-completion
+- Decision: ProjectService 成为商业版项目生命周期唯一入口，`project.nfsproj` 使用原子写入；打开项目接受文件或目录；另存为创建唯一目录并重新生成 `project_id`；最近项目写入 `~/.nfs_scanner/recent_projects.json`。
+- Reason: 项目必须是一次近场扫描工作的完整工程容器，不能只在日志中提示。
+- Impact: 新建/打开/保存/另存为/recent/dirty/UI 上下文均可由 QA 自动验证；打开项目不连接设备、不启动扫描、不修改历史 CSV。
+- Needs Review: no
+
 
 - Date: 2026-06-26
 - Task: commercial-demo-v0.4-final-acceptance
@@ -605,4 +614,3 @@ Needs Review: yes/no
 - Reason: 用户要求 Final Acceptance Pass：只修阻断项、不改 Header、不接真实设备；Functional/Acceptance/Safety 全 PASS。
 - Impact: 151 tests PASS；新增 `tools/run_final_acceptance_v0_4.py` 与 final acceptance 报告；QA visual 子项待后续 polish sprint。
 - Needs Review: no
-

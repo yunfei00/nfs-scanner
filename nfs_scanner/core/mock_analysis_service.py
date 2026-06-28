@@ -117,6 +117,26 @@ class MockAnalysisService:
 
         self._tasks = []
 
+    def load_task_index(self, task_index: list[dict]) -> None:
+        """Restore task list from project.nfsproj metadata only."""
+
+        tasks: list[MockScanTaskRecord] = []
+        for index, item in enumerate(task_index):
+            task_id = str(item.get("task_id") or f"project-task-{index + 1}")
+            tasks.append(
+                MockScanTaskRecord(
+                    task_id=task_id,
+                    name=str(item.get("name") or task_id),
+                    point_count=int(item.get("point_count") or 0),
+                    completed_at=str(item.get("completed_at") or ""),
+                    scan_mode=str(item.get("scan_mode") or "snake"),
+                    peak_frequency=str(item.get("peak_frequency") or "-"),
+                    peak_amplitude=str(item.get("peak_amplitude") or "-"),
+                    area_mm2=float(item.get("area_mm2") or 0.0),
+                )
+            )
+        self._tasks = tasks
+
     def clear_history(self) -> None:
         """Clear all mock tasks except built-in demo defaults."""
 

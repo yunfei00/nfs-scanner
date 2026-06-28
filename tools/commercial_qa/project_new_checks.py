@@ -69,12 +69,13 @@ def run_project_new_checks(shell: CommercialMainShell) -> list[QACheck]:
         )
 
         label = shell.status_bar_widget.project_label.text()
+        storage = shell.status_bar_widget.storage_label.text()
         checks.append(
             _check(
                 "project_new_updates_status_bar",
                 "status bar shows project name and saved",
-                label,
-                "QA_NewProject" in label and "已保存" in label,
+                f"{label} | {storage}",
+                "QA_NewProject" in label and "已保存" in storage,
             )
         )
 

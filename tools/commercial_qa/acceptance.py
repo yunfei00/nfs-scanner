@@ -127,9 +127,9 @@ def run_stop_scan_acceptance(shell: CommercialMainShell) -> list[QACheck]:
     app = QApplication.instance()
     assert app is not None
 
+    shell._on_new_project()
     data_view = shell.workspace.data_view()
     before_count = len(data_view.analysis_service.list_tasks())
-    shell._on_new_project()
     for device_id in ("motion-001", "spectrum-001", "camera-001", "vna-001"):
         shell.workspace.device_center_view()._connect(device_id)
     app.processEvents()

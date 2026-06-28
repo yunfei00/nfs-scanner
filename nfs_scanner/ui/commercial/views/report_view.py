@@ -45,6 +45,7 @@ class ReportView(QWidget):
         self._heatmap_widget: MockHeatmapWidget | None = None
         self._spectrum_widget: MockSpectrumWidget | None = None
         self._status_label: QLabel | None = None
+        self._project_banner: QLabel | None = None
         self._setup_ui()
         self.refresh_tasks()
 
@@ -57,6 +58,16 @@ class ReportView(QWidget):
         self._project = project
         self._report_service = MockReportService(analysis, project)
         self.refresh_tasks()
+
+    def update_project_context(self, project_name: str | None, project_root: str | None = None) -> None:
+        if self._project_banner is None:
+            return
+        if project_name:
+            self._project_banner.setText(f"报告项目：{project_name}")
+            self._project_banner.setToolTip(project_root or project_name)
+        else:
+            self._project_banner.setText("报告项目：未打开")
+            self._project_banner.setToolTip("")
 
     def refresh_tasks(self) -> None:
         if self._task_combo is None:
@@ -86,6 +97,10 @@ class ReportView(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
+
+        self._project_banner = QLabel("报告项目：未打开", self)
+        self._project_banner.setObjectName("commercialViewProjectBanner")
+        layout.addWidget(self._project_banner, 0)
 
         toolbar = QWidget(self)
         toolbar_layout = QHBoxLayout(toolbar)

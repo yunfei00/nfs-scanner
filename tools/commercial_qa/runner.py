@@ -17,7 +17,9 @@ from .auto_fix import apply_runtime_mitigations, has_blocked_failures
 from .acceptance import run_acceptance_checks
 from .functional import run_functional_demo_flow
 from .mock_features import run_mock_feature_checks
+from .project_lifecycle_checks import run_project_lifecycle_checks
 from .project_new_checks import run_project_new_checks
+from .project_visibility_checks import run_project_visibility_checks
 from .v1_checks import run_v1_completion_checks
 from .models import QACheck, QAResult
 from .report import write_qa_reports
@@ -221,6 +223,12 @@ def run_commercial_qa(*, include_external: bool = True, round_number: int = 1) -
 
         project_new_checks = run_project_new_checks(shell)
         result.checks.extend(project_new_checks)
+
+        project_lifecycle_checks = run_project_lifecycle_checks(shell)
+        result.checks.extend(project_lifecycle_checks)
+
+        visibility_checks = run_project_visibility_checks(shell)
+        result.checks.extend(visibility_checks)
 
         shell.property_panel._tabs.setCurrentIndex(1)
         app.processEvents()

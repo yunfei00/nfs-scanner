@@ -23,6 +23,8 @@ class CommercialBrandArea(QWidget):
         self._title_label: QLabel | None = None
         self._subtitle_label: QLabel | None = None
         self._version_badge: QLabel | None = None
+        self._active_project_name = ""
+        self._active_project_saved = True
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -63,6 +65,38 @@ class CommercialBrandArea(QWidget):
 
         root.addWidget(self._logo_block, 0, Qt.AlignmentFlag.AlignVCenter)
         root.addWidget(text_column, 1, Qt.AlignmentFlag.AlignVCenter)
+
+    def update_project_context(
+        self,
+        project_name: str | None,
+        *,
+        storage_saved: bool,
+        project_root: str | None = None,
+    ) -> None:
+        """Show active project on the brand subtitle line (compact, no toolbar impact)."""
+
+        if self._subtitle_label is None:
+            return
+        if project_name:
+            self._active_project_name = project_name
+            self._active_project_saved = storage_saved
+            status = "已保存" if storage_saved else "未保存"
+            display = project_name if len(project_name) <= 22 else project_name[:21] + "…"
+            self._subtitle_label.setText(f"{display} · {status}")
+            self._subtitle_label.setToolTip(project_root or project_name)
+        else:
+            self._active_project_name = ""
+            self._active_project_saved = True
+            self._subtitle_label.setText("Near Field Scanner")
+            self._subtitle_label.setToolTip("Mock · Dry Run · 无硬件控制")
+
+    def active_project_line(self) -> str:
+        if self._active_project_name:
+            status = "已保存" if self._active_project_saved else "未保存"
+            return f"{self._active_project_name} · {status}"
+        if self._subtitle_label is None:
+            return ""
+        return self._subtitle_label.text()
 
     def logo_block(self) -> NFSLogoWidget | None:
         return self._logo_block

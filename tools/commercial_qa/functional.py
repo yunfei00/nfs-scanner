@@ -127,7 +127,7 @@ def run_functional_demo_flow(shell: CommercialMainShell) -> tuple[list[QACheck],
             "save_project_updates_storage",
             "storage status shows saved",
             shell.status_bar_widget.project_label.text(),
-            session is not None and session.storage_status == "saved" and "已保存" in shell.status_bar_widget.project_label.text(),
+            session is not None and session.storage_status == "saved" and "已保存" in shell.status_bar_widget.storage_label.text(),
         )
     )
 

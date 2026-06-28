@@ -859,6 +859,52 @@ QLabel#nfsWorkflowTimelineTitle {
     font-weight: 600;
 }
 
+QFrame#commercialProjectContextBar {
+    background-color: transparent;
+    border: none;
+}
+
+QLabel#commercialProjectContextName {
+    color: #94A3B8;
+    font-size: 11px;
+}
+
+QLabel#commercialProjectContextStatus {
+    color: #6EE7B7;
+    font-size: 10px;
+}
+
+QLabel#commercialProjectContextStatus[dirty="true"] {
+    color: #FBBF24;
+}
+
+QLabel#commercialProjectContextDot {
+    color: #FBBF24;
+    font-size: 8px;
+}
+
+QLabel#nfsWorkflowTimelineContextName {
+    color: #CBD5E1;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+QLabel#nfsWorkflowTimelineContextStatus {
+    color: #6EE7B7;
+    font-size: 9px;
+}
+
+QLabel#commercialViewProjectBanner {
+    color: #94A3B8;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 0;
+}
+
+QFrame#commercialProjectSummaryCard {
+    max-height: 180px;
+}
+
 /* --- Icon toolbar --- */
 
 QToolButton#commercialIconToolButton,

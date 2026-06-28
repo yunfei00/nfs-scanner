@@ -47,7 +47,8 @@ class ProjectCreateTestCase(unittest.TestCase):
             sample_name="PCB-A",
             description="unit test",
         )
-        model, root = self.service.create_project(request)
+        model = self.service.create_project(request)
+        root = Path(model.project_root)
         self.assertTrue(root.is_dir())
         for sub in ("scans", "reports", "exports", "snapshots", "logs", "qa"):
             self.assertTrue((root / sub).is_dir())
@@ -61,7 +62,7 @@ class ProjectCreateTestCase(unittest.TestCase):
         self.assertIn("project_id", payload)
         self.assertIn("scan_config", payload)
         self.assertEqual(payload["task_index"], [])
-        self.assertFalse(self.service.is_dirty)
+        self.assertFalse(self.service.is_dirty())
         self.assertEqual(model.project_name, "UnitTestScan")
 
     def test_standard_template_scan_config(self) -> None:
@@ -120,7 +121,8 @@ class ProjectNewUiSyncTestCase(unittest.TestCase):
                 assert session is not None
                 self.assertEqual(session.name, "QASyncProject")
                 self.assertEqual(session.storage_status, "saved")
-                self.assertIn("已保存", shell.status_bar_widget.project_label.text())
+                self.assertIn("QASyncProject", shell.status_bar_widget.project_label.text())
+                self.assertIn("已保存", shell.status_bar_widget.storage_label.text())
                 self.assertEqual(shell.workflow_panel.step_state(0), "completed")
                 self.assertEqual(shell.mock_scan.snapshot().status, "configured")
                 self.assertEqual(len(shell.workspace.data_view().analysis_service.list_tasks()), 0)

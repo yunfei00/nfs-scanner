@@ -73,9 +73,11 @@ NFS_SCANNER_UI=commercial
 
 ## 当前状态
 
-**Commercial V1 功能完成**（正式商用流程 + Simulation Provider）。
+**Commercial V1 项目生命周期完成**（正式商用流程 + Simulation Provider）。
 
 - 文档：`.ai/reviews/commercial_v1_functional_completion.md`
+- 项目生命周期：`.ai/reviews/commercial_v1_project_lifecycle.md`
+- 项目生命周期验收：`.ai/reviews/commercial_v1_project_lifecycle_acceptance.md`
 - Action 清单：`.ai/reviews/commercial_v1_action_inventory.md`
 - 手动验收：`.ai/reviews/commercial_v1_manual_acceptance.md`
 - v0.5 冻结 tag：`commercial-demo-v0.5`（历史基线）
@@ -85,6 +87,13 @@ NFS_SCANNER_UI=commercial
 ```text
 全部工具栏/Tab/属性页/导出/自检 → Mock 行为完整 → QA PASS → 已冻结
 ```
+
+项目生命周期已正式落盘：
+
+- 默认项目根目录：`~/.nfs_scanner/projects/`
+- 项目文件：`<ProjectName>/project.nfsproj`
+- 最近项目：`~/.nfs_scanner/recent_projects.json`
+- 支持新建、打开、保存、另存为、recent、dirty 状态与多处 UI 项目上下文显示。
 
 v0.4 功能验收（Reset 状态一致、Stop 不生成 task）仍然有效。
 

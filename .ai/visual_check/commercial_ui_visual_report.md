@@ -1,6 +1,6 @@
 # Commercial UI Visual Report
 
-- Generated: 2026-06-28 09:14:56
+- Generated: 2026-06-28 12:01:39
 - Default screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_default.png`
 - Top header screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_top_header.png`
 - Maximized screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_maximized.png`
@@ -20,7 +20,7 @@
 | colorbar_adjacent | gap <= 12 px | 2px | PASS |
 | right_panel_width | 340–380 px | 350px | PASS |
 | left_panel_width | 220–280 px | 230px | PASS |
-| workflow_panel_height | <= 360 px | 257px | PASS |
+| workflow_panel_height | <= 360 px | 279px | PASS |
 | device_status_panel_height | expanded content height 120-650 px in left scroll | 624px | PASS |
 | left_no_nested_device_scroll | no isolated device-status scroll area | inner_scroll=False | PASS |
 | device_status_collapsed_height | collapsed height <= 100 px | 45px | PASS |
@@ -125,7 +125,7 @@
 | colorbar_adjacent | gap <= 12 px | 2px | PASS |
 | right_panel_width | 340–380 px | 350px | PASS |
 | left_panel_width | 220–280 px | 230px | PASS |
-| workflow_panel_height | <= 360 px | 257px | PASS |
+| workflow_panel_height | <= 360 px | 279px | PASS |
 | device_status_panel_height | expanded content height 120-650 px in left scroll | 624px | PASS |
 | left_no_nested_device_scroll | no isolated device-status scroll area | inner_scroll=False | PASS |
 | device_status_collapsed_height | collapsed height <= 100 px | 45px | PASS |

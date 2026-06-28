@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from PySide6.QtWidgets import QWidget
+
 from nfs_scanner.core.device_service import DeviceServiceProtocol
-from nfs_scanner.core.mock_project_service import ProjectSession
+from nfs_scanner.core.project import ProjectService
+from nfs_scanner.core.project.model import ProjectSession
 from nfs_scanner.core.runtime_service import RuntimeSnapshot
+from nfs_scanner.version import APP_NAME, APP_VERSION
 
 from .demo_state import DemoState
 from .status_bar import CommercialStatusBar
@@ -28,7 +32,7 @@ def devices_ready(device_service: DeviceServiceProtocol) -> bool:
 def build_demo_state(
     snapshot: RuntimeSnapshot,
     *,
-    session: ProjectSession | None,
+    project_service: ProjectService,
     devices_connected: bool,
     scan_config_valid: bool,
     current_task_id: str | None,
@@ -38,6 +42,14 @@ def build_demo_state(
     report_exported_for_task_id: str | None,
     has_history_tasks: bool,
 ) -> DemoState:
+    """Build unified demo state including project visibility fields."""
+
+    session = project_service.current_session()
+    model = project_service.model
+    project_dir = project_service.project_dir
+    project_file = None
+    if project_dir is not None:
+        project_file = str(project_dir / "project.nfsproj")
     return DemoState.from_runtime(
         snapshot,
         project_open=session is not None,
@@ -50,7 +62,25 @@ def build_demo_state(
         report_exported_for_task_id=report_exported_for_task_id,
         storage_saved=session.storage_status == "saved" if session else False,
         has_history_tasks=has_history_tasks,
+        project_id=session.project_id if session else None,
+        project_name=session.name if session else None,
+        project_root=str(project_dir) if project_dir else None,
+        project_file=project_file,
+        project_dirty=project_service.is_dirty(),
+        project_created_at=model.created_at if model else None,
+        project_updated_at=model.updated_at if model else None,
     )
+
+
+def apply_window_project_title(window: QWidget, state: DemoState) -> None:
+    """Set shell window title from active project context."""
+
+    title = f"{APP_NAME} v{APP_VERSION}"
+    if state.project_name:
+        title += f" - {state.project_name}"
+        if state.project_dirty:
+            title += " *"
+    window.setWindowTitle(title)
 
 
 def apply_demo_state(
@@ -62,24 +92,39 @@ def apply_demo_state(
     snapshot: RuntimeSnapshot,
     session: ProjectSession | None,
     last_task_name: str | None = None,
+    project_context_bar=None,
+    project_summary_card=None,
+    data_view=None,
+    report_view=None,
+    window: QWidget | None = None,
 ) -> None:
-    """Push derived demo state to workflow, status bar, and toolbar."""
+    """Push derived demo state to workflow, status bar, toolbar, and project UI."""
 
     step_states, hints = state.workflow_step_states()
     workflow.update_from_demo_state(step_states, hints)
+    workflow.update_project_step_context(state.project_name, storage_saved=state.storage_saved)
 
-    status_bar.update_project_session(session)
-    status_bar.update_runtime_snapshot(snapshot, task_name=last_task_name)
-    status_bar.demo_label.setText("Mock · Dry Run · 无硬件控制")
-    if state.storage_saved:
-        status_bar.storage_label.setText("存储: 已保存")
-    else:
-        status_bar.storage_label.setText("模式: 无硬件控制")
-    status_bar._refresh_chip_widths()
+    status_bar.update_from_demo_state(state, snapshot, session=session, task_name=last_task_name)
+
+    if project_context_bar is not None and hasattr(project_context_bar, "update_project_context"):
+        project_context_bar.update_project_context(
+            state.project_name,
+            storage_saved=state.storage_saved,
+            project_root=state.project_root,
+        )
+    elif project_context_bar is not None and hasattr(project_context_bar, "update_from_state"):
+        project_context_bar.update_from_state(state)
+    if project_summary_card is not None:
+        project_summary_card.update_from_state(state)
+    if data_view is not None and hasattr(data_view, "update_project_context"):
+        data_view.update_project_context(state.project_name, state.project_root)
+    if report_view is not None and hasattr(report_view, "update_project_context"):
+        report_view.update_project_context(state.project_name, state.project_root)
+    if window is not None:
+        apply_window_project_title(window, state)
 
     buttons = state.button_states()
     paused = state.scan_state == "paused"
-    running = state.scan_state in ("running", "paused")
     toolbar.set_scan_controls_enabled(
         start_enabled=buttons["start"],
         pause_enabled=buttons["pause"],

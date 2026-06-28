@@ -4,15 +4,15 @@ Last updated: 2026-06-28
 
 ## Current Stage
 
-**Commercial V1 — New Project Complete**
+**Commercial V1 — Project Lifecycle Complete**
 
-正式「新建项目」已实现：对话框 + 完整工程目录 + `project.nfsproj` 自动保存。
+商业版 UI 项目生命周期已完成：新建、打开、保存、另存为、最近项目、当前项目上下文显示、dirty 状态与自动 QA 验证。
 
 ## Next Stage
 
-**Commercial V1 — Open / Save Project**（后续 Sprint，本轮未实现）
+**Commercial V1 — Post-Lifecycle Review / Real Device Planning**
 
-Real Device Integration 仍须 R01 安全评审后启动。
+Real Device Integration 仍须 R01 安全评审后启动；项目生命周期本身不再依赖真实设备。
 
 ## Constraints
 
@@ -25,6 +25,7 @@ Real Device Integration 仍须 R01 安全评审后启动。
 | 版本 | 状态 | 文档 |
 |------|------|------|
 | Commercial V1 | **active** | `.ai/reviews/commercial_v1_functional_completion.md` |
+| Commercial V1 Project Lifecycle | **complete** | `.ai/reviews/commercial_v1_project_lifecycle_acceptance.md` |
 | Commercial Demo v0.5 | frozen | `.ai/releases/commercial_demo_v0_5_freeze.md` |
 | Commercial Demo v0.4 | frozen | `.ai/reviews/commercial_demo_v0_4_final_acceptance.md` |
 
@@ -32,8 +33,8 @@ Real Device Integration 仍须 R01 安全评审后启动。
 
 | Sprint | Status |
 |--------|--------|
-| Commercial V1 New Project | **complete** ✅ |
-| Commercial V1 (other) | active |
+| Commercial V1 New Project | complete ✅ |
+| Commercial V1 Project Lifecycle | **complete** ✅ |
 | Commercial Demo v0.5 | frozen ✅ |
 | Real Device R01–R10 | **planning only** 📋 |
 | Real Motion Control | **blocked** until R01 safety review |
