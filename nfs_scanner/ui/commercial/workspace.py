@@ -70,6 +70,7 @@ class CommercialWorkspace(QWidget):
                     self._services.devices,
                     self._services.device_config,
                     self._services.motion_connection,
+                    self._services.device_provider,
                     self.tab_widget,
                 )
                 self._device_center_view = view

@@ -1,4 +1,4 @@
-"""Device center workspace view backed by device and config services."""
+"""Device center workspace view backed by simulation device services."""
 
 from __future__ import annotations
 
@@ -19,46 +19,53 @@ from PySide6.QtWidgets import (
 
 from nfs_scanner.core.device_config import CameraDeviceConfig, MotionDeviceConfig, SpectrumDeviceConfig
 from nfs_scanner.core.device_service import DeviceServiceProtocol, DeviceSummary
-from nfs_scanner.core.integration_safety import (
-    REAL_DEVICE_ENV_VAR,
-    RealDeviceControlBlockedError,
-    is_real_device_control_allowed,
-)
+from nfs_scanner.core.devices.simulation_provider import CORE_DEVICE_IDS, SimulationDeviceProvider
 from nfs_scanner.core.mock_device_config_service import MockDeviceConfigService
 from nfs_scanner.core.mock_device_service import MockDeviceService
-from nfs_scanner.core.motion_connection_adapter import (
-    REAL_CONNECTION_BANNER,
-    MotionConnectionAdapter,
-    MotionConnectionError,
-)
-from nfs_scanner.core.serial_discovery import list_serial_ports
 
 from ..scroll_helpers import configure_abstract_scroll_area, configure_scroll_area
 from ..widgets import NFSCard, NFSPrimaryButton, NFSSecondaryButton, NFSStatusBadge
 
 
 class DeviceCenterView(QWidget):
-    """Device management page with mock services and motion connection test."""
+    """Device management page — formal UI with simulation / dry-run only."""
 
     devices_changed = Signal()
+    config_saved = Signal(str)
     feedback_requested = Signal(str, str)
 
     def __init__(
         self,
         device_service: DeviceServiceProtocol,
         config_service: MockDeviceConfigService | None = None,
-        motion_connection: MotionConnectionAdapter | None = None,
+        motion_connection=None,
+        device_provider: SimulationDeviceProvider | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.setObjectName("deviceCenterView")
         self._device_service = device_service
         self._config_service = config_service or MockDeviceConfigService()
-        self._motion_connection = motion_connection or MotionConnectionAdapter()
+        self._provider = device_provider
         self._cards_layout: QVBoxLayout | None = None
         self._dry_run_log_view: QPlainTextEdit | None = None
+        self._project_label: QLabel | None = None
+        self._safety_label: QLabel | None = None
         self._setup_ui()
         self.refresh_devices()
+
+    def set_project_context(self, project_name: str | None) -> None:
+        if self._project_label is not None:
+            text = project_name or "（未打开项目）"
+            self._project_label.setText(f"当前项目：{text}")
+
+    def sync_dry_run_log(self, lines: list[str] | None = None) -> None:
+        if self._dry_run_log_view is None:
+            return
+        if lines is None and self._provider is not None:
+            lines = self._provider.command_log
+        if lines is not None:
+            self._dry_run_log_view.setPlainText("\n".join(lines))
 
     def append_dry_run_line(self, line: str) -> None:
         if self._dry_run_log_view is not None and line.strip():
@@ -75,8 +82,11 @@ class DeviceCenterView(QWidget):
             if widget is not None:
                 widget.deleteLater()
         for device in self._device_service.list_devices():
+            if device.kind == "vna":
+                continue
             self._cards_layout.addWidget(self._create_device_card(device))
         self._cards_layout.addStretch(1)
+        self.sync_dry_run_log()
 
     def _setup_ui(self) -> None:
         root_layout = QVBoxLayout(self)
@@ -88,13 +98,28 @@ class DeviceCenterView(QWidget):
         header_layout.setContentsMargins(8, 8, 8, 0)
         title = QLabel("设备中心", header)
         title.setObjectName("nfsSectionTitle")
-        subtitle = QLabel("Mock 设备管理 + 运动平台真实连接测试（不发送运动命令）", header)
-        subtitle.setObjectName("nfsMutedLabel")
         header_layout.addWidget(title)
-        header_layout.addWidget(subtitle)
-        header_layout.addStretch(1)
+
+        meta = QWidget(header)
+        meta_layout = QVBoxLayout(meta)
+        meta_layout.setContentsMargins(0, 0, 0, 0)
+        meta_layout.setSpacing(2)
+        self._project_label = QLabel("当前项目：（未打开项目）", meta)
+        self._project_label.setObjectName("nfsMutedLabel")
+        self._safety_label = QLabel("安全模式：NO HARDWARE CONTROL · Simulation / Dry Run", meta)
+        self._safety_label.setObjectName("nfsValueLabel")
+        meta_layout.addWidget(self._project_label)
+        meta_layout.addWidget(self._safety_label)
+        header_layout.addWidget(meta, 1)
+
+        connect_all = NFSPrimaryButton("全部连接", header)
+        connect_all.clicked.connect(self._connect_all)
+        disconnect_all = NFSSecondaryButton("全部断开", header)
+        disconnect_all.clicked.connect(self._disconnect_all)
         refresh_all = NFSSecondaryButton("全部刷新", header)
         refresh_all.clicked.connect(self._refresh_all)
+        header_layout.addWidget(connect_all)
+        header_layout.addWidget(disconnect_all)
         header_layout.addWidget(refresh_all)
         root_layout.addWidget(header)
 
@@ -125,18 +150,15 @@ class DeviceCenterView(QWidget):
         card = NFSCard(device.display_name, self)
         card.setProperty("deviceKind", device.kind)
 
-        if device.kind == "motion":
-            banner = QLabel(REAL_CONNECTION_BANNER, card.body)
-            banner.setObjectName("nfsMutedLabel")
-            banner.setWordWrap(True)
-            card.body_layout.addWidget(banner)
-
         header = QWidget(card.body)
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(0, 0, 0, 0)
         kind_label = QLabel(device.kind.upper(), header)
         kind_label.setObjectName("nfsMutedLabel")
+        dry_run_badge = QLabel("DRY RUN", header)
+        dry_run_badge.setObjectName("nfsMutedLabel")
         header_layout.addWidget(kind_label)
+        header_layout.addWidget(dry_run_badge)
         header_layout.addStretch(1)
         header_layout.addWidget(NFSStatusBadge(device.status_label, device.badge_status, header))
         card.body_layout.addWidget(header)
@@ -145,24 +167,22 @@ class DeviceCenterView(QWidget):
         form.setContentsMargins(0, 0, 0, 0)
         form.setVerticalSpacing(8)
         form.addRow("型号/协议", QLabel(device.model, card.body))
-        config_summary = QLabel(self._config_service.summary_for_device(device.device_id, device.kind), card.body)
+        config_summary = QLabel(
+            self._config_service.summary_for_device(device.device_id, device.kind),
+            card.body,
+        )
         config_summary.setObjectName("nfsValueLabel")
         form.addRow("连接配置", config_summary)
         message = QLabel(device.last_message or "—", card.body)
         message.setObjectName("nfsMutedLabel")
         message.setWordWrap(True)
         form.addRow("最近状态", message)
+        updated = QLabel(device.last_updated or "—", card.body)
+        updated.setObjectName("nfsMutedLabel")
+        form.addRow("更新时间", updated)
         card.body_layout.addLayout(form)
 
         card.body_layout.addWidget(self._build_config_editor(device))
-
-        if device.kind == "motion":
-            conn_log = QPlainTextEdit(card.body)
-            conn_log.setObjectName("nfsMotionConnectionLog")
-            conn_log.setReadOnly(True)
-            conn_log.setMaximumHeight(96)
-            conn_log.setPlainText("\n".join(self._motion_connection.log_lines()) or "连接日志（只读）")
-            card.body_layout.addWidget(conn_log)
 
         actions = QWidget(card.body)
         actions_layout = QHBoxLayout(actions)
@@ -171,18 +191,18 @@ class DeviceCenterView(QWidget):
         connect_button = NFSPrimaryButton("连接", actions)
         disconnect_button = NFSSecondaryButton("断开", actions)
         refresh_button = NFSSecondaryButton("刷新", actions)
-        reset_button = NFSSecondaryButton("Reset Mock", actions)
-        detail_button = NFSSecondaryButton("Detail", actions)
+        test_button = NFSSecondaryButton("测试连接", actions)
+        configure_button = NFSSecondaryButton("配置", actions)
         connect_button.clicked.connect(lambda _checked=False, did=device.device_id: self._connect(did))
         disconnect_button.clicked.connect(lambda _checked=False, did=device.device_id: self._disconnect(did))
         refresh_button.clicked.connect(lambda _checked=False, did=device.device_id: self._refresh_one(did))
-        reset_button.clicked.connect(lambda _checked=False, did=device.device_id: self._reset_one(did))
-        detail_button.clicked.connect(lambda _checked=False, did=device.device_id: self._show_detail(did))
+        test_button.clicked.connect(lambda _checked=False, did=device.device_id: self._test_connection(did))
+        configure_button.clicked.connect(lambda _checked=False, did=device.device_id: self._show_detail(did))
         actions_layout.addWidget(connect_button)
         actions_layout.addWidget(disconnect_button)
         actions_layout.addWidget(refresh_button)
-        actions_layout.addWidget(reset_button)
-        actions_layout.addWidget(detail_button)
+        actions_layout.addWidget(test_button)
+        actions_layout.addWidget(configure_button)
         actions_layout.addStretch(1)
         card.body_layout.addWidget(actions)
         return card
@@ -193,7 +213,7 @@ class DeviceCenterView(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
 
-        title = QLabel("设备配置（内存保存，默认 mock）", panel)
+        title = QLabel("设备配置（MOCK CONFIG ONLY — 不访问真实硬件）", panel)
         title.setObjectName("nfsMutedLabel")
         layout.addWidget(title)
 
@@ -208,9 +228,6 @@ class DeviceCenterView(QWidget):
             port_combo = QComboBox(panel)
             port_combo.setEditable(True)
             self._populate_serial_ports(port_combo, cfg.port)
-            refresh_ports = NFSSecondaryButton("刷新串口", panel)
-            refresh_ports.clicked.connect(lambda: self._populate_serial_ports(port_combo, port_combo.currentText()))
-
             baud = QSpinBox(panel)
             baud.setRange(1200, 921600)
             baud.setValue(cfg.baudrate)
@@ -222,26 +239,14 @@ class DeviceCenterView(QWidget):
             timeout.setSingleStep(0.1)
             timeout.setValue(cfg.timeout)
             mode = QComboBox(panel)
-            mode.addItem("mock", "mock")
-            mode.addItem("real_connection_test", "real_connection_test")
+            mode.addItem("simulation", "mock")
+            mode.addItem("dry-run", "mock")
             mode.setCurrentIndex(0)
-            mode.setToolTip("Mock 模式：真实设备连接已禁用")
-            model = mode.model()
-            item = model.item(1)
-            if item is not None:
-                item.setEnabled(False)
-                item.setToolTip("Mock 模式：真实设备连接已禁用")
             form.addRow("串口", port_combo)
-            form.addRow("", refresh_ports)
             form.addRow("波特率", baud)
             form.addRow("协议", protocol)
             form.addRow("超时 (s)", timeout)
             form.addRow("连接模式", mode)
-            if not is_real_device_control_allowed():
-                hint = QLabel(f"真实连接测试需设置 {REAL_DEVICE_ENV_VAR}=1", panel)
-                hint.setObjectName("nfsMutedLabel")
-                hint.setWordWrap(True)
-                form.addRow(hint)
 
             def apply_motion() -> None:
                 config = MotionDeviceConfig(
@@ -249,17 +254,19 @@ class DeviceCenterView(QWidget):
                     baudrate=baud.value(),
                     protocol=protocol.currentText(),
                     timeout=timeout.value(),
-                    connection_mode=mode.currentData(),
+                    connection_mode="mock",
                 )
                 errors = self._config_service.set_motion(device.device_id, config)
-                validation.setText("；".join(errors) if errors else "配置已保存（内存）")
+                validation.setText("；".join(errors) if errors else "MOCK CONFIG ONLY — 配置已保存")
                 if not errors:
-                    self.feedback_requested.emit("DEVICE", f"Mock config applied: {device.display_name}")
+                    self.config_saved.emit(f"motion {config.port} @ {config.baudrate}")
+                    self.feedback_requested.emit("DEVICE", f"MOCK CONFIG ONLY: {device.display_name}")
                     self.refresh_devices()
+                    self.devices_changed.emit()
 
             apply_button = NFSSecondaryButton("应用配置", panel)
             apply_button.clicked.connect(apply_motion)
-        elif device.kind in {"spectrum", "vna"}:
+        elif device.kind == "spectrum":
             cfg = self._config_service.get_spectrum(device.device_id)
             resource = QLineEdit(cfg.resource, panel)
             ip = QLineEdit(cfg.ip, panel)
@@ -280,10 +287,12 @@ class DeviceCenterView(QWidget):
                     model=model_field.text(),
                 )
                 errors = self._config_service.set_spectrum(device.device_id, config)
-                validation.setText("；".join(errors) if errors else "配置已保存（内存）")
+                validation.setText("；".join(errors) if errors else "MOCK CONFIG ONLY — 配置已保存")
                 if not errors:
-                    self.feedback_requested.emit("DEVICE", f"Mock config applied: {device.display_name}")
+                    self.config_saved.emit(f"spectrum {config.ip}:{config.port}")
+                    self.feedback_requested.emit("DEVICE", f"MOCK CONFIG ONLY: {device.display_name}")
                     self.refresh_devices()
+                    self.devices_changed.emit()
 
             apply_button = NFSSecondaryButton("应用配置", panel)
             apply_button.clicked.connect(apply_spectrum)
@@ -296,7 +305,7 @@ class DeviceCenterView(QWidget):
             fps = QSpinBox(panel)
             fps.setRange(1, 120)
             fps.setValue(cfg.fps)
-            form.addRow("相机索引", index)
+            form.addRow("设备 ID / 索引", index)
             form.addRow("分辨率", resolution)
             form.addRow("帧率", fps)
 
@@ -307,10 +316,12 @@ class DeviceCenterView(QWidget):
                     fps=fps.value(),
                 )
                 errors = self._config_service.set_camera(device.device_id, config)
-                validation.setText("；".join(errors) if errors else "配置已保存（内存）")
+                validation.setText("；".join(errors) if errors else "MOCK CONFIG ONLY — 配置已保存")
                 if not errors:
-                    self.feedback_requested.emit("DEVICE", f"Mock config applied: {device.display_name}")
+                    self.config_saved.emit(f"camera #{config.camera_index} {config.resolution}")
+                    self.feedback_requested.emit("DEVICE", f"MOCK CONFIG ONLY: {device.display_name}")
                     self.refresh_devices()
+                    self.devices_changed.emit()
 
             apply_button = NFSSecondaryButton("应用配置", panel)
             apply_button.clicked.connect(apply_camera)
@@ -323,47 +334,24 @@ class DeviceCenterView(QWidget):
     def _populate_serial_ports(self, combo: QComboBox, selected: str) -> None:
         current = selected.strip()
         combo.clear()
-        names = list(dict.fromkeys([current or "COM6", "MOCK://motion", "DRY-RUN://motion"]))
-        for name in names:
+        for name in [current or "COM6", "MOCK://motion", "DRY-RUN://motion"]:
             combo.addItem(name, name)
-        combo.setToolTip("Mock 模式：不枚举真实串口")
+        combo.setToolTip("Simulation 模式：不枚举真实串口")
         if current:
             index = combo.findData(current)
             if index >= 0:
                 combo.setCurrentIndex(index)
-        return
-        ports = list_serial_ports()
-        if not ports:
-            combo.addItem(current or "")
-            combo.setToolTip("未发现串口")
-            return
-        names = [entry.name for entry in ports]
-        for entry in ports:
-            label = entry.name
-            if entry.description:
-                label = f"{entry.name} — {entry.description}"
-            combo.addItem(label, entry.name)
-        if current and current not in names:
-            combo.insertItem(0, current, current)
-        index = combo.findData(current)
-        if index >= 0:
-            combo.setCurrentIndex(index)
-        elif current:
-            combo.setEditText(current)
 
     def _connect(self, device_id: str) -> None:
         device = self._find_device(device_id)
         if device is None:
             return
-        if device.kind == "motion":
-            cfg = self._config_service.get_motion(device_id)
-            if cfg.connection_mode == "real_connection_test":
-                self._connect_motion_real(device_id, cfg)
-                self.refresh_devices()
-                self.devices_changed.emit()
-                return
-        self._device_service.connect_device(device_id)
-        self.feedback_requested.emit("DEVICE", f"Mock connect requested: {device.display_name}")
+        if self._provider is not None:
+            result = self._provider.connect_device(device_id)
+            self.append_dry_run_line(result.message)
+        else:
+            self._device_service.connect_device(device_id)
+        self.feedback_requested.emit("DEVICE", f"Simulation connect: {device.display_name}")
         self.refresh_devices()
         self.devices_changed.emit()
 
@@ -371,90 +359,47 @@ class DeviceCenterView(QWidget):
         device = self._find_device(device_id)
         if device is None:
             return
-        if device.kind == "motion":
-            cfg = self._config_service.get_motion(device_id)
-            if cfg.connection_mode == "real_connection_test":
-                self._disconnect_motion_real(device_id)
-                self.refresh_devices()
-                self.devices_changed.emit()
-                return
-        self._device_service.disconnect_device(device_id)
-        self.feedback_requested.emit("DEVICE", f"Mock disconnect requested: {device.display_name}")
+        if self._provider is not None:
+            result = self._provider.disconnect_device(device_id)
+            self.append_dry_run_line(result.message)
+        else:
+            self._device_service.disconnect_device(device_id)
+        self.feedback_requested.emit("DEVICE", f"Simulation disconnect: {device.display_name}")
         self.refresh_devices()
         self.devices_changed.emit()
 
-    def _connect_motion_real(self, device_id: str, config: MotionDeviceConfig) -> None:
-        errors = config.validate_for_real_connection_test()
-        if errors:
-            self._log_motion_connection("; ".join(errors))
-            if isinstance(self._device_service, MockDeviceService):
-                self._device_service.update_motion_connection_state(
-                    device_id,
-                    connection_status="error",
-                    status_label="错误",
-                    badge_status="error",
-                    summary=self._config_service.summary_for_device(device_id, "motion"),
-                    last_message=errors[0],
-                )
-            return
-        try:
-            snapshot = self._motion_connection.open_connection(
-                config.port,
-                config.baudrate,
-                config.timeout,
-            )
-            if isinstance(self._device_service, MockDeviceService):
-                self._device_service.update_motion_connection_state(
-                    device_id,
-                    connection_status="connected",
-                    status_label="已连接",
-                    badge_status="connected",
-                    summary=self._config_service.summary_for_device(device_id, "motion"),
-                    last_message=snapshot.last_message,
-                )
-            for line in self._motion_connection.log_lines():
-                self._log_motion_connection(line)
-        except (RealDeviceControlBlockedError, MotionConnectionError) as exc:
-            self._log_motion_connection(str(exc))
-            if isinstance(self._device_service, MockDeviceService):
-                self._device_service.update_motion_connection_state(
-                    device_id,
-                    connection_status="error",
-                    status_label="错误",
-                    badge_status="error",
-                    summary=self._config_service.summary_for_device(device_id, "motion"),
-                    last_message=str(exc),
-                )
+    def _connect_all(self) -> None:
+        if self._provider is not None:
+            self.append_dry_run_line("DRY RUN - NO HARDWARE CONTROL")
+            for result in self._provider.connect_all():
+                self.append_dry_run_line(result.message)
+        else:
+            for device_id in CORE_DEVICE_IDS:
+                self._device_service.connect_device(device_id)
+        self.feedback_requested.emit("DEVICE", "Simulation connect all")
+        self.refresh_devices()
+        self.devices_changed.emit()
 
-    def _disconnect_motion_real(self, device_id: str) -> None:
-        try:
-            snapshot = self._motion_connection.close_connection()
-            if isinstance(self._device_service, MockDeviceService):
-                self._device_service.update_motion_connection_state(
-                    device_id,
-                    connection_status="disconnected",
-                    status_label="未连接",
-                    badge_status="disconnected",
-                    summary=self._config_service.summary_for_device(device_id, "motion"),
-                    last_message=snapshot.last_message or "Real connection closed",
-                )
-            for line in self._motion_connection.log_lines()[-2:]:
-                self._log_motion_connection(line)
-        except MotionConnectionError as exc:
-            self._log_motion_connection(str(exc))
-
-    def _log_motion_connection(self, message: str) -> None:
-        if message.strip():
-            self.append_dry_run_line(f"[CONN TEST] {message}")
-
-    def _find_device(self, device_id: str) -> DeviceSummary | None:
-        for device in self._device_service.list_devices():
-            if device.device_id == device_id:
-                return device
-        return None
+    def _disconnect_all(self) -> None:
+        if self._provider is not None:
+            for result in self._provider.disconnect_all():
+                self.append_dry_run_line(result.message)
+        else:
+            for device in self._device_service.list_devices():
+                if device.device_id in CORE_DEVICE_IDS:
+                    self._device_service.disconnect_device(device.device_id)
+        self.feedback_requested.emit("DEVICE", "Simulation disconnect all")
+        self.refresh_devices()
+        self.devices_changed.emit()
 
     def _refresh_one(self, device_id: str) -> None:
-        self._device_service.refresh_status()
+        if self._provider is not None:
+            result = self._provider.refresh_device(device_id)
+            self.append_dry_run_line(result.message)
+        elif isinstance(self._device_service, MockDeviceService):
+            self._device_service.refresh_device(device_id)
+        else:
+            self._device_service.refresh_status()
         device = self._find_device(device_id)
         name = device.display_name if device is not None else device_id
         self.feedback_requested.emit("DEVICE", f"Mock status refreshed: {name}")
@@ -462,19 +407,35 @@ class DeviceCenterView(QWidget):
         self.devices_changed.emit()
 
     def _refresh_all(self) -> None:
-        self._device_service.refresh_status()
+        if self._provider is not None:
+            for result in self._provider.refresh_all():
+                self.append_dry_run_line(result.message)
+        else:
+            self._device_service.refresh_status()
         self.feedback_requested.emit("DEVICE", "Mock status refreshed: all devices")
         self.refresh_devices()
         self.devices_changed.emit()
 
-    def _reset_one(self, device_id: str) -> None:
-        if isinstance(self._device_service, MockDeviceService):
-            device = self._device_service.reset_device(device_id)
-            self.feedback_requested.emit("DEVICE", f"Mock reset: {device.display_name}")
+    def _test_connection(self, device_id: str) -> None:
+        device = self._find_device(device_id)
+        if device is None:
+            return
+        if self._provider is not None:
+            result = self._provider.test_connection(device_id)
+            self.append_dry_run_line(result.message)
+            message = result.message
         else:
-            self.feedback_requested.emit("DEVICE", f"Mock reset unavailable: {device_id}")
+            message = f"Simulation test OK: {device.display_name}"
+            self.append_dry_run_line(message)
+        self.feedback_requested.emit("DEVICE", f"测试连接成功: {device.display_name} — {message}")
         self.refresh_devices()
         self.devices_changed.emit()
+
+    def _find_device(self, device_id: str) -> DeviceSummary | None:
+        for device in self._device_service.list_devices():
+            if device.device_id == device_id:
+                return device
+        return None
 
     def _show_detail(self, device_id: str) -> None:
         device = self._find_device(device_id)
@@ -482,20 +443,19 @@ class DeviceCenterView(QWidget):
             return
         self.feedback_requested.emit(
             "DEVICE",
-            f"Mock detail: {device.display_name} | {device.model} | {device.address} | {device.connection_status}",
+            f"配置: {device.display_name} | {device.model} | "
+            f"{self._config_service.summary_for_device(device_id, device.kind)}",
         )
 
     def focus_config_tab(self) -> None:
-        self.feedback_requested.emit("DEVICE", "设备配置面板已激活")
+        self.feedback_requested.emit("DEVICE", "设备配置面板已激活 — 请在设备卡片中编辑配置")
 
     def test_selected_connection(self) -> None:
-        for device in self._device_service.list_devices():
-            if device.kind == "motion":
-                self._connect(device.device_id)
-                self.append_dry_run_line(f"[TEST] Simulation connection OK: {device.display_name}")
-                self.feedback_requested.emit("DEVICE", f"测试连接成功: {device.display_name} (Simulation)")
+        for device_id in CORE_DEVICE_IDS:
+            device = self._find_device(device_id)
+            if device is not None:
+                self._test_connection(device_id)
                 return
         devices = self._device_service.list_devices()
         if devices:
-            self._connect(devices[0].device_id)
-            self.feedback_requested.emit("DEVICE", f"测试连接成功: {devices[0].display_name} (Simulation)")
+            self._test_connection(devices[0].device_id)
