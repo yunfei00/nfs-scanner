@@ -40,11 +40,16 @@ class CommercialMockFlowTestCase(unittest.TestCase):
 
             shell._on_connect_device()
             self._app.processEvents()
-            self.assertTrue(all(item.connection_status == "connected" for item in shell._services.devices.list_devices()))
+            core_ids = {"motion-001", "spectrum-001", "camera-001"}
+            connected = {
+                item.device_id
+                for item in shell._services.devices.list_devices()
+                if item.connection_status == "connected"
+            }
+            self.assertEqual(core_ids, connected)
 
-            mode_widgets = shell.workspace.device_center_view().findChildren(QComboBox)
-            real_mode_tooltips = [widget.toolTip() for widget in mode_widgets if widget.findData("real_connection_test") >= 0]
-            self.assertTrue(any("真实设备连接已禁用" in tip for tip in real_mode_tooltips))
+            center = shell.workspace.device_center_view()
+            self.assertIn("NO HARDWARE CONTROL", center._safety_label.text())
 
             lut_items = {
                 combo.itemText(index)

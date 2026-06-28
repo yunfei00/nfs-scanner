@@ -20,6 +20,12 @@ class MockDeviceServiceTestCase(unittest.TestCase):
         kinds = {device.kind for device in devices}
         self.assertEqual(kinds, {"motion", "spectrum", "camera", "vna"})
 
+    def test_initial_state_disconnected(self) -> None:
+        for device in self.service.list_devices():
+            if device.device_id in {"motion-001", "spectrum-001", "camera-001"}:
+                self.assertEqual(device.connection_status, "disconnected")
+                self.assertTrue(device.dry_run_enabled)
+
     def test_connect_and_disconnect(self) -> None:
         device = self.service.connect_device("spectrum-001")
         self.assertEqual(device.connection_status, "connected")

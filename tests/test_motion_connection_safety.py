@@ -49,18 +49,27 @@ class MotionConnectionSafetyTestCase(unittest.TestCase):
         finally:
             view.close()
 
-    def test_real_connection_rejected_without_env(self) -> None:
-        service = MockDeviceService()
+    def test_real_connection_mode_uses_simulation_in_device_center(self) -> None:
+        """Device Center V1 always simulation — real_connection_test config does not open serial."""
+
         bundle = create_commercial_services()
         bundle.device_config.set_motion(
             "motion-001",
             MotionDeviceConfig(port="COM3", connection_mode="real_connection_test"),
         )
-        view = DeviceCenterView(service, bundle.device_config, bundle.motion_connection)
+        service = bundle.devices
+        view = DeviceCenterView(
+            service,
+            bundle.device_config,
+            bundle.motion_connection,
+            bundle.device_provider,
+        )
         try:
             view._connect("motion-001")
             device = next(item for item in service.list_devices() if item.device_id == "motion-001")
-            self.assertNotEqual(device.connection_status, "connected")
+            self.assertEqual(device.connection_status, "connected")
+            self.assertIn("dry run", device.last_message.lower())
+            self.assertFalse(is_real_device_control_allowed())
         finally:
             view.close()
 

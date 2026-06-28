@@ -18,6 +18,7 @@ from .acceptance import run_acceptance_checks
 from .functional import run_functional_demo_flow
 from .mock_features import run_mock_feature_checks
 from .project_lifecycle_checks import run_project_lifecycle_checks
+from .device_lifecycle_checks import run_device_lifecycle_checks
 from .project_new_checks import run_project_new_checks
 from .project_visibility_checks import run_project_visibility_checks
 from .v1_checks import run_v1_completion_checks
@@ -226,6 +227,9 @@ def run_commercial_qa(*, include_external: bool = True, round_number: int = 1) -
 
         project_lifecycle_checks = run_project_lifecycle_checks(shell)
         result.checks.extend(project_lifecycle_checks)
+
+        device_lifecycle_checks = run_device_lifecycle_checks(shell)
+        result.checks.extend(device_lifecycle_checks)
 
         visibility_checks = run_project_visibility_checks(shell)
         result.checks.extend(visibility_checks)
