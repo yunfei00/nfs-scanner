@@ -17,6 +17,7 @@ from .auto_fix import apply_runtime_mitigations, has_blocked_failures
 from .acceptance import run_acceptance_checks
 from .functional import run_functional_demo_flow
 from .mock_features import run_mock_feature_checks
+from .v1_checks import run_v1_completion_checks
 from .models import QACheck, QAResult
 from .report import write_qa_reports
 from .safety import run_static_safety_checks, verify_dry_run_only, verify_no_real_spectrum_camera
@@ -213,6 +214,9 @@ def run_commercial_qa(*, include_external: bool = True, round_number: int = 1) -
 
         mock_feature_checks = run_mock_feature_checks(shell)
         result.checks.extend(mock_feature_checks)
+
+        v1_checks = run_v1_completion_checks(shell)
+        result.checks.extend(v1_checks)
 
         shell.property_panel._tabs.setCurrentIndex(1)
         app.processEvents()
