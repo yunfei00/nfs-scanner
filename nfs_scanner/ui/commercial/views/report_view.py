@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 
 from nfs_scanner.core.mock_analysis_service import MockAnalysisService
 from nfs_scanner.core.mock_project_service import MockProjectService
+from nfs_scanner.core.project import ProjectService
 from nfs_scanner.core.mock_report_service import MockReportService
 
 from ..widgets import NFSCard
@@ -32,7 +33,7 @@ class ReportView(QWidget):
         parent: QWidget | None = None,
         *,
         analysis: MockAnalysisService | None = None,
-        project: MockProjectService | None = None,
+        project: MockProjectService | ProjectService | None = None,
     ) -> None:
         super().__init__(parent)
         self.setObjectName("reportView")
@@ -50,7 +51,7 @@ class ReportView(QWidget):
     def bind_services(
         self,
         analysis: MockAnalysisService,
-        project: MockProjectService | None,
+        project: MockProjectService | ProjectService | None,
     ) -> None:
         self._analysis = analysis
         self._project = project
@@ -220,6 +221,22 @@ class ReportView(QWidget):
         self.status_message.emit("REPORT", f"Mock report exported: {path_text}")
         if self._status_label is not None:
             self._status_label.setText(f"Mock 报告已导出: {path_text}")
+
+    def preview_current_report(self) -> None:
+        self._refresh_preview()
+        self.status_message.emit("REPORT", "Report preview refreshed")
+
+    def export_markdown(self) -> None:
+        self._export_report("md")
+
+    def export_html(self) -> None:
+        self._export_report("html")
+
+    def export_png(self) -> None:
+        self._export_report("png")
+
+    def export_pdf_placeholder(self) -> None:
+        self._export_report("pdf")
 
     def last_export_path(self) -> str | None:
         text = self._status_label.text() if self._status_label is not None else ""

@@ -285,6 +285,16 @@ class CommercialPropertyPanel(QScrollArea):
         if self._tabs is not None:
             self._tabs.setCurrentIndex(2)
 
+    def focus_display_tab(self) -> None:
+        if self._tabs is not None:
+            self._tabs.setCurrentIndex(1)
+
+    def emit_current_scan_config(self) -> None:
+        """Re-emit current scan configuration for path preview sync."""
+
+        self._debounce_timer.stop()
+        self._emit_scan_config()
+
     def _build_region_section(self, parent: QWidget) -> QWidget:
         frame, frame_layout = self._section_frame(parent, "扫描区域")
         region_combo = QComboBox(frame)

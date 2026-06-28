@@ -5,13 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from nfs_scanner.core.device_service import DeviceServiceProtocol
+from nfs_scanner.core.devices import SimulationDeviceProvider
 from nfs_scanner.core.dry_run_bundle import DryRunAdapterBundle, create_dry_run_bundle
 from nfs_scanner.core.mock_device_config_service import MockDeviceConfigService
-from nfs_scanner.core.mock_device_service import MockDeviceService
-from nfs_scanner.core.mock_project_service import MockProjectService
 from nfs_scanner.core.mock_scan_runtime import MockScanRuntimeService
 from nfs_scanner.core.motion_connection_adapter import MotionConnectionAdapter
+from nfs_scanner.core.project import ProjectService
 from nfs_scanner.core.runtime_service import ScanRuntimeServiceProtocol
+from nfs_scanner.core.scan_runtime import ScanRuntimeController, SimulationScanProvider
 
 
 @dataclass(slots=True)
@@ -23,17 +24,24 @@ class CommercialServiceBundle:
     device_config: MockDeviceConfigService
     dry_run: DryRunAdapterBundle
     motion_connection: MotionConnectionAdapter
-    project: MockProjectService
+    project: ProjectService
+    device_provider: SimulationDeviceProvider
+    scan_controller: ScanRuntimeController
 
 
 def create_commercial_services() -> CommercialServiceBundle:
-    """Create default mock services for the commercial UI."""
+    """Create default simulation services for Commercial V1."""
 
+    runtime = MockScanRuntimeService()
+    device_provider = SimulationDeviceProvider()
+    scan_provider = SimulationScanProvider(runtime)
     return CommercialServiceBundle(
-        runtime=MockScanRuntimeService(),
-        devices=MockDeviceService(),
+        runtime=runtime,
+        devices=device_provider.mock_service,
         device_config=MockDeviceConfigService(),
         dry_run=create_dry_run_bundle(),
         motion_connection=MotionConnectionAdapter(),
-        project=MockProjectService(),
+        project=ProjectService(),
+        device_provider=device_provider,
+        scan_controller=ScanRuntimeController(scan_provider),
     )

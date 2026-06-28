@@ -484,3 +484,18 @@ class DeviceCenterView(QWidget):
             "DEVICE",
             f"Mock detail: {device.display_name} | {device.model} | {device.address} | {device.connection_status}",
         )
+
+    def focus_config_tab(self) -> None:
+        self.feedback_requested.emit("DEVICE", "设备配置面板已激活")
+
+    def test_selected_connection(self) -> None:
+        for device in self._device_service.list_devices():
+            if device.kind == "motion":
+                self._connect(device.device_id)
+                self.append_dry_run_line(f"[TEST] Simulation connection OK: {device.display_name}")
+                self.feedback_requested.emit("DEVICE", f"测试连接成功: {device.display_name} (Simulation)")
+                return
+        devices = self._device_service.list_devices()
+        if devices:
+            self._connect(devices[0].device_id)
+            self.feedback_requested.emit("DEVICE", f"测试连接成功: {devices[0].display_name} (Simulation)")

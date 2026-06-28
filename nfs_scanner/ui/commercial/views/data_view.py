@@ -294,6 +294,39 @@ class DataView(QWidget):
         else:
             self.status_message.emit("DATA", f"无法删除任务: {task_id}")
 
+    def clear_history(self) -> None:
+        self.clear_history_tasks()
+
+    def export_selected_json(self) -> Path | None:
+        return self.export_selected_task()
+
+    def export_selected_csv(self) -> Path | None:
+        if self._task_list is None:
+            return None
+        item = self._task_list.currentItem()
+        if item is None:
+            self.status_message.emit("EXPORT", "No data task selected")
+            return None
+        task_id = str(item.data(Qt.ItemDataRole.UserRole))
+        task = self._analysis_service.get_task(task_id)
+        if task is None:
+            return None
+        output_dir = MockArtifactService.category_dir("data")
+        path = output_dir / MockArtifactService.build_filename(
+            artifact_type="scan_data",
+            task_id=task.task_id,
+            extension="csv",
+        )
+        lines = [
+            "task_id,name,point_count,completed_at,scan_mode,peak_frequency,peak_amplitude,area_mm2",
+            f"{task.task_id},{task.name},{task.point_count},{task.completed_at},"
+            f"{task.scan_mode},{task.peak_frequency},{task.peak_amplitude},{task.area_mm2}",
+        ]
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        self.data_exported.emit(str(path))
+        self.status_message.emit("EXPORT", f"Data CSV exported: {path}")
+        return path
+
     def clear_history_tasks(self) -> None:
         self._analysis_service.clear_history()
         self.refresh_tasks()

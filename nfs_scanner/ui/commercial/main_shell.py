@@ -20,12 +20,16 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from nfs_scanner.core.artifact_service import ArtifactService
 from nfs_scanner.core.demo_session import DemoServiceBundle, DemoSessionController
 from nfs_scanner.core.mock_artifact_service import MockArtifactService
 from nfs_scanner.core.mock_point_data import demo_sample_rows, export_table_json
 from nfs_scanner.core.mock_scan_runtime import MockScanRuntimeService
 
 from .demo_help_dialog import DemoHelpDialog
+
+from .action_handlers import build_action_registry
+from .actions import CommercialActionRegistry
 
 from .demo_state_sync import apply_demo_state, build_demo_state, devices_ready
 from .bottom_dock import CommercialBottomDock
@@ -95,6 +99,7 @@ class CommercialMainShell(QMainWindow):
         self._center_splitter: QSplitter | None = None
         self._upper_splitter: QSplitter | None = None
         self._custom_maximized = False
+        self._action_registry: CommercialActionRegistry | None = None
         self._setup_ui()
         self._apply_initial_window_size()
         self._connect_scan_preview()
@@ -106,6 +111,7 @@ class CommercialMainShell(QMainWindow):
         self.workspace.bind_report_analysis(self.workspace.data_view().analysis_service)
         self.workspace.report_view().report_exported.connect(self._on_report_exported)
         self.toolbar.apply_integration_safety()
+        self._action_registry = build_action_registry(self)
         self._services.project.open_mock_project()
         self._refresh_project_ui()
         self._apply_target_demo_presentation()
@@ -189,16 +195,46 @@ class CommercialMainShell(QMainWindow):
         self.toolbar.demo_reset_requested.connect(self._reset_demo_session)
 
     def _connect_toolbar_actions(self) -> None:
-        self.toolbar.project_new_requested.connect(self._on_new_project)
-        self.toolbar.project_open_requested.connect(self._on_open_project)
-        self.toolbar.project_save_requested.connect(self._on_save_project)
-        self.toolbar.connect_device_requested.connect(self._on_connect_device)
+        self.toolbar.project_new_requested.connect(
+            lambda: self._trigger_registry("project.new")
+        )
+        self.toolbar.project_open_requested.connect(
+            lambda: self._trigger_registry("project.open")
+        )
+        self.toolbar.project_save_requested.connect(
+            lambda: self._trigger_registry("project.save")
+        )
+        self.toolbar.connect_device_requested.connect(
+            lambda: self._trigger_registry("device.connect_all")
+        )
+        self.toolbar.scan_start_requested.connect(
+            lambda: self._trigger_registry("scan.start")
+        )
         self.toolbar.scan_pause_toggle_requested.connect(self._toggle_mock_scan_pause)
-        self.toolbar.export_data_requested.connect(self._on_export_data)
-        self.toolbar.report_center_requested.connect(self._on_report_center)
-        self.toolbar.device_center_requested.connect(self._on_connect_device)
-        self.toolbar.self_check_requested.connect(self._show_help_dialog)
+        self.toolbar.scan_stop_requested.connect(
+            lambda: self._trigger_registry("scan.stop")
+        )
+        self.toolbar.export_data_requested.connect(
+            lambda: self._trigger_registry("data.export_json")
+        )
+        self.toolbar.report_center_requested.connect(
+            lambda: self._trigger_registry("report.open_center")
+        )
+        self.toolbar.device_center_requested.connect(
+            lambda: self._trigger_registry("device.open_center")
+        )
+        self.toolbar.self_check_requested.connect(
+            lambda: self._trigger_registry("help.self_check")
+        )
         self.toolbar.mock_action_requested.connect(self._on_toolbar_mock_action)
+
+    def _trigger_registry(self, action_id: str) -> None:
+        if self._action_registry is not None:
+            self._action_registry.trigger(action_id)
+
+    @property
+    def action_registry(self) -> CommercialActionRegistry | None:
+        return self._action_registry
 
     def _connect_workflow_navigation(self) -> None:
         self.workflow_panel.step_selected.connect(self._on_workflow_step_selected)
@@ -342,42 +378,147 @@ class CommercialMainShell(QMainWindow):
         self.status_bar_widget.update_storage_saved(path)
         self._sync_demo_state()
 
-    def _on_toolbar_mock_action(self, action: str) -> None:
+    def _show_help_dialog(self, tab: str = "help") -> None:
+        dialog = DemoHelpDialog(self, self, initial_tab=tab)
+        dialog.exec()
+        self.bottom_dock.append_log_line("已打开帮助 / 自检面板", level="UI")
+
+    def _run_commercial_self_check(self) -> None:
+        self._run_mock_self_check()
+
+    def _trigger_action(self, action_key: str) -> None:
+        """Central dispatcher for toolbar and registry actions."""
+
         realtime = self.workspace.realtime_view()
-        if action == "拍照":
-            filename = MockArtifactService.build_filename(
+        if action_key == "camera.capture":
+            filename = ArtifactService.build_filename(
                 artifact_type="camera_snapshot",
                 extension="png",
             )
-            path = MockArtifactService.category_dir("screenshot") / filename
+            path = ArtifactService.category_dir("screenshot") / filename
             realtime.capture_screenshot(str(path))
             self._latest_snapshot_path = str(path)
-            self.bottom_dock.append_log_line(f"Mock 相机快照已保存: {path}", level="EXPORT")
+            self._services.project.register_export(export_type="screenshot", path=str(path))
+            self.bottom_dock.append_log_line(f"相机快照已保存: {path}", level="EXPORT")
             return
-        if action == "区域对齐":
+        if action_key == "region.align":
             realtime.mock_region_align()
             self._region_aligned = True
             self.workflow_panel.mark_completed_through(2)
-            self.bottom_dock.append_log_line("Mock 区域对齐完成，ROI 控制点已刷新", level="SCAN")
+            self.bottom_dock.append_log_line("区域对齐完成，ROI 控制点已刷新", level="SCAN")
             return
-        if action == "清除覆盖":
+        if action_key == "region.clear":
             realtime.clear_overlays()
             self.bottom_dock.append_log_line("已清除热力图覆盖 / 标注 / 临时 Marker", level="UI")
             return
-        if action == "参数模板":
+        if action_key == "settings.apply_template":
             self.property_panel.focus_scan_tab()
             self.property_panel.apply_param_template("标准扫描")
             self.bottom_dock.append_log_line("已打开扫描参数并应用标准模板", level="SCAN")
             return
-        if action == "帮助":
-            self._show_help_dialog()
-            return
-        self.bottom_dock.append_log_line(f"Mock toolbar action: {action}", level="UI")
+        if self._action_registry is not None:
+            self._action_registry.trigger(action_key)
 
-    def _show_help_dialog(self) -> None:
-        dialog = DemoHelpDialog(self, self)
-        dialog.exec()
-        self.bottom_dock.append_log_line("已打开帮助 / Mock 自检面板", level="UI")
+    def _on_toolbar_mock_action(self, action: str) -> None:
+        mapping = {
+            "拍照": "camera.capture",
+            "区域对齐": "region.align",
+            "清除覆盖": "region.clear",
+            "参数模板": "settings.apply_template",
+            "帮助": "help.open",
+        }
+        key = mapping.get(action)
+        if key:
+            if key == "help.open":
+                self._show_help_dialog()
+            else:
+                self._trigger_action(key)
+            return
+        self.bottom_dock.append_log_line(f"工具栏操作: {action}", level="UI")
+
+    def _on_save_project_as(self) -> None:
+        session = self._services.project.current_session()
+        base_name = session.name if session else "ProjectCopy"
+        try:
+            self._on_save_project()
+            path = self._services.project.save_as(name=f"{base_name}_Copy")
+        except RuntimeError as error:
+            self.bottom_dock.append_log_line(str(error), level="PROJECT")
+            return
+        self.bottom_dock.append_log_line(f"项目已另存为: {path}", level="PROJECT")
+        self._refresh_project_ui()
+        self.status_bar_widget.update_storage_saved(str(path))
+
+    def _on_recent_projects(self) -> None:
+        recent = self._services.project.list_recent()
+        if not recent:
+            self.bottom_dock.append_log_line("暂无最近项目", level="PROJECT")
+            return
+        entry = recent[0]
+        if entry.missing:
+            self.bottom_dock.append_log_line(f"最近项目不可用: {entry.project_file}", level="WARN")
+            return
+        try:
+            from pathlib import Path
+
+            session = self._services.project.open_project(Path(entry.project_file))
+            self.bottom_dock.append_log_line(f"已打开最近项目: {session.name}", level="PROJECT")
+            self._refresh_project_ui()
+            self._sync_demo_state()
+        except FileNotFoundError:
+            self.bottom_dock.append_log_line(f"项目文件不存在: {entry.project_file}", level="WARN")
+
+    def _on_close_project(self) -> None:
+        if self._services.project.is_dirty:
+            self._on_save_project()
+        self._services.project.close_project()
+        self._current_task_id = None
+        self.bottom_dock.append_log_line("项目已关闭", level="PROJECT")
+        self._refresh_project_ui()
+        self._sync_demo_state()
+
+    def _on_disconnect_devices(self) -> None:
+        provider = self._services.device_provider
+        for result in provider.disconnect_all():
+            self.bottom_dock.append_log_line(result.message, level="DEVICE")
+        self.device_status_panel.refresh_devices()
+        self.workspace.device_center_view().refresh_devices()
+        self._sync_demo_state()
+
+    def _on_refresh_devices(self) -> None:
+        for result in self._services.device_provider.refresh_all():
+            self.workspace.device_center_view().append_dry_run_line(result.message)
+        self.device_status_panel.refresh_devices()
+        self.workspace.device_center_view().refresh_devices()
+        self.bottom_dock.append_log_line("设备状态已刷新", level="DEVICE")
+
+    def _on_open_device_center(self) -> None:
+        self.workspace.switch_to_tab(self.workspace.DEVICE_CENTER_TAB_INDEX)
+        self.bottom_dock.append_log_line("打开设备中心", level="DEVICE")
+
+    def _on_open_data_view(self) -> None:
+        self.workspace.switch_to_tab(self.workspace.DATA_VIEW_TAB_INDEX)
+        self.bottom_dock.append_log_line("打开数据视图", level="DATA")
+
+    def _pause_mock_scan(self) -> None:
+        snapshot = self.mock_scan.snapshot()
+        if snapshot.status == "running":
+            self.mock_scan.pause()
+            self.bottom_dock.append_log_line("扫描已暂停", level="SCAN")
+            self._sync_demo_state(self.mock_scan.snapshot())
+
+    def _resume_mock_scan(self) -> None:
+        snapshot = self.mock_scan.snapshot()
+        if snapshot.status == "paused":
+            self.mock_scan.resume()
+            self.bottom_dock.append_log_line("扫描继续", level="SCAN")
+            self._sync_demo_state(self.mock_scan.snapshot())
+
+    def _reset_scan_runtime(self) -> None:
+        self.mock_scan.reset()
+        self._services.scan_controller.provider.reset()
+        self.bottom_dock.append_log_line("扫描运行时已重置", level="SCAN")
+        self._sync_demo_state(self.mock_scan.snapshot())
 
     def _on_display_opacity_changed(self, value: int) -> None:
         realtime = self.workspace.realtime_view()
@@ -551,12 +692,13 @@ class CommercialMainShell(QMainWindow):
         self._sync_demo_state()
 
     def _on_connect_device(self) -> None:
-        for device in self._services.devices.list_devices():
-            self._services.devices.connect_device(device.device_id)
+        for result in self._services.device_provider.connect_all():
+            self.bottom_dock.append_log_line(result.message, level="DEVICE")
+            self.workspace.device_center_view().append_dry_run_line(result.message)
         self.device_status_panel.refresh_devices()
         self.workspace.device_center_view().refresh_devices()
         self.workspace.switch_to_tab(self.workspace.DEVICE_CENTER_TAB_INDEX)
-        self.bottom_dock.append_log_line("打开设备中心", level="DEVICE")
+        self.bottom_dock.append_log_line("设备已连接 (Simulation)", level="DEVICE")
         self._sync_demo_state()
 
     def _on_devices_changed(self) -> None:

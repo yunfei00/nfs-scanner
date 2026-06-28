@@ -63,6 +63,16 @@ class RealtimeView(QWidget):
         self._heatmap_opacity = 0.52
         self._tool_buttons: list[QToolButton] = []
         self._current_tool = "选择"
+        self._grid_visible = True
+        self._path_visible = True
+        self._undo_stack: list[str] = []
+        self._redo_stack: list[str] = []
+        self._lut_index = 0
+        self._opacity_slider: QSlider | None = None
+        self._lut_combo: QComboBox | None = None
+        self._pan_active = False
+        self._last_mouse_pos = None
+        self._measure_start = None
         self._setup_ui()
         self._load_mock_layers()
 
@@ -81,22 +91,35 @@ class RealtimeView(QWidget):
             ("选择", True),
             ("平移", True),
             ("缩放", True),
-            ("框选", False),
-            ("多边形", False),
-            ("撤销", False),
-            ("重做", False),
-            ("标注", False),
-            ("网格", False),
-            ("测量", False),
+            ("框选", True),
+            ("多边形", True),
+            ("撤销", True),
+            ("重做", True),
+            ("标注", True),
+            ("网格", True),
+            ("路径", True),
+            ("测量", True),
         )
         for tip, _enabled in canvas_tools:
             button = QToolButton(toolbar)
             button.setObjectName("realtimeCanvasToolButton")
             button.setText(tip)
-            button.setToolTip(f"{tip}（Mock）")
+            button.setToolTip(tip)
             button.setEnabled(True)
-            button.setCheckable(True)
-            button.clicked.connect(lambda _checked=False, name=tip: self._select_tool(name))
+            if tip in ("网格", "路径"):
+                button.setCheckable(True)
+                button.setChecked(True)
+                if tip == "网格":
+                    button.clicked.connect(self.toggle_grid)
+                else:
+                    button.clicked.connect(self.toggle_path)
+            elif tip == "撤销":
+                button.clicked.connect(self.undo_last_action)
+            elif tip == "重做":
+                button.clicked.connect(self.redo_last_action)
+            else:
+                button.setCheckable(True)
+                button.clicked.connect(lambda _checked=False, name=tip: self.activate_tool(name))
             button.setFixedSize(_CANVAS_TOOL_BUTTON_WIDTH, _CANVAS_TOOL_BUTTON_HEIGHT)
             self._tool_buttons.append(button)
             toolbar_layout.addWidget(button)
@@ -128,6 +151,7 @@ class RealtimeView(QWidget):
         opacity_slider.setValue(60)
         opacity_slider.setFixedWidth(72)
         opacity_slider.valueChanged.connect(self._on_opacity_changed)
+        self._opacity_slider = opacity_slider
         self._opacity_value_label = QLabel("60%", toolbar)
         self._opacity_value_label.setObjectName("nfsMutedLabel")
         self._opacity_value_label.setFixedWidth(32)
@@ -141,6 +165,7 @@ class RealtimeView(QWidget):
         lut_combo.addItems(list(COMMON_LUT_NAMES))
         lut_combo.setCurrentText("Turbo")
         lut_combo.currentTextChanged.connect(self._on_lut_changed)
+        self._lut_combo = lut_combo
         toolbar_layout.addWidget(lut_label)
         toolbar_layout.addWidget(lut_combo)
         toolbar_layout.addStretch(1)
@@ -192,12 +217,89 @@ class RealtimeView(QWidget):
             heatmap_layer.set_lut_name(lut_name)
         self.lut_changed.emit(lut_name)
 
+    def activate_tool(self, tool_name: str) -> None:
+        """Public entry for action registry tool activation."""
+
+        self._select_tool(tool_name)
+        cursors = {
+            "选择": Qt.CursorShape.ArrowCursor,
+            "平移": Qt.CursorShape.OpenHandCursor,
+            "缩放": Qt.CursorShape.SizeAllCursor,
+            "框选": Qt.CursorShape.CrossCursor,
+            "多边形": Qt.CursorShape.CrossCursor,
+            "标注": Qt.CursorShape.IBeamCursor,
+            "测量": Qt.CursorShape.CrossCursor,
+        }
+        self.canvas.setCursor(cursors.get(tool_name, Qt.CursorShape.ArrowCursor))
+        self.canvas_action_requested.emit(f"工具:{tool_name}")
+
     def _select_tool(self, tool_name: str) -> None:
         self._current_tool = tool_name
         for button in self._tool_buttons:
+            if button.text() in ("网格", "路径", "撤销", "重做"):
+                continue
             button.setChecked(button.text() == tool_name)
-        self.canvas.setToolTip(f"Mock 工具已切换：{tool_name}")
+        self.canvas.setToolTip(f"当前工具：{tool_name}")
         self.tool_changed.emit(tool_name)
+
+    def _push_undo(self, action: str) -> None:
+        self._undo_stack.append(action)
+        if len(self._undo_stack) > 50:
+            self._undo_stack.pop(0)
+        self._redo_stack.clear()
+
+    def undo_last_action(self) -> None:
+        if not self._undo_stack:
+            self.canvas_action_requested.emit("撤销:无操作")
+            return
+        action = self._undo_stack.pop()
+        self._redo_stack.append(action)
+        if action.startswith("overlay:"):
+            self.clear_overlays()
+        self.canvas_action_requested.emit(f"撤销:{action}")
+
+    def redo_last_action(self) -> None:
+        if not self._redo_stack:
+            self.canvas_action_requested.emit("重做:无操作")
+            return
+        action = self._redo_stack.pop()
+        self._undo_stack.append(action)
+        if action == "overlay:annotate":
+            self.layer_manager.ensure_layer(LayerKind.ANNOTATION).build_mock()
+        self.canvas_action_requested.emit(f"重做:{action}")
+
+    def toggle_grid(self) -> None:
+        self._grid_visible = not self._grid_visible
+        self.set_layer_visible("grid", self._grid_visible)
+        for button in self._tool_buttons:
+            if button.text() == "网格":
+                button.setChecked(self._grid_visible)
+        self.canvas_action_requested.emit("网格:" + ("显示" if self._grid_visible else "隐藏"))
+
+    def toggle_path(self) -> None:
+        self._path_visible = not self._path_visible
+        self.set_layer_visible("path", self._path_visible)
+        for button in self._tool_buttons:
+            if button.text() == "路径":
+                button.setChecked(self._path_visible)
+        self.canvas_action_requested.emit("路径:" + ("显示" if self._path_visible else "隐藏"))
+
+    def cycle_lut(self) -> None:
+        if self._lut_combo is None:
+            return
+        names = [self._lut_combo.itemText(i) for i in range(self._lut_combo.count())]
+        if not names:
+            return
+        self._lut_index = (self._lut_index + 1) % len(names)
+        self._lut_combo.setCurrentText(names[self._lut_index])
+        self.canvas_action_requested.emit(f"LUT:{names[self._lut_index]}")
+
+    def adjust_opacity_step(self, delta: int) -> None:
+        if self._opacity_slider is None:
+            return
+        value = max(20, min(90, self._opacity_slider.value() + delta))
+        self._opacity_slider.setValue(value)
+        self.canvas_action_requested.emit(f"透明度:{value}%")
 
     def fit_canvas(self) -> None:
         self.canvas.fit_view()
@@ -228,12 +330,20 @@ class RealtimeView(QWidget):
     def mock_region_align(self) -> None:
         """Simulate ROI alignment by refreshing annotation layer."""
 
+        self._push_undo("overlay:align")
         annotation_layer = self.layer_manager.ensure_layer(LayerKind.ANNOTATION)
         annotation_layer.build_mock()
         marker_layer = self.layer_manager.ensure_layer(LayerKind.MARKER)
         marker_layer.build_mock()
         self.canvas_action_requested.emit("区域对齐")
         self.mini_map.update()
+
+    def add_annotation_marker(self) -> None:
+        """Add a mock annotation marker at canvas center."""
+
+        self._push_undo("overlay:annotate")
+        self.layer_manager.ensure_layer(LayerKind.MARKER).build_mock()
+        self.canvas_action_requested.emit("标注:已添加")
 
     def set_layer_visible(self, layer_key: str, visible: bool) -> None:
         mapping = {
@@ -271,6 +381,51 @@ class RealtimeView(QWidget):
                     freq="2.450 GHz",
                     amp="-23.45 dBm",
                 )
+                if self._current_tool == "平移" and self._pan_active and self._last_mouse_pos is not None:
+                    delta = event.position().toPoint() - self._last_mouse_pos
+                    self.canvas.horizontalScrollBar().setValue(
+                        self.canvas.horizontalScrollBar().value() - delta.x()
+                    )
+                    self.canvas.verticalScrollBar().setValue(
+                        self.canvas.verticalScrollBar().value() - delta.y()
+                    )
+                    self._last_mouse_pos = event.position().toPoint()
+            elif event.type() == QEvent.Type.MouseButtonPress and isinstance(event, QMouseEvent):
+                if self._current_tool == "平移":
+                    self._pan_active = True
+                    self._last_mouse_pos = event.position().toPoint()
+                    self.canvas.setCursor(Qt.CursorShape.ClosedHandCursor)
+                elif self._current_tool == "缩放":
+                    factor = 1.15 if event.angleDelta().y() >= 0 else 0.87
+                    self.canvas.scale(factor, factor)
+                    self.canvas_action_requested.emit(f"缩放:{factor:.2f}")
+                elif self._current_tool == "框选":
+                    self._push_undo("overlay:box")
+                    self.canvas_action_requested.emit("框选:ROI已更新")
+                elif self._current_tool == "多边形":
+                    self.canvas_action_requested.emit("多边形:添加顶点")
+                elif self._current_tool == "标注":
+                    self.add_annotation_marker()
+                elif self._current_tool == "测量":
+                    if self._measure_start is None:
+                        self._measure_start = self.canvas.mapToScene(event.position().toPoint())
+                        self.canvas_action_requested.emit("测量:选择起点")
+                    else:
+                        end = self.canvas.mapToScene(event.position().toPoint())
+                        dx = end.x() - self._measure_start.x()
+                        dy = end.y() - self._measure_start.y()
+                        dist = math.hypot(dx, dy)
+                        self.canvas_action_requested.emit(f"测量:{dist:.2f} mm")
+                        self._measure_start = None
+            elif event.type() == QEvent.Type.MouseButtonRelease and isinstance(event, QMouseEvent):
+                if self._current_tool == "平移":
+                    self._pan_active = False
+                    self.canvas.setCursor(Qt.CursorShape.OpenHandCursor)
+            elif event.type() == QEvent.Type.Wheel and isinstance(event, QMouseEvent):
+                if self._current_tool == "缩放":
+                    factor = 1.1 if event.angleDelta().y() > 0 else 0.9
+                    self.canvas.scale(factor, factor)
+                    self.canvas_action_requested.emit(f"滚轮缩放:{factor:.2f}")
         return super().eventFilter(watched, event)
 
     def resizeEvent(self, event) -> None:

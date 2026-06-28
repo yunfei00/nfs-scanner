@@ -194,3 +194,9 @@ class DataTableView(QWidget):
             path = export_table_json(rows, self._current_task_id)
         self.table_exported.emit(str(path))
         self.status_message.emit("EXPORT", f"Mock 表格已导出: {path}")
+
+    def export_csv(self) -> None:
+        self._export("csv")
+
+    def export_json(self) -> None:
+        self._export("json")

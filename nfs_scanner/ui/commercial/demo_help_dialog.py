@@ -25,20 +25,31 @@ from nfs_scanner.core.integration_safety import REAL_DEVICE_ENV_VAR, is_real_dev
 class DemoHelpDialog(QDialog):
     """Built-in help and mock self-check panel."""
 
-    def __init__(self, shell, parent=None) -> None:
+    def __init__(self, shell, parent=None, *, initial_tab: str = "help") -> None:
         super().__init__(parent or shell)
         self._shell = shell
-        self.setWindowTitle("帮助 / Mock 自检")
+        self._initial_tab = initial_tab
+        self.setWindowTitle("帮助 / 自检")
         self.setMinimumSize(640, 480)
         self._status_browser: QTextBrowser | None = None
+        self._tabs: QTabWidget | None = None
         self._setup_ui()
 
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
         tabs = QTabWidget(self)
-        tabs.addTab(self._build_help_tab(), "Demo 操作流程")
+        self._tabs = tabs
+        tabs.addTab(self._build_help_tab(), "快速开始")
+        tabs.addTab(self._build_shortcuts_tab(), "快捷键")
         tabs.addTab(self._build_safety_tab(), "安全说明")
-        tabs.addTab(self._build_self_check_tab(), "Mock 自检")
+        tabs.addTab(self._build_about_tab(), "关于")
+        tabs.addTab(self._build_self_check_tab(), "自检")
+        if self._initial_tab == "shortcuts":
+            tabs.setCurrentIndex(1)
+        elif self._initial_tab == "about":
+            tabs.setCurrentIndex(3)
+        elif self._initial_tab == "self_check":
+            tabs.setCurrentIndex(4)
         layout.addWidget(tabs, 1)
 
         row = QHBoxLayout()
@@ -61,18 +72,51 @@ class DemoHelpDialog(QDialog):
         browser.setOpenExternalLinks(False)
         browser.setHtml(
             """
-            <h3>Commercial Mock Demo 操作流程</h3>
+            <h3>Commercial V1 操作流程</h3>
             <ol>
-              <li>新建或打开 Demo 项目</li>
-              <li>连接 Mock 设备（运动平台 / 频谱仪 / 相机）</li>
-              <li>区域标定与扫描参数配置</li>
-              <li>开始 Mock 扫描，可暂停 / 继续 / 停止</li>
-              <li>完成后在 Data View 查看结果</li>
+              <li>新建 / 打开 / 保存项目（project.nfsproj）</li>
+              <li>连接设备（Simulation Provider，无真实硬件）</li>
+              <li>配置扫描区域、步长、频率与路径策略</li>
+              <li>开始扫描，可暂停 / 继续 / 停止</li>
+              <li>Data View 查看热力图与频谱</li>
               <li>Report Center 预览并导出报告</li>
-              <li>Reset Demo 恢复演示初始状态</li>
             </ol>
-            <p><b>快捷键</b>: F11 最大化（系统）; Esc 关闭对话框</p>
-            <p><b>模式</b>: MOCK · DRY RUN · NO HARDWARE CONTROL</p>
+            <p><b>当前模式</b>: Simulation Provider · 正式商用流程 · 无硬件控制</p>
+            """
+        )
+        layout.addWidget(browser)
+        return page
+
+    def _build_shortcuts_tab(self) -> QWidget:
+        page = QWidget(self)
+        layout = QVBoxLayout(page)
+        browser = QTextBrowser(page)
+        browser.setHtml(
+            """
+            <h3>快捷键</h3>
+            <ul>
+              <li>Ctrl+N — 新建项目</li>
+              <li>Ctrl+O — 打开项目</li>
+              <li>Ctrl+S — 保存项目</li>
+              <li>F11 — 最大化窗口</li>
+              <li>Esc — 关闭对话框</li>
+            </ul>
+            """
+        )
+        layout.addWidget(browser)
+        return page
+
+    def _build_about_tab(self) -> QWidget:
+        page = QWidget(self)
+        layout = QVBoxLayout(page)
+        browser = QTextBrowser(page)
+        browser.setHtml(
+            """
+            <h3>NFS Scanner</h3>
+            <p><b>版本</b>: Commercial V1</p>
+            <p><b>UI</b>: 商业版界面</p>
+            <p><b>数据提供</b>: Simulation Provider（DemoProvider）</p>
+            <p>后续可通过替换 Provider/Adapter 接入真实运动平台、频谱仪与相机，UI 流程无需重写。</p>
             """
         )
         layout.addWidget(browser)
