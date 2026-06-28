@@ -61,6 +61,8 @@ class CommercialPropertyPanel(QScrollArea):
     display_reset_view_requested = Signal()
     scan_param_template_changed = Signal(str)
     instrument_config_saved = Signal(str)
+    scan_params_applied = Signal()
+    scan_params_reset = Signal()
 
     _DEBOUNCE_MS = 250
     _COMPACT_FIELD_WIDTH = 80
@@ -404,7 +406,39 @@ class CommercialPropertyPanel(QScrollArea):
         self._region_combo = region_combo
         frame_layout.addWidget(region_combo)
         frame_layout.addWidget(self._build_region_grid(frame))
+        button_row = QHBoxLayout()
+        apply_button = NFSSecondaryButton("应用参数", frame)
+        apply_button.clicked.connect(self._apply_scan_params_clicked)
+        reset_button = NFSSecondaryButton("重置参数", frame)
+        reset_button.clicked.connect(self._reset_scan_params_clicked)
+        button_row.addWidget(apply_button)
+        button_row.addWidget(reset_button)
+        button_row.addStretch(1)
+        frame_layout.addLayout(button_row)
         return frame
+
+    def _apply_scan_params_clicked(self) -> None:
+        self._emit_scan_config()
+        self.scan_params_applied.emit()
+
+    def _reset_scan_params_clicked(self) -> None:
+        defaults = {
+            "x_start": f"{DEFAULT_X_START:g}",
+            "y_start": f"{DEFAULT_Y_START:g}",
+            "x_stop": f"{DEFAULT_X_STOP:g}",
+            "y_stop": f"{DEFAULT_Y_STOP:g}",
+            "z_height": f"{DEFAULT_Z_HEIGHT:g}",
+            "x_step": f"{DEFAULT_X_STEP:g}",
+            "y_step": f"{DEFAULT_Y_STEP:g}",
+            "dwell_ms": str(DEFAULT_DWELL_MS),
+            "speed_mm_min": f"{DEFAULT_SPEED_MM_MIN:g}",
+        }
+        for key, value in defaults.items():
+            field = self._field_map.get(key)
+            if field is not None:
+                field.setText(value)
+        self._emit_scan_config()
+        self.scan_params_reset.emit()
 
     def _build_stats_grid(self, parent: QWidget) -> QWidget:
         grid_host = QFrame(parent)
@@ -616,6 +650,14 @@ class CommercialPropertyPanel(QScrollArea):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(8, 8, 16, 8)
 
+        mode_label = QLabel(
+            "当前模式：Simulation / Dry Run / NO HARDWARE CONTROL",
+            page,
+        )
+        mode_label.setObjectName("nfsValueLabel")
+        mode_label.setWordWrap(True)
+        layout.addWidget(mode_label)
+
         spec_frame, spec_layout = self._section_frame(page, "频谱仪 Mock 配置")
         self._inst_start_mhz = NFSNumericField("MHz", spec_frame)
         self._inst_start_mhz.setText("1500")
@@ -668,12 +710,20 @@ class CommercialPropertyPanel(QScrollArea):
         save_button.setObjectName("nfsPrimaryButton")
         save_button.setToolTip("MOCK CONFIG ONLY — 不访问真实硬件")
         save_button.clicked.connect(self._save_instrument_mock_config)
+        test_button = QPushButton("测试配置", page)
+        test_button.setObjectName("nfsSecondaryButton")
+        test_button.setToolTip("Simulation 配置校验 — 不连接真实设备")
+        test_button.clicked.connect(self._test_instrument_mock_config)
         layout.addWidget(spec_frame)
         layout.addWidget(cam_frame)
         layout.addWidget(motion_frame)
         layout.addWidget(save_button)
+        layout.addWidget(test_button)
         layout.addStretch(1)
         return page
+
+    def _test_instrument_mock_config(self) -> None:
+        self.instrument_config_saved.emit("test ok — simulation config validated (no hardware)")
 
     def _save_instrument_mock_config(self) -> None:
         self.instrument_config_saved.emit(

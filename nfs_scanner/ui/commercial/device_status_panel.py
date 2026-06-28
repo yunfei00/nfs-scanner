@@ -6,6 +6,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget
 
 from nfs_scanner.core.device_service import DeviceServiceProtocol, DeviceSummary
+from nfs_scanner.core.mock_device_config_service import MockDeviceConfigService
 
 from .widgets import NFSCard, NFSCollapsiblePanel, NFSStatusBadge
 
@@ -19,12 +20,14 @@ class CommercialDeviceStatusPanel(QWidget):
         self,
         device_service: DeviceServiceProtocol,
         *,
+        config_service: MockDeviceConfigService | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.setObjectName("commercialDeviceStatusPanel")
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
         self._device_service = device_service
+        self._config_service = config_service
         self._cards_layout: QVBoxLayout | None = None
         self._panel: NFSCollapsiblePanel | None = None
         self._setup_ui()
@@ -87,7 +90,12 @@ class CommercialDeviceStatusPanel(QWidget):
         row_layout.addWidget(NFSStatusBadge(device.status_label, device.badge_status, row))
         card.body_layout.addWidget(row)
 
-        address = QLabel(device.address, card.body)
+        address_text = device.address
+        if self._config_service is not None:
+            summary = self._config_service.summary_for_device(device.device_id, device.kind)
+            if summary:
+                address_text = summary
+        address = QLabel(address_text, card.body)
         address.setObjectName("nfsMutedLabel")
         card.body_layout.addWidget(address)
 

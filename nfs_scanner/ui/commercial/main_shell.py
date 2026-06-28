@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, Qt, QTimer
-from PySide6.QtGui import QResizeEvent, QShowEvent
+from PySide6.QtGui import QCursor, QResizeEvent, QShowEvent
 from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QInputDialog,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QScrollArea,
     QSizeGrip,
@@ -27,9 +28,12 @@ from PySide6.QtWidgets import (
 from nfs_scanner.core.project import NewProjectRequest
 from nfs_scanner.core.artifact_service import ArtifactService
 from nfs_scanner.core.demo_session import DemoServiceBundle, DemoSessionController
-from nfs_scanner.core.mock_artifact_service import MockArtifactService
-from nfs_scanner.core.mock_point_data import demo_sample_rows, export_table_json
+from nfs_scanner.core.export_manager import export_scan_csv, export_scan_json
+from nfs_scanner.core.mock_point_data import demo_sample_rows, export_table_json, rows_for_service
 from nfs_scanner.core.mock_scan_runtime import MockScanRuntimeService
+from nfs_scanner.core.output_paths import ensure_output_dirs
+from nfs_scanner.core.path_planner import calculate_preview_stats, generate_preview_points
+from nfs_scanner.core.report_generator import generate_html_report
 
 from .demo_help_dialog import DemoHelpDialog
 from .dialogs.new_project_dialog import NewProjectDialog
@@ -40,11 +44,14 @@ from .actions import CommercialActionRegistry
 from .demo_state_sync import apply_demo_state, build_demo_state, devices_ready
 from .bottom_dock import CommercialBottomDock
 from .device_status_panel import CommercialDeviceStatusPanel
+from .log_bus import LogBus  # noqa: F401 - shared log model for bottom dock
 from .property_panel import CommercialPropertyPanel
 from .runtime import MockScanController
+from .runtime.real_scan_controller import RealScanController
 from .services import CommercialServiceBundle, create_commercial_services
 from .scroll_helpers import apply_commercial_scroll_config, configure_scroll_area
 from .status_bar import CommercialStatusBar
+from .status_bus import StatusBus
 from .top_header import CommercialTopHeader
 from .toolbar import CommercialToolbar
 from .workspace import CommercialWorkspace
@@ -74,6 +81,7 @@ class CommercialMainShell(QMainWindow):
         services: CommercialServiceBundle | None = None,
     ) -> None:
         super().__init__(parent)
+        ensure_output_dirs()
         self.setObjectName("commercialMainShell")
         self.setProperty("targetStyleMode", "true")
         self.setWindowFlags(
@@ -86,13 +94,18 @@ class CommercialMainShell(QMainWindow):
         self.top_header = CommercialTopHeader(self, self.toolbar, self)
         self.workflow_panel = CommercialWorkflowPanel(self)
         self.project_summary_card = ProjectSummaryCard(self)
-        self.device_status_panel = CommercialDeviceStatusPanel(self._services.devices, parent=self)
+        self.device_status_panel = CommercialDeviceStatusPanel(
+            self._services.devices,
+            config_service=self._services.device_config,
+            parent=self,
+        )
         self.workspace = CommercialWorkspace(self, services=self._services)
         self.property_panel = CommercialPropertyPanel(self)
         self.bottom_dock = CommercialBottomDock(self)
         self.status_bar_widget = CommercialStatusBar(self)
         self.left_scroll_area: QScrollArea | None = None
         self.mock_scan = MockScanController(self._services.runtime, self)
+        self.real_scan = RealScanController(self._services.hardware_manager, self)
         self._last_dry_run_point = 0
         self._completed_scan_registered = False
         self._scan_home_after_complete = False
@@ -109,11 +122,15 @@ class CommercialMainShell(QMainWindow):
         self._custom_maximized = False
         self._action_registry: CommercialActionRegistry | None = None
         self._suppress_project_dirty = False
+        self._status_bus = StatusBus()
+        self._last_export_path: str | None = None
+        self._last_report_path: str | None = None
         self._setup_ui()
         self._apply_initial_window_size()
         self._connect_scan_preview()
         self._connect_mock_scan()
         self._connect_device_sync()
+        self._connect_background_sync()
         self._connect_project_workflow()
         self._connect_toolbar_actions()
         self._connect_workflow_navigation()
@@ -202,12 +219,80 @@ class CommercialMainShell(QMainWindow):
         device_center = self.workspace.device_center_view()
         device_center.devices_changed.connect(self.device_status_panel.refresh_devices)
         device_center.devices_changed.connect(self._on_devices_changed)
+        device_center.config_saved.connect(self._on_device_config_saved)
         device_center.feedback_requested.connect(
             lambda level, message: self.bottom_dock.append_log_line(message, level=level)
         )
         self.workspace.vision_view().camera_log.connect(
             lambda message, level: self.bottom_dock.append_log_line(message, level=level)
         )
+
+    def _connect_background_sync(self) -> None:
+        """Wire camera snapshots and realtime view background controls."""
+
+        vision = self.workspace.vision_view()
+        realtime = self.workspace.realtime_view()
+        vision.scan_background_requested.connect(self._on_set_scan_background)
+        realtime.background_clear_requested.connect(self._on_clear_scan_background)
+        realtime.background_opacity_changed.connect(self._on_background_opacity_changed)
+
+    def _sync_background_ui(self) -> None:
+        """Push BackgroundManager state to vision and realtime views."""
+
+        info = self._services.background.get_background_info()
+        path = info.image_path if info.has_image() else None
+        self.workspace.vision_view().set_current_background_path(path)
+        if info.has_image():
+            self.workspace.realtime_view().apply_scan_background(info)
+        else:
+            self.workspace.realtime_view().clear_scan_background()
+
+    def _on_set_scan_background(self, path: str) -> None:
+        ok, error = self._services.background.set_background_image(path)
+        if not ok:
+            self.bottom_dock.append_log_line(
+                f"[BACKGROUND] Set scan background failed: {error}",
+                level="BACKGROUND",
+            )
+            self.workspace.vision_view().set_status_message(error, error=True)
+            return
+
+        info = self._services.background.get_background_info()
+        if not self.workspace.realtime_view().apply_scan_background(info):
+            self._services.background.clear_background_image()
+            message = "无法加载底图到实时视图。"
+            self.bottom_dock.append_log_line(f"[BACKGROUND] {message}", level="BACKGROUND")
+            self.workspace.vision_view().set_status_message(message, error=True)
+            return
+
+        display_path = Path(path).as_posix()
+        self.workspace.vision_view().set_current_background_path(display_path)
+        self.workspace.vision_view().set_status_message(f"已设为扫描底图：{display_path}")
+        self.bottom_dock.append_log_line(
+            f"[BACKGROUND] Set scan background: {display_path}",
+            level="BACKGROUND",
+        )
+        self._mark_project_dirty_and_refresh()
+
+    def _on_clear_scan_background(self) -> None:
+        if not self._services.background.has_background():
+            self.workspace.realtime_view().clear_scan_background()
+            return
+
+        self._services.background.clear_background_image()
+        self.workspace.realtime_view().clear_scan_background()
+        self.workspace.vision_view().set_current_background_path(None)
+        self.bottom_dock.append_log_line("[BACKGROUND] Scan background cleared.", level="BACKGROUND")
+        self._mark_project_dirty_and_refresh()
+
+    def _on_background_opacity_changed(self, opacity: float) -> None:
+        self._services.background.set_opacity(opacity)
+        self._mark_project_dirty_and_refresh()
+
+    def _reset_scan_background(self) -> None:
+        self._services.background.clear_background_image()
+        self.workspace.realtime_view().clear_scan_background()
+        self.workspace.vision_view().set_current_background_path(None)
 
     def _connect_project_workflow(self) -> None:
         self.toolbar.demo_reset_requested.connect(self._reset_demo_session)
@@ -232,9 +317,7 @@ class CommercialMainShell(QMainWindow):
         self.toolbar.scan_stop_requested.connect(
             lambda: self._trigger_registry("scan.stop")
         )
-        self.toolbar.export_data_requested.connect(
-            lambda: self._trigger_registry("data.export_json")
-        )
+        self.toolbar.export_data_requested.connect(self._on_export_data_menu)
         self.toolbar.report_center_requested.connect(
             lambda: self._trigger_registry("report.open_center")
         )
@@ -278,6 +361,8 @@ class CommercialMainShell(QMainWindow):
             lambda name: self.bottom_dock.append_log_line(f"参数模板已应用: {name}", level="SCAN")
         )
         self.property_panel.instrument_config_saved.connect(self._on_instrument_config_saved)
+        self.property_panel.scan_params_applied.connect(self._on_scan_params_applied)
+        self.property_panel.scan_params_reset.connect(self._on_scan_params_reset)
 
         data_table = self.workspace.data_table_view()
         data_table.status_message.connect(
@@ -326,6 +411,12 @@ class CommercialMainShell(QMainWindow):
         self.property_panel.scan_pause_toggle_requested.connect(self._toggle_mock_scan_pause)
         self.mock_scan.snapshot_changed.connect(self._on_mock_scan_snapshot)
         self.mock_scan.log_line.connect(self.bottom_dock.append_log_line)
+        self.real_scan.log_line.connect(self.bottom_dock.append_log_line)
+        self.real_scan.real_scan_progress.connect(self._on_real_scan_progress)
+        self.real_scan.real_scan_error.connect(
+            lambda message: self.bottom_dock.append_log_line(message, level="ERROR")
+        )
+        self.real_scan.scan_finished.connect(self._on_real_scan_finished)
         self._sync_demo_state()
 
     def _sync_demo_state(self, snapshot=None) -> None:
@@ -352,6 +443,7 @@ class CommercialMainShell(QMainWindow):
             report_exported=self._report_exported,
             report_exported_for_task_id=self._report_exported_for_task_id,
             has_history_tasks=bool(tasks),
+            background_manager=self._services.background,
         )
         apply_demo_state(
             state,
@@ -366,6 +458,18 @@ class CommercialMainShell(QMainWindow):
             data_view=self.workspace.data_view(),
             report_view=self.workspace.report_view(),
             window=self,
+        )
+        device_center = self.workspace.device_center_view()
+        device_center.set_project_context(state.project_name)
+        device_center.sync_dry_run_log(self._services.device_provider.command_log)
+        hw = self._services.hardware_manager.refresh_status()
+        motion_label = hw.motion_status if hw.real_mode_confirmed else "Mock"
+        instrument_label = hw.instrument_status if hw.real_mode_confirmed else "Mock"
+        self.status_bar_widget.update_device_mode(
+            real_mode=hw.real_mode_confirmed,
+            motion_status=motion_label,
+            instrument_status=instrument_label,
+            real_scan_running=self.real_scan.is_running,
         )
         buttons = state.button_states()
         paused = state.scan_state == "paused"
@@ -403,7 +507,7 @@ class CommercialMainShell(QMainWindow):
     def _show_help_dialog(self, tab: str = "help") -> None:
         dialog = DemoHelpDialog(self, self, initial_tab=tab)
         dialog.exec()
-        self.bottom_dock.append_log_line("已打开帮助 / 自检面板", level="UI")
+        self.bottom_dock.append_log_line("Help opened", level="INFO")
 
     def _run_commercial_self_check(self) -> None:
         self._run_mock_self_check()
@@ -541,16 +645,31 @@ class CommercialMainShell(QMainWindow):
         provider = self._services.device_provider
         for result in provider.disconnect_all():
             self.bottom_dock.append_log_line(result.message, level="DEVICE")
+            self.workspace.device_center_view().append_dry_run_line(result.message)
         self.device_status_panel.refresh_devices()
         self.workspace.device_center_view().refresh_devices()
+        self.workspace.device_center_view().sync_dry_run_log()
+        if self._services.project.current_session() is not None:
+            self._mark_project_dirty_and_refresh()
         self._sync_demo_state()
 
     def _on_refresh_devices(self) -> None:
         for result in self._services.device_provider.refresh_all():
+            self.bottom_dock.append_log_line(result.message, level="DEVICE")
             self.workspace.device_center_view().append_dry_run_line(result.message)
         self.device_status_panel.refresh_devices()
         self.workspace.device_center_view().refresh_devices()
+        self.workspace.device_center_view().sync_dry_run_log()
         self.bottom_dock.append_log_line("设备状态已刷新", level="DEVICE")
+        self._sync_demo_state()
+
+    def _on_device_config_saved(self, summary: str) -> None:
+        self.bottom_dock.append_log_line(
+            f"MOCK CONFIG ONLY — 设备配置已更新: {summary}（不连接真实硬件）",
+            level="DEVICE",
+        )
+        self._mark_project_dirty_and_refresh()
+        self.device_status_panel.refresh_devices()
 
     def _on_open_device_center(self) -> None:
         self.workspace.switch_to_tab(self.workspace.DEVICE_CENTER_TAB_INDEX)
@@ -597,8 +716,59 @@ class CommercialMainShell(QMainWindow):
 
     def _on_instrument_config_saved(self, summary: str) -> None:
         config_service = self._services.device_config
+        from nfs_scanner.core.device_config import CameraDeviceConfig, MotionDeviceConfig, SpectrumDeviceConfig
+
+        motion_port = self.property_panel._inst_port.currentText() if hasattr(self.property_panel, "_inst_port") else "COM6"
+        motion_baud_text = self.property_panel._inst_baud.text() if hasattr(self.property_panel, "_inst_baud") else "115200"
+        try:
+            motion_baud = int(motion_baud_text)
+        except ValueError:
+            motion_baud = 115200
+        config_service.set_motion(
+            "motion-001",
+            MotionDeviceConfig(port=motion_port, baudrate=motion_baud, connection_mode="mock"),
+        )
+        if hasattr(self.property_panel, "_inst_resolution"):
+            config_service.set_camera(
+                "camera-001",
+                CameraDeviceConfig(
+                    resolution=self.property_panel._inst_resolution.currentText(),
+                    fps=int(self.property_panel._inst_fps.text() or "30"),
+                ),
+            )
+        config_service.set_spectrum(
+            "spectrum-001",
+            SpectrumDeviceConfig(model="FSW"),
+        )
         path = config_service.save_all_to_json()
-        self.bottom_dock.append_log_line(f"MOCK CONFIG ONLY 已保存: {path} ({summary})", level="DEVICE")
+        self.bottom_dock.append_log_line(
+            f"MOCK CONFIG ONLY — 仪表设置已保存: {summary} ({path})",
+            level="INSTR",
+        )
+        self.device_status_panel.refresh_devices()
+        self.workspace.device_center_view().refresh_devices()
+        self._mark_project_dirty_and_refresh()
+
+    def _on_scan_params_applied(self) -> None:
+        region = self.property_panel.current_scan_region()
+        path_config = self.property_panel.current_scan_path_config()
+        self.workspace.realtime_view().update_path_preview(region, path_config)
+        self.bottom_dock.append_log_line(
+            (
+                "Scan area applied: "
+                f"X {region.x_start:g}-{region.x_stop:g}, "
+                f"Y {region.y_start:g}-{region.y_stop:g}, "
+                f"step {region.x_step:g}/{region.y_step:g}"
+            ),
+            level="PARAM",
+        )
+        self._mark_project_dirty_and_refresh()
+
+    def _on_scan_params_reset(self) -> None:
+        region = self.property_panel.current_scan_region()
+        path_config = self.property_panel.current_scan_path_config()
+        self.workspace.realtime_view().update_path_preview(region, path_config)
+        self.bottom_dock.append_log_line("Scan parameters reset to defaults", level="PARAM")
         self._mark_project_dirty_and_refresh()
 
     def _on_scan_validity_changed(self, valid: bool, message: str) -> None:
@@ -770,6 +940,7 @@ class CommercialMainShell(QMainWindow):
             self.mock_scan.configure(region, path_config)
             self.workspace.realtime_view().update_path_preview(region, path_config)
             self.workspace.realtime_view().clear_overlays()
+            self._reset_scan_background()
             self.bottom_dock.seed_idle_demo_stats()
             self.property_panel._debounce_timer.stop()
             self._sync_demo_state()
@@ -873,6 +1044,16 @@ class CommercialMainShell(QMainWindow):
                 model.instrument_config,
                 model.device_config,
             )
+            if model.device_config:
+                self._services.device_config.import_project_payload(model.device_config)
+            self.device_status_panel.refresh_devices()
+            self.workspace.device_center_view().refresh_devices()
+            self.bottom_dock.append_log_line(
+                "设备配置已加载，未自动连接硬件",
+                level="DEVICE",
+            )
+            self._services.background.load_from_display_config(model.display_config)
+            self._sync_background_ui()
 
             data_view = self.workspace.data_view()
             if hasattr(data_view.analysis_service, "load_task_index"):
@@ -890,6 +1071,11 @@ class CommercialMainShell(QMainWindow):
         finally:
             self._suppress_project_dirty = False
         self._services.project.mark_clean()
+
+    def _build_device_config_for_save(self) -> dict[str, object]:
+        """Return device_config payload for project.nfsproj from MockDeviceConfigService."""
+
+        return self._services.device_config.export_project_payload()
 
     def _on_save_project(self) -> None:
         try:
@@ -926,6 +1112,10 @@ class CommercialMainShell(QMainWindow):
             report_view = self.workspace.report_view()
             report_task_id = report_view._current_task_id() if hasattr(report_view, "_current_task_id") else None
             report_index = [{"task_id": report_task_id}] if report_task_id else []
+            display_config = {
+                **self.property_panel.current_display_config(),
+                **self._services.background.to_display_config(),
+            }
             self._services.project.update_session_context(
                 scan_config={
                     "region": {
@@ -943,9 +1133,9 @@ class CommercialMainShell(QMainWindow):
                         "speed_mm_min": path_config.speed_mm_min,
                     },
                 },
-                display_config=self.property_panel.current_display_config(),
+                display_config=display_config,
                 instrument_config=self.property_panel.current_instrument_config(),
-                device_config=self.property_panel.current_device_config(),
+                device_config=self._build_device_config_for_save(),
                 workflow_state={
                     "active_step_index": self.workflow_panel.active_step_index(),
                     "project_step_state": self.workflow_panel.step_state(0),
@@ -973,13 +1163,51 @@ class CommercialMainShell(QMainWindow):
         self._sync_demo_state()
 
     def _on_connect_device(self) -> None:
+        session = self._services.project.current_session()
+        if session is None:
+            self.bottom_dock.append_log_line(
+                "建议先新建项目；仍执行 Simulation 设备连接",
+                level="DEVICE",
+            )
+        self.bottom_dock.append_log_line("DRY RUN - NO HARDWARE CONTROL", level="DEVICE")
+        panel = self.workspace.device_center_view()
         for result in self._services.device_provider.connect_all():
             self.bottom_dock.append_log_line(result.message, level="DEVICE")
-            self.workspace.device_center_view().append_dry_run_line(result.message)
+            panel.append_dry_run_line(result.message)
         self.device_status_panel.refresh_devices()
-        self.workspace.device_center_view().refresh_devices()
+        panel.refresh_devices()
+        panel.sync_dry_run_log()
         self.workspace.switch_to_tab(self.workspace.DEVICE_CENTER_TAB_INDEX)
-        self.bottom_dock.append_log_line("设备已连接 (Simulation)", level="DEVICE")
+        connected = [
+            device.kind
+            for device in self._services.devices.list_devices()
+            if device.connection_status == "connected"
+        ]
+        kinds = ", ".join(sorted(set(connected))) or "none"
+        self.bottom_dock.append_log_line(
+            f"Simulation devices connected: {kinds}",
+            level="DEVICE",
+        )
+        self._sync_demo_state()
+
+    def _on_connect_real_devices(self) -> None:
+        answer = QMessageBox.warning(
+            self,
+            "连接真实设备",
+            "即将连接真实运动平台与仪表。\n请确认设备已上电、接线正确、急停可用。\n\n是否继续？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            self.bottom_dock.append_log_line("Real device connect cancelled", level="DEVICE")
+            return
+        ok, message = self._services.hardware_manager.connect_all()
+        level = "DEVICE" if ok else "ERROR"
+        self.bottom_dock.append_log_line(message or ("Real devices connected" if ok else "Connect failed"), level=level)
+        panel = self.workspace.device_center_view()
+        if panel is not None and hasattr(panel, "_hardware_panel") and panel._hardware_panel is not None:
+            panel._hardware_panel.refresh_status()
+        self.workspace.switch_to_tab(self.workspace.DEVICE_CENTER_TAB_INDEX)
         self._sync_demo_state()
 
     def _on_devices_changed(self) -> None:
@@ -990,10 +1218,63 @@ class CommercialMainShell(QMainWindow):
         ]
         if connected:
             self.bottom_dock.append_log_line(
-                f"Mock 设备已连接: {', '.join(connected)}",
+                f"Simulation 设备状态: {', '.join(connected)}",
                 level="DEVICE",
             )
-        self._sync_demo_state()
+        if self._services.project.current_session() is not None:
+            self._mark_project_dirty_and_refresh()
+        else:
+            self._sync_demo_state()
+
+    def _on_export_data_menu(self) -> None:
+        menu = QMenu(self)
+        menu.addAction("导出 CSV", self._export_scan_csv)
+        menu.addAction("导出 PNG", self._export_realtime_png)
+        menu.addAction("导出 JSON", self._export_scan_json)
+        menu.exec(QCursor.pos())
+
+    def _collect_export_rows(self):
+        analysis = self.workspace.data_view().analysis_service
+        task_id = self._current_task_id
+        if task_id:
+            return rows_for_service(analysis, task_id, max_rows=1000)
+        tasks = analysis.list_tasks()
+        if tasks:
+            return rows_for_service(analysis, tasks[0].task_id, max_rows=1000)
+        return demo_sample_rows()
+
+    def _export_scan_csv(self) -> None:
+        rows = self._collect_export_rows()
+        if not rows:
+            self.bottom_dock.append_log_line(
+                "No scan data available, exported mock template only",
+                level="WARN",
+            )
+            rows = demo_sample_rows()
+        path = export_scan_csv(rows)
+        self._last_export_path = str(path)
+        self.workflow_panel.mark_completed_through(5)
+        self.bottom_dock.append_log_line(f"Exported CSV: {path.as_posix()}", level="DATA")
+
+    def _export_scan_json(self) -> None:
+        rows = self._collect_export_rows()
+        if not rows:
+            rows = demo_sample_rows()
+            self.bottom_dock.append_log_line(
+                "No scan data available, exported mock template only",
+                level="WARN",
+            )
+        path = export_scan_json(rows)
+        self._last_export_path = str(path)
+        self.bottom_dock.append_log_line(f"Exported JSON: {path.as_posix()}", level="DATA")
+
+    def _export_realtime_png(self) -> None:
+        from nfs_scanner.core.export_manager import build_export_path
+
+        path = build_export_path("realtime_view", "png")
+        self.workspace.realtime_view().capture_screenshot(str(path))
+        self._last_export_path = str(path)
+        self.bottom_dock.append_log_line(f"Exported image: {path.as_posix()}", level="DATA")
 
     def _on_export_data(self) -> None:
         data_view = self.workspace.data_view()
@@ -1019,9 +1300,59 @@ class CommercialMainShell(QMainWindow):
         report_view.refresh_tasks()
         self.workspace.switch_to_tab(self.workspace.REPORT_VIEW_TAB_INDEX)
         self.workflow_panel.set_step_state(6, "active")
-        self.bottom_dock.append_log_line("打开报告中心", level="REPORT")
+        path = self._generate_html_report()
+        if path is not None:
+            report_view.set_last_report_path(str(path))
+        self.bottom_dock.append_log_line("Report center opened", level="REPORT")
+
+    def _generate_html_report(self) -> Path | None:
+        session = self._services.project.current_session()
+        if session is None:
+            self.bottom_dock.append_log_line("No open project for report generation", level="WARN")
+            return None
+        region = self.property_panel.current_scan_region()
+        path_config = self.property_panel.current_scan_path_config()
+        points = generate_preview_points(region, path_config)
+        stats = calculate_preview_stats(points, region, path_config)
+        devices = [
+            {
+                "display_name": device.display_name,
+                "connection_status": device.connection_status,
+            }
+            for device in self._services.devices.list_devices()
+        ]
+        background = self._services.background.get_background_info()
+        report_path = generate_html_report(
+            project_name=session.name,
+            project_id=session.project_id,
+            scan_summary={
+                "scan_status": self.mock_scan.snapshot().status,
+                "point_count": stats.point_count,
+                "region_label": (
+                    f"X {region.x_start:g}-{region.x_stop:g}, "
+                    f"Y {region.y_start:g}-{region.y_stop:g}, "
+                    f"step {region.x_step:g}/{region.y_step:g}"
+                ),
+            },
+            device_summary=devices,
+            background_image_path=background.image_path,
+            last_export_path=self._last_export_path,
+            log_lines=self.bottom_dock.recent_log_lines(limit=20),
+        )
+        self._last_report_path = str(report_path)
+        self.bottom_dock.append_log_line(f"Report generated: {report_path.as_posix()}", level="REPORT")
+        return report_path
 
     def _on_workflow_step_selected(self, index: int) -> None:
+        step_logs = {
+            0: ("PROJECT", "Project management opened"),
+            1: ("DEVICE", "Device center opened"),
+            2: ("SCAN", "Region calibration opened"),
+            3: ("PARAM", "Scan configuration opened"),
+            4: ("SCAN", "Execution step selected"),
+            5: ("DATA", "Data analysis opened"),
+            6: ("REPORT", "Report center opened"),
+        }
         tab_map = {
             0: self.workspace.REALTIME_TAB_INDEX,
             1: self.workspace.DEVICE_CENTER_TAB_INDEX,
@@ -1032,6 +1363,12 @@ class CommercialMainShell(QMainWindow):
             6: self.workspace.REPORT_VIEW_TAB_INDEX,
         }
         self.workspace.switch_to_tab(tab_map.get(index, self.workspace.REALTIME_TAB_INDEX))
+        if index == 3:
+            self.property_panel.focus_scan_tab()
+        if index == 4 and self.property_panel.can_start_scan():
+            self.bottom_dock.append_log_line("Scan parameters valid; click Start to begin Dry Run.", level="SCAN")
+        level, message = step_logs.get(index, ("UI", f"Workflow step {index + 1} selected"))
+        self.bottom_dock.append_log_line(message, level=level)
 
     def _reset_demo_session(self) -> None:
         runtime = self._services.runtime
@@ -1066,6 +1403,9 @@ class CommercialMainShell(QMainWindow):
         self._sync_demo_state()
 
     def _start_mock_scan(self) -> None:
+        if self._services.hardware_manager.is_real_mode():
+            self._start_real_scan()
+            return
         if self._services.project.current_session() is None:
             self.bottom_dock.append_log_line("Mock 扫描: 自动打开 Demo 项目", level="PROJECT")
             self._on_open_project()
@@ -1091,15 +1431,125 @@ class CommercialMainShell(QMainWindow):
         self._services.dry_run.motion.home()
         self._services.dry_run.spectrum.configure_frequency(1.5e9, 2.0e9)
         self._flush_dry_run_logs(force=True)
-        self.bottom_dock.append_log_line("Mock 扫描开始", level="SCAN")
         region = self.property_panel.current_scan_region()
         path_config = self.property_panel.current_scan_path_config()
+        points = generate_preview_points(region, path_config)
+        stats = calculate_preview_stats(points, region, path_config)
+        self.bottom_dock.append_log_line(
+            f"Dry run scan started: {stats.point_count} points",
+            level="SCAN",
+        )
         self.mock_scan.start(region, path_config)
         self._sync_demo_state(self.mock_scan.snapshot())
 
+    def _start_real_scan(self) -> None:
+        if self.real_scan.is_running:
+            self.bottom_dock.append_log_line("Real scan already running", level="WARN")
+            return
+        if not self.property_panel.can_start_scan():
+            message = self.property_panel.validation_message() or "参数无效"
+            self.bottom_dock.append_log_line(f"Real scan not started: {message}", level="WARN")
+            return
+        ready, message = self._services.hardware_manager.ensure_ready_for_scan()
+        if not ready:
+            self.bottom_dock.append_log_line(message, level="ERROR")
+            return
+        region = self.property_panel.current_scan_region()
+        path_config = self.property_panel.current_scan_path_config()
+        points = generate_preview_points(region, path_config)
+        stats = calculate_preview_stats(points, region, path_config)
+        summary = (
+            f"即将开始真实扫描：\n"
+            f"X: {region.x_start} -> {region.x_stop}, step {region.x_step}\n"
+            f"Y: {region.y_start} -> {region.y_stop}, step {region.y_step}\n"
+            f"Z: {region.z_height}\n"
+            f"Total points: {stats.point_count}\n"
+            f"Instrument: {self._services.hardware_manager.instrument.instrument_id}\n"
+            f"Motion: {self._services.hardware_manager.motion.identify()}\n\n"
+            f"请确认扫描区域安全，急停可用。是否开始？"
+        )
+        answer = QMessageBox.warning(
+            self,
+            "开始真实扫描",
+            summary,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            self.bottom_dock.append_log_line("Real scan cancelled by user", level="SCAN")
+            return
+        session = self._services.project.current_session()
+        project_id = session.project_id if session else "demo-project"
+        started, start_message = self.real_scan.start(region, path_config, project_id=project_id)
+        if not started:
+            self.bottom_dock.append_log_line(start_message, level="ERROR")
+            return
+        self.bottom_dock.append_log_line(
+            f"Real scan started: {stats.point_count} points",
+            level="SCAN",
+        )
+        self.workflow_panel.set_step_state(4, "active")
+
+    def _on_real_scan_progress(self, update) -> None:
+        self.bottom_dock.update_real_scan_point(update)
+        self.workspace.realtime_view().update_real_scan_point(update)
+        table = self.workspace.data_table_view()
+        if table is not None:
+            table.append_real_scan_point(update)
+        percent = int(update.index / update.total * 100) if update.total else 0
+        self.status_bar_widget.update_device_mode(
+            real_mode=True,
+            motion_status="Connected",
+            instrument_status="Connected",
+            real_scan_running=True,
+        )
+        self.status_bar_widget.progress_label.setText(f"进度: {percent}%")
+        self.bottom_dock.append_log_line(
+            f"[SCAN] Real point {update.index}/{update.total} X={update.x_mm:.2f} Y={update.y_mm:.2f}",
+            level="SCAN",
+        )
+
+    def _on_real_scan_finished(self, result) -> None:
+        if result.stopped_by_user:
+            self.bottom_dock.append_log_line("[SCAN] Real scan stopped by user", level="SCAN")
+        elif result.last_error:
+            self.bottom_dock.append_log_line(f"Real scan error: {result.last_error}", level="ERROR")
+        else:
+            self.bottom_dock.append_log_line(
+                f"Real scan completed: {result.completed_points}/{result.total_points} points",
+                level="SCAN",
+            )
+        self.bottom_dock.append_log_line(f"Output saved: {result.output_dir}", level="DATA")
+        self.workflow_panel.mark_completed_through(4)
+        self._sync_demo_state()
+
+    def closeEvent(self, event) -> None:  # noqa: N802 - Qt API
+        if self.real_scan.is_running:
+            answer = QMessageBox.warning(
+                self,
+                "扫描运行中",
+                "真实扫描正在运行。关闭窗口将请求停止扫描并保存已采集数据。\n是否继续关闭？",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                event.ignore()
+                return
+            self.real_scan.stop()
+            self.bottom_dock.append_log_line("[SCAN] Real scan stop requested on window close", level="SCAN")
+        super().closeEvent(event)
+
     def _stop_mock_scan(self) -> None:
+        if self.real_scan.is_running:
+            self.real_scan.stop()
+            self.bottom_dock.append_log_line("[SCAN] Real scan stop requested", level="SCAN")
+            return
+        snapshot = self.mock_scan.snapshot()
+        if snapshot.status not in ("running", "paused"):
+            self.bottom_dock.append_log_line("No running scan task to stop", level="WARN")
+            return
         self.mock_scan.stop()
-        self.bottom_dock.append_log_line("Mock 扫描已停止", level="SCAN")
+        self.bottom_dock.append_log_line("Dry run scan stopped by user", level="SCAN")
         self._sync_demo_state(self.mock_scan.snapshot())
 
     def _toggle_mock_scan_pause(self) -> None:
