@@ -607,6 +607,15 @@ Needs Review: yes/no
 - Impact: 新建/打开/保存/另存为/recent/dirty/UI 上下文均可由 QA 自动验证；打开项目不连接设备、不启动扫描、不修改历史 CSV。
 - Needs Review: no
 
+### 2026-06-28 - Commercial V1 Project Lifecycle Acceptance
+
+- Date: 2026-06-28
+- Task: commercial-v1-project-lifecycle-acceptance
+- Decision: 对 `7e2411a` 执行完整验收（177 unittest + visual + commercial QA + 程序化 lifecycle 探针）；全部 PASS，无需代码修复。
+- Reason: 确认 Project Lifecycle Completion 提交在真实用户流程中可用，而非仅单元测试通过。
+- Impact: 验收报告写入 `.ai/reviews/commercial_v1_project_lifecycle_acceptance.md`；Real Device Sprint 仍未启动。
+- Needs Review: no
+
 
 - Date: 2026-06-26
 - Task: commercial-demo-v0.4-final-acceptance
