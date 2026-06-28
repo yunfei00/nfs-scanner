@@ -580,6 +580,15 @@ Needs Review: yes/no
 - Impact: 155 tests + visual + QA PASS；MockArtifactService 统一 ~/.nfs_scanner 导出路径。
 - Needs Review: no
 
+### 2026-06-28 - Commercial V1 Functional Completion
+
+- Date: 2026-06-28
+- Task: commercial-v1-functional-completion
+- Decision: 商业 UI 升级为正式 Commercial V1 流程；引入 CommercialActionRegistry、ProjectService（project.nfsproj）、SimulationDeviceProvider、ScanRuntimeController；底层仍为 Simulation，不接真实硬件。
+- Reason: 用户要求每个可见按钮/Tab/流程正式可用，不允许空 handler；为真实设备 Provider 替换预留接口。
+- Impact: 160 unittest + QA PASS；另存为保留新 project_id；真实设备仅能通过 docs/real-device-integration Sprint 接入。
+- Needs Review: no（真实设备 Sprint 启动前须 R01 安全评审）
+
 
 - Date: 2026-06-26
 - Task: commercial-demo-v0.4-final-acceptance

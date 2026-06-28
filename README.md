@@ -73,10 +73,14 @@ NFS_SCANNER_UI=commercial
 
 ## 当前状态
 
-**Commercial Demo v0.5 已冻结**（Mock Feature Complete）。
+**Commercial V1 功能完成**（正式商用流程 + Simulation Provider）。
 
-冻结文档：`.ai/releases/commercial_demo_v0_5_freeze.md`  
-Git tag：`commercial-demo-v0.5`
+- 文档：`.ai/reviews/commercial_v1_functional_completion.md`
+- Action 清单：`.ai/reviews/commercial_v1_action_inventory.md`
+- 手动验收：`.ai/reviews/commercial_v1_manual_acceptance.md`
+- v0.5 冻结 tag：`commercial-demo-v0.5`（历史基线）
+
+底层仍为 Simulation / Dry Run，**未接入真实运动平台、频谱仪、相机**。
 
 ```text
 全部工具栏/Tab/属性页/导出/自检 → Mock 行为完整 → QA PASS → 已冻结
@@ -288,7 +292,9 @@ CommercialServiceBundle
       ├── DeviceServiceProtocol
       │       └── MockDeviceService / Future RealDeviceService
       │
-      ├── MockProjectService
+      ├── ProjectService（project.nfsproj）
+      ├── SimulationDeviceProvider → MockDeviceService
+      ├── ScanRuntimeController → MockScanRuntimeService
       ├── MockAnalysisService
       └── MockReportService
 ```
