@@ -28,6 +28,8 @@ class MockReportService:
 
         task = self._analysis.get_task(task_id)
         if task is None:
+            if task_id == "demo-sample":
+                return self.build_demo_preview()
             raise KeyError(f"Unknown mock task id: {task_id}")
 
         summary = self._analysis.build_summary(task_id)
@@ -116,11 +118,43 @@ class MockReportService:
             "modified_at": session.modified_at,
         }
 
-    def _render_markdown(self, preview: dict[str, Any]) -> str:
+    _TEMPLATES = {
+        "简洁版": "compact",
+        "标准版": "standard",
+        "客户交付版": "customer",
+    }
+
+    def build_demo_preview(self) -> dict[str, Any]:
+        """Fallback preview when no task is selected."""
+
+        return {
+            "project": self._project_info(),
+            "scan": {
+                "task_id": "demo-sample",
+                "task_name": "Demo Sample Scan",
+                "point_count": 36,
+                "completed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "scan_mode": "snake",
+                "peak_frequency": "2.450 GHz",
+                "peak_amplitude": "-23.5 dBm",
+                "area_mm2": 3600.0,
+                "path_length": "72 mm (mock)",
+                "mean_amplitude": "-52.6 dBm",
+                "heatmap_grid": "64 x 64 mock grid",
+            },
+            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+
+    def _render_markdown(self, preview: dict[str, Any], *, template: str = "standard") -> str:
         project = preview["project"]
         scan = preview["scan"]
+        title_map = {
+            "compact": "近场扫描 Mock 报告（简洁版）",
+            "standard": "近场扫描 Mock 报告",
+            "customer": "近场扫描 Mock 报告（客户交付版）",
+        }
         lines = [
-            "# 近场扫描 Mock 报告",
+            f"# {title_map.get(template, title_map['standard'])}",
             "",
             f"- 生成时间: {preview['generated_at']}",
             "",
@@ -141,14 +175,42 @@ class MockReportService:
             f"- 峰值幅度: {scan['peak_amplitude']}",
             f"- 平均幅度: {scan['mean_amplitude']}",
             f"- 热力图网格: {scan['heatmap_grid']}",
-            "",
-            "## 安全声明",
-            "",
-            "- MOCK / DRY RUN / NO HARDWARE CONTROL",
-            "- Demo 数据，不含真实硬件控制",
-            "",
-            "---",
-            "",
-            "*Mock 报告 — 不含真实 CSV 或 PDF 导出。*",
         ]
+        if template in {"standard", "customer"}:
+            lines.extend(
+                [
+                    "",
+                    "## 热力图描述",
+                    "",
+                    "- Mock 热力图覆盖 PCB 扫描区域，峰值位于中心偏右。",
+                    "",
+                    "## 风险 / 峰值点",
+                    "",
+                    f"- 峰值频率 {scan['peak_frequency']} @ {scan['peak_amplitude']}",
+                ]
+            )
+        if template == "customer":
+            lines.extend(
+                [
+                    "",
+                    "## 设备摘要",
+                    "",
+                    "- 运动平台: Mock GRBL",
+                    "- 频谱仪: Mock FSW",
+                    "- 相机: Mock USB Camera",
+                ]
+            )
+        lines.extend(
+            [
+                "",
+                "## 安全声明",
+                "",
+                "- MOCK / DRY RUN / NO HARDWARE CONTROL",
+                "- Demo 数据，不含真实硬件控制",
+                "",
+                "---",
+                "",
+                "*Mock 报告 — 不含真实 CSV 或 PDF 导出。*",
+            ]
+        )
         return "\n".join(lines) + "\n"

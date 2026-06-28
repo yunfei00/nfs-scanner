@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
+import json
+from dataclasses import asdict, replace
+from datetime import datetime
+from pathlib import Path
 
 from .device_config import CameraDeviceConfig, MotionDeviceConfig, SpectrumDeviceConfig
+from .mock_artifact_service import MockArtifactService
 
 
 class MockDeviceConfigService:
@@ -48,6 +52,22 @@ class MockDeviceConfigService:
         if not errors:
             self._camera[device_id] = replace(config)
         return errors
+
+    def save_all_to_json(self) -> Path:
+        """Persist current mock configs to ~/.nfs_scanner/mock_exports/config/."""
+
+        payload = {
+            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "mock_only": True,
+            "motion": {key: asdict(value) for key, value in self._motion.items()},
+            "spectrum": {key: asdict(value) for key, value in self._spectrum.items()},
+            "camera": {key: asdict(value) for key, value in self._camera.items()},
+        }
+        filename = MockArtifactService.build_filename(
+            artifact_type="mock_device_config",
+            extension="json",
+        )
+        return MockArtifactService.export_json("config", filename, payload)
 
     def summary_for_device(self, device_id: str, kind: str) -> str:
         if kind == "motion":

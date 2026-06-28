@@ -105,6 +105,18 @@ class MockAnalysisService:
         self._tasks.insert(0, record)
         return record
 
+    def delete_task(self, task_id: str) -> bool:
+        """Remove one mock task from history."""
+
+        before = len(self._tasks)
+        self._tasks = [task for task in self._tasks if task.task_id != task_id]
+        return len(self._tasks) < before
+
+    def clear_history(self) -> None:
+        """Clear all mock tasks except built-in demo defaults."""
+
+        self._tasks = _default_tasks()
+
     def build_summary(self, task_id: str, *, view_mode: str = "trace") -> MockAnalysisSummary | None:
         task = self.get_task(task_id)
         if task is None:
