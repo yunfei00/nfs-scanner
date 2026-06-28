@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import sys
 
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget
+
+import numpy as np
+from numpy.typing import NDArray
 
 from nfs_scanner.devices.camera.constants import (
     DEFAULT_CAMERA_NAME,
@@ -15,6 +19,7 @@ from nfs_scanner.devices.camera.constants import (
 )
 from nfs_scanner.devices.camera.manager import CameraManager
 from nfs_scanner.devices.camera.models import CameraInfo, CameraProfile, CameraState
+from nfs_scanner.devices.camera.qt_image import bgr_frame_to_qimage
 
 from ..widgets import NFSStatusBadge
 from ..widgets.camera_control_panel import CameraControlPanel
@@ -24,6 +29,8 @@ from ..widgets.camera_preview_panel import CameraPreviewPanel
 class VisionView(QWidget):
     """USB camera preview panel for the commercial UI."""
 
+    camera_log = Signal(str, str)
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("visionView")
@@ -32,6 +39,7 @@ class VisionView(QWidget):
         self._worker = None
         self._preview_active = False
         self._devices_loaded = False
+        self._last_frame_bgr: NDArray[np.uint8] | None = None
         self._setup_ui()
         self._sync_status()
 
@@ -69,7 +77,7 @@ class VisionView(QWidget):
         self._control_panel.refresh_clicked.connect(self._refresh_devices)
         self._control_panel.start_preview_clicked.connect(self._start_preview)
         self._control_panel.stop_preview_clicked.connect(self._stop_preview)
-        self._control_panel.snapshot_clicked.connect(self._take_snapshot)
+        self._control_panel.snapshot_clicked.connect(self._on_snapshot_clicked)
         self._control_panel.device_changed.connect(self._update_device_details)
         body.addWidget(self._control_panel)
 
@@ -176,6 +184,7 @@ class VisionView(QWidget):
         worker.frame_ready.connect(self._on_frame_ready)
         worker.error_occurred.connect(self._on_worker_error)
         self._preview_active = True
+        self._last_frame_bgr = None
         self._preview_panel.show_placeholder("")
         self._control_panel.set_message(f"预览中: {device.name} · {profile.resolution_label} @ {profile.fps}fps")
         self._sync_status()
@@ -190,23 +199,43 @@ class VisionView(QWidget):
         self._manager.stop_preview()
         self._manager.close()
         self._preview_active = False
+        self._last_frame_bgr = None
         self._preview_panel.show_placeholder("预览已停止")
         self._sync_status()
         self._update_device_details()
         self._update_controls()
 
-    def _take_snapshot(self) -> None:
-        if not self._preview_active and self._manager.state == CameraState.DISCONNECTED:
-            self._control_panel.set_message("请先开始预览，或确保相机已连接。", error=True)
+    def _on_snapshot_clicked(self) -> None:
+        if not self._preview_active:
+            message = "请先开始预览。"
+            self._control_panel.set_message(message, error=True)
+            self.camera_log.emit("[CAMERA] Snapshot failed: no frame available. Start preview first.", "CAMERA")
             return
+
+        if self._last_frame_bgr is None:
+            message = self._manager.last_error or "没有可用帧，请先开始预览。"
+            self._control_panel.set_message(message, error=True)
+            self.camera_log.emit("[CAMERA] Snapshot failed: no frame available. Start preview first.", "CAMERA")
+            return
+
         path = self._manager.capture_snapshot()
         if path is None:
-            self._control_panel.set_message(self._manager.last_error or "拍照失败。", error=True)
+            error = self._manager.last_error or "拍照失败。"
+            self._control_panel.set_message(error, error=True)
+            self.camera_log.emit(f"[CAMERA] Snapshot failed: {error}", "CAMERA")
             return
-        self._control_panel.set_message(f"已保存: {path}")
 
-    def _on_frame_ready(self, image) -> None:
-        self._manager.remember_qimage(image)
+        display_path = path.as_posix()
+        self._control_panel.set_last_snapshot(display_path)
+        self._control_panel.set_message(f"拍照成功：{display_path}")
+        self.camera_log.emit(f"[CAMERA] Snapshot saved: {display_path}", "CAMERA")
+
+    def _on_frame_ready(self, frame) -> None:
+        if frame is None:
+            return
+        self._last_frame_bgr = frame.copy()
+        self._manager.remember_bgr_frame(frame)
+        image = bgr_frame_to_qimage(frame)
         self._preview_panel.set_frame_image(image)
         if self._preview_active:
             self._sync_status()

@@ -5,18 +5,16 @@ from __future__ import annotations
 import logging
 
 from PySide6.QtCore import QThread, Signal
-from PySide6.QtGui import QImage
 
 from .opencv_camera import OpenCVCameraDevice
-from .qt_image import bgr_frame_to_qimage
 
 logger = logging.getLogger(__name__)
 
 
 class CameraWorker(QThread):
-    """Poll camera frames on a worker thread and emit ``QImage`` previews."""
+    """Poll camera frames on a worker thread and emit raw BGR frames."""
 
-    frame_ready = Signal(QImage)
+    frame_ready = Signal(object)
     error_occurred = Signal(str)
 
     def __init__(self, device: OpenCVCameraDevice, *, interval_ms: int = 33, parent=None) -> None:
@@ -43,9 +41,7 @@ class CameraWorker(QThread):
                     break
                 self.msleep(self._interval_ms)
                 continue
-            image = bgr_frame_to_qimage(frame)
-            if not image.isNull():
-                self.frame_ready.emit(image)
+            self.frame_ready.emit(frame.copy())
             self.msleep(self._interval_ms)
         self._device.mark_previewing(False)
 

@@ -205,6 +205,9 @@ class CommercialMainShell(QMainWindow):
         device_center.feedback_requested.connect(
             lambda level, message: self.bottom_dock.append_log_line(message, level=level)
         )
+        self.workspace.vision_view().camera_log.connect(
+            lambda message, level: self.bottom_dock.append_log_line(message, level=level)
+        )
 
     def _connect_project_workflow(self) -> None:
         self.toolbar.demo_reset_requested.connect(self._reset_demo_session)

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -15,8 +14,9 @@ from .enumeration import enumerate_cameras, find_default_camera
 from .models import CameraEnumerationResult, CameraInfo, CameraProfile, CameraState
 from .opencv_camera import OpenCVCameraDevice
 from .qt_image import bgr_frame_to_qimage
+from .snapshot import save_camera_snapshot
 from .worker import CameraWorker
-from ._opencv_import import opencv_available, require_opencv
+from ._opencv_import import opencv_available
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +115,7 @@ class CameraManager:
         if self._device is not None:
             self._device.disconnect()
             self._device = None
+        self._last_frame = None
         self._state = CameraState.DISCONNECTED
         self._last_error = ""
 
@@ -161,38 +162,35 @@ class CameraManager:
             self._remember_frame(frame)
         return frame
 
-    def capture_snapshot(self, *, output_dir: Path | None = None) -> Path | None:
-        """Capture one frame and save it as a JPEG under ``outputs/camera/``."""
+    def remember_bgr_frame(self, frame: NDArray[np.uint8]) -> None:
+        """Store the latest raw BGR frame from the preview worker (UI thread)."""
 
-        frame = self.read_frame()
-        if frame is None:
-            if self._last_frame is not None:
-                frame = self._last_frame.copy()
-            else:
-                self._last_error = self._last_error or "没有可用帧，无法拍照"
-                return None
+        self._last_frame = frame.copy()
+        image = bgr_frame_to_qimage(frame)
+        if not image.isNull():
+            self._last_qimage = image
+
+    def capture_snapshot(self, *, output_dir: Path | None = None) -> Path | None:
+        """Save the latest preview BGR frame as JPEG under ``outputs/camera/``."""
+
+        if self._last_frame is None:
+            self._last_error = "没有可用帧，请先开始预览"
+            save_camera_snapshot(None, output_dir or self._output_dir)
+            return None
 
         target_dir = output_dir or self._output_dir
-        target_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        target_path = target_dir / f"camera_{timestamp}.jpg"
-
-        cv2 = require_opencv()
-        ok = cv2.imwrite(str(target_path), frame)
-        if not ok:
-            self._last_error = f"保存图片失败: {target_path}"
+        path, error = save_camera_snapshot(self._last_frame.copy(), target_dir)
+        if error:
+            self._last_error = error
             return None
-        logger.info("Camera snapshot saved: %s", target_path)
-        return target_path
+        self._last_error = ""
+        return path
 
     def remember_qimage(self, image: QImage) -> None:
-        """Store the latest preview frame for snapshot fallback."""
+        """Legacy hook for preview-only QImage updates."""
 
         if not image.isNull():
             self._last_qimage = image.copy()
 
     def _remember_frame(self, frame: NDArray[np.uint8]) -> None:
-        self._last_frame = frame
-        image = bgr_frame_to_qimage(frame)
-        if not image.isNull():
-            self._last_qimage = image
+        self.remember_bgr_frame(frame)

@@ -144,6 +144,11 @@ class CameraControlPanel(QWidget):
         self.message_label.setWordWrap(True)
         layout.addWidget(self.message_label)
 
+        self.last_snapshot_label = QLabel("", content)
+        self.last_snapshot_label.setObjectName("nfsMutedLabel")
+        self.last_snapshot_label.setWordWrap(True)
+        layout.addWidget(self.last_snapshot_label)
+
         scroll.setWidget(content)
         outer.addWidget(scroll, 1)
 
@@ -174,6 +179,9 @@ class CameraControlPanel(QWidget):
     def set_device_details(self, text: str) -> None:
         self.device_details.setPlainText(text)
 
+    def set_last_snapshot(self, path: str) -> None:
+        self.last_snapshot_label.setText(f"最近拍照：{path}")
+
     def set_controls_enabled(self, *, supported: bool, previewing: bool) -> None:
         for widget in (
             self.device_combo,
@@ -181,7 +189,7 @@ class CameraControlPanel(QWidget):
             self.fps_combo,
             self.refresh_button,
             self.start_button,
-            self.snapshot_button,
         ):
             widget.setEnabled(supported and not previewing)
         self.stop_button.setEnabled(supported and previewing)
+        self.snapshot_button.setEnabled(supported and previewing)

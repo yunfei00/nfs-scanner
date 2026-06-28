@@ -174,11 +174,58 @@ ffmpeg -f dshow -video_size 1920x1080 -framerate 30 -vcodec mjpeg -i "video=LRCP
 ### 软件内拍照
 
 1. 打开 **相机 / 视觉**
-2. 选择设备与参数
-3. 点击 **开始预览**
-4. 点击 **拍照**
+2. 选择设备（如 `LRCP  F1080P` 或 `Camera 1`）
+3. 分辨率选择 `1920x1080`，帧率选择 `30 fps`，编码 `MJPG`
+4. 点击 **开始预览**，确认右侧有实时画面
+5. 点击 **拍照**
+6. 在底部日志查看：`[CAMERA] Snapshot saved: outputs/camera/camera_YYYYMMDD_HHMMSS.jpg`
+7. 在控制区底部查看：**最近拍照：outputs/camera/...**
 
-默认保存目录：
+## 拍照功能
+
+### 保存位置
+
+```text
+outputs/camera/
+```
+
+### 文件名格式
+
+```text
+camera_YYYYMMDD_HHMMSS.jpg
+```
+
+示例：
+
+```text
+outputs/camera/camera_20260628_233500.jpg
+```
+
+### 使用步骤
+
+1. 选择设备
+2. 选择 1920x1080 / 30fps / MJPG
+3. 点击 **开始预览**
+4. 确认有实时画面
+5. 点击 **拍照**
+6. 到 `outputs/camera/` 查看 JPG
+
+### 实现说明
+
+- 保存的是 **原始 OpenCV BGR 帧**（如 1920x1080），不是预览 QLabel 的缩放图
+- 预览运行时 Worker 线程 emit 帧，UI 主线程保存 `last_frame_bgr`
+- 必须先 **开始预览** 才能拍照
+
+### 拍照常见问题
+
+| 现象 | 处理 |
+|------|------|
+| 点击拍照没有反应 | 确认已开始预览；预览中「拍照」按钮才会启用 |
+| 图片没有生成 | 检查 `outputs/camera/` 目录写入权限 |
+| 图片尺寸太小 | 不应保存 QLabel 缩放图；应检查原始 BGR 帧分辨率 |
+| 颜色异常 | `cv2.imwrite` 使用 BGR 帧，预览转换仅在显示层做 RGB |
+
+默认保存目录（重复说明）：
 
 ```text
 outputs/camera/camera_YYYYMMDD_HHMMSS.jpg
@@ -238,6 +285,7 @@ nfs_scanner/devices/camera/
   opencv_camera.py   # OpenCVCameraDevice
   manager.py         # CameraManager
   worker.py          # CameraWorker (QThread)
+  snapshot.py        # save_camera_snapshot()
   qt_image.py        # BGR -> QImage
 
 nfs_scanner/ui/commercial/views/vision_view.py
@@ -246,7 +294,7 @@ nfs_scanner/ui/commercial/views/vision_view.py
 ## 自动化测试
 
 ```bash
-python -m unittest tests.test_camera_opencv -v
+python -m unittest tests.test_camera_opencv tests.test_camera_snapshot -v
 ```
 
 - 无相机环境：大部分测试仍可运行

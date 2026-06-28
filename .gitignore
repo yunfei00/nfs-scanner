@@ -204,8 +204,10 @@ cython_debug/
 # Runtime instrument discovery cache (see config/instrument_devices.example.json)
 config/instrument_devices.json
 
-# Runtime camera snapshots
-outputs/camera/
+# Runtime camera snapshots (keep directory via .gitkeep)
+outputs/camera/*.jpg
+outputs/camera/*.png
+!outputs/camera/.gitkeep
 
 # Marimo
 marimo/_static/
