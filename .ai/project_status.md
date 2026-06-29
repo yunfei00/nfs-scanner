@@ -4,13 +4,13 @@ Last updated: 2026-06-28
 
 ## Current Stage
 
-**Commercial V1 — Device Lifecycle Complete**
+**Commercial V1 — Real Device Bridge Integrated**
 
-商业版设备生命周期（Simulation Provider）：连接/断开/刷新/配置/测试连接、Device Center、仪表设置、project.nfsproj device_config、Dry Run Log 与 QA 验收已完成。
+Simulation 仍为默认；`RealDeviceProvider` / `RealScanProvider` 已桥接 `HardwareDeviceManager` + `SerialMotionController` + 频谱仪 adapters，真实 I/O 需 env + yaml + UI 确认。
 
 ## Next Stage
 
-**Commercial V1 — Scan Runtime / Real Device Planning (R01 gated)**
+**Manual bench validation (small motion + spectrum + 3×3 scan)**
 
 Real Device Integration 仍须 R01 安全评审后启动；项目生命周期本身不再依赖真实设备。
 

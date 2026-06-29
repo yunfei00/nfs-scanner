@@ -625,6 +625,15 @@ Needs Review: yes/no
 - Impact: Device Center / 仪表设置 / 左侧状态 / Workflow 第 2 步 / project dirty / Dry Run Log 可 QA 验证；真实 Provider 后续替换即可。
 - Needs Review: no
 
+### 2026-06-29 - Commercial V1 Real Device Bridge Integration
+
+- Date: 2026-06-29
+- Task: commercial-v1-real-device-bridge-integration
+- Decision: 新增 `RealDeviceProvider` / `RealScanProvider` 桥接已有 `HardwareDeviceManager`、`SerialMotionController`、频谱仪 adapters；`CommercialServiceBundle` 保留 Simulation 默认并暴露 `real_device_provider` / `real_scan_provider`；Device Center 恢复 `HardwareModePanel`；真实 I/O 需 env + yaml mode:real + UI 确认。
+- Reason: 底层能力已存在，缺 UI→Provider→Manager 正式桥接；不重复实现串口/SCPI。
+- Impact: 自动测试全 Fake；默认仍 blocked；QA real_device_bridge checks PASS。
+- Needs Review: no
+
 
 - Date: 2026-06-26
 - Task: commercial-demo-v0.4-final-acceptance
