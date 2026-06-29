@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget
@@ -30,6 +31,7 @@ class VisionView(QWidget):
     """USB camera preview panel for the commercial UI."""
 
     camera_log = Signal(str, str)
+    scan_background_requested = Signal(str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -40,6 +42,7 @@ class VisionView(QWidget):
         self._preview_active = False
         self._devices_loaded = False
         self._last_frame_bgr: NDArray[np.uint8] | None = None
+        self._last_snapshot_path: Path | None = None
         self._setup_ui()
         self._sync_status()
 
@@ -78,6 +81,7 @@ class VisionView(QWidget):
         self._control_panel.start_preview_clicked.connect(self._start_preview)
         self._control_panel.stop_preview_clicked.connect(self._stop_preview)
         self._control_panel.snapshot_clicked.connect(self._on_snapshot_clicked)
+        self._control_panel.set_scan_background_clicked.connect(self._on_set_scan_background_clicked)
         self._control_panel.device_changed.connect(self._update_device_details)
         body.addWidget(self._control_panel)
 
@@ -131,6 +135,7 @@ class VisionView(QWidget):
         combo.blockSignals(False)
         self._update_device_details()
         self._update_controls()
+        self.camera_log.emit("[CAMERA] Safe refresh completed", "CAMERA")
 
     def _update_device_details(self) -> None:
         device = self._selected_device()
@@ -187,6 +192,7 @@ class VisionView(QWidget):
         self._last_frame_bgr = None
         self._preview_panel.show_placeholder("")
         self._control_panel.set_message(f"预览中: {device.name} · {profile.resolution_label} @ {profile.fps}fps")
+        self.camera_log.emit(f"[CAMERA] Preview started: {device.name}", "CAMERA")
         self._sync_status()
         self._update_device_details()
         self._update_controls()
@@ -201,6 +207,7 @@ class VisionView(QWidget):
         self._preview_active = False
         self._last_frame_bgr = None
         self._preview_panel.show_placeholder("预览已停止")
+        self.camera_log.emit("[CAMERA] Preview stopped", "CAMERA")
         self._sync_status()
         self._update_device_details()
         self._update_controls()
@@ -226,9 +233,31 @@ class VisionView(QWidget):
             return
 
         display_path = path.as_posix()
+        self._last_snapshot_path = path
         self._control_panel.set_last_snapshot(display_path)
         self._control_panel.set_message(f"拍照成功：{display_path}")
         self.camera_log.emit(f"[CAMERA] Snapshot saved: {display_path}", "CAMERA")
+
+    def _on_set_scan_background_clicked(self) -> None:
+        if self._last_snapshot_path is None or not self._last_snapshot_path.is_file():
+            message = "请先拍照并确认图片已保存。"
+            self._control_panel.set_message(message, error=True)
+            self.camera_log.emit("[BACKGROUND] Set scan background failed: no snapshot available.", "BACKGROUND")
+            return
+        path_text = self._last_snapshot_path.as_posix()
+        self.scan_background_requested.emit(path_text)
+
+    def set_current_background_path(self, path: str | None) -> None:
+        """Update the control panel label for the active scan background."""
+
+        self._control_panel.set_current_background(path)
+
+    def set_status_message(self, text: str, *, error: bool = False) -> None:
+        self._control_panel.set_message(text, error=error)
+
+    @property
+    def last_snapshot_path(self) -> Path | None:
+        return self._last_snapshot_path
 
     def _on_frame_ready(self, frame) -> None:
         if frame is None:

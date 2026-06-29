@@ -1,6 +1,6 @@
 # Commercial Demo QA Report
 
-- Generated: 2026-06-28 22:37:34
+- Generated: 2026-06-29 07:46:07
 - Round: 1
 - Overall: **PASS**
 
@@ -53,7 +53,7 @@
 | canvas_wider_than_right_panel | workspace > right panel | 676px > 350px | PASS |
 | bottom_dock_height | >= 200px | 200px | PASS |
 | log_view_height | >= 100px | 140px | PASS |
-| log_visible_lines | >= 6 visible lines | estimated=13 | PASS |
+| log_visible_lines | >= 6 visible lines | estimated=9 | PASS |
 | statistics_panel_height | >= 100px | 192px | PASS |
 | status_bar_visible | status bar visible | True | PASS |
 | default_window_within_screen | window <= available screen | 1280x720 <= 1280x720 | PASS |
@@ -69,7 +69,7 @@
 | maximized_canvas_wider_than_right_panel | workspace > right panel | 676px > 350px | PASS |
 | maximized_bottom_dock_height | >= 200px | 200px | PASS |
 | maximized_log_view_height | >= 100px | 140px | PASS |
-| maximized_log_visible_lines | >= 6 visible lines | estimated=103 | PASS |
+| maximized_log_visible_lines | >= 6 visible lines | estimated=121 | PASS |
 | maximized_statistics_panel_height | >= 100px | 192px | PASS |
 | maximized_status_bar_visible | status bar visible | True | PASS |
 | maximized_maximized_window_capture | custom maximized == True | True | PASS |
@@ -92,9 +92,9 @@
 | stop_scan_stopped | runtime status == stopped | stopped | PASS |
 | scan_completes_or_stops | runtime status completed or stopped | completed | PASS |
 | data_view_mock_task | data view lists mock scan tasks | 3 | PASS |
-| data_view_export_mock_json | data export creates mock json | C:\Users\yunfei\.nfs_scanner\mock_exports\data\mock_data_demo_mock-34b41c51_20260628_223741.json | PASS |
+| data_view_export_mock_json | data export creates mock json | C:\Users\yunfei\.nfs_scanner\mock_exports\data\mock_data_demo_mock-2241b7ca_20260629_074612.json | PASS |
 | report_center_preview | report preview populated | Demo Near Field Scan | PASS |
-| mock_report_export | markdown/txt report file created | C:\Users\yunfei\.nfs_scanner\reports\report_mock-34b41c51_20260628_223741.md | PASS |
+| mock_report_export | markdown/txt report file created | C:\Users\yunfei\.nfs_scanner\reports\report_mock-2241b7ca_20260629_074612.md | PASS |
 | mock_report_multi_format_export | html/pdf/png mock report files created | .html, .pdf, .png | PASS |
 | mock_self_check_report | local mock self-check report created | .ai\qa\latest\commercial_mock_self_check.json | PASS |
 | reset_demo_restores_state | runtime idle and demo reset applied | status=configured, tasks 3->2 | PASS |
@@ -128,8 +128,8 @@
 | left_scrollbar_width | >= 12px when visible | 14px | PASS |
 | property_scrollbar_width | >= 12px when visible | 14px | PASS |
 | log_scrollbar_width | >= 12px when scrollable | 14px | PASS |
-| log_area_scrollable | log content scrollable | range=98 | PASS |
-| property_area_scrollable | property panel scrollable | range=176 | PASS |
+| log_area_scrollable | log content scrollable | range=116 | PASS |
+| property_area_scrollable | property panel scrollable | range=350 | PASS |
 | device_status_scrollable_or_compact | device scroll visible when needed | width=0px | PASS |
 | wheel_interaction | wheel step changes scroll value | True | PASS |
 | handle_position_interaction | handle position can be set smoothly | True | PASS |
@@ -159,7 +159,7 @@
 |-------|----------|--------|--------|
 | compileall | exit code 0 | Listing 'nfs_scanner\\ui\\widgets'... | PASS |
 | unittest | exit code 0 | OK (skipped=1) | PASS |
-| commercial_ui_visual_check | exit code 0 | [ WARN:0@1.921] global cap.cpp:480 cv::VideoCapture::open VIDEOIO(DSHOW): backend is generally available but can't be used to capture by index | PASS |
+| commercial_ui_visual_check | exit code 0 | TypeError: device_changed() only accepts 0 argument(s), 1 given! | PASS |
 
 ## Failures
 

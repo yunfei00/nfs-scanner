@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import subprocess
 import sys
@@ -9,13 +10,16 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from .constants import (
+    CAMERA_SAFE_ENUMERATION,
     DEFAULT_CAMERA_NAME,
     DEFAULT_VID_PID,
     DEFAULT_VID_PID_TOKEN,
+    is_opencv_probe_allowed,
 )
 from .models import CameraEnumerationResult, CameraInfo
 from ._opencv_import import opencv_available, require_opencv
 
+logger = logging.getLogger(__name__)
 
 _VID_PID_PATTERN = re.compile(r"vid_([0-9a-f]{4})&pid_([0-9a-f]{4})", re.IGNORECASE)
 _ALT_NAME_PATTERN = re.compile(r'Alternative name\s+"([^"]+)"', re.IGNORECASE)
@@ -114,9 +118,46 @@ def _parse_ffmpeg_dshow_devices(text: str) -> list[_DShowDeviceRecord]:
     return records
 
 
-def _probe_opencv_indices(max_index: int = 10) -> list[int]:
-    """Probe DirectShow indices that OpenCV can open."""
+def _list_pnp_cameras_via_powershell() -> list[_DShowDeviceRecord]:
+    """List camera-class PnP devices without opening any capture handle."""
 
+    if sys.platform != "win32":
+        return []
+    command = (
+        "Get-CimInstance Win32_PnPEntity | "
+        "Where-Object { $_.PNPClass -in @('Camera','Image') } | "
+        "ForEach-Object { \"$($_.Name)|$($_.PNPDeviceID)\" }"
+    )
+    try:
+        completed = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", command],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=15,
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return []
+
+    records: list[_DShowDeviceRecord] = []
+    for line in (completed.stdout or "").splitlines():
+        stripped = line.strip()
+        if not stripped or "|" not in stripped:
+            continue
+        name, pnp_id = stripped.split("|", 1)
+        if name:
+            records.append(_DShowDeviceRecord(name=name.strip(), alternative_name=pnp_id.strip()))
+    return records
+
+
+def _probe_opencv_indices(max_index: int = 10) -> list[int]:
+    """Probe DirectShow indices that OpenCV can open (dev/debug only)."""
+
+    if not is_opencv_probe_allowed():
+        logger.debug("Skipping OpenCV camera index probe (safe enumeration enabled)")
+        return []
     if not opencv_available() or sys.platform != "win32":
         return []
 
@@ -151,16 +192,18 @@ def _build_camera_info(
     )
 
 
-def _merge_ffmpeg_with_indices(
+def _devices_from_records(
     records: Iterable[_DShowDeviceRecord],
-    indices: Iterable[int],
+    *,
+    names_from_ffmpeg: bool,
+    indices: Iterable[int] | None = None,
 ) -> list[CameraInfo]:
     record_list = list(records)
-    index_list = list(indices)
-    if not record_list and not index_list:
+    if not record_list:
         return []
 
-    if record_list and not index_list:
+    index_list = list(indices) if indices is not None else list(range(len(record_list)))
+    if not index_list:
         index_list = list(range(len(record_list)))
 
     devices: list[CameraInfo] = []
@@ -172,7 +215,7 @@ def _merge_ffmpeg_with_indices(
                     index=index,
                     name=record.name,
                     alternative_name=record.alternative_name,
-                    names_from_ffmpeg=True,
+                    names_from_ffmpeg=names_from_ffmpeg,
                 )
             )
         else:
@@ -186,59 +229,74 @@ def _merge_ffmpeg_with_indices(
     return devices
 
 
-def _enumerate_opencv_fallback(*, max_index: int) -> list[CameraInfo]:
-    indices = _probe_opencv_indices(max_index=max_index)
-    return [
-        _build_camera_info(
-            index=index,
-            name=f"Camera {index}",
-            names_from_ffmpeg=False,
+def _placeholder_devices(*, max_index: int) -> list[CameraInfo]:
+    """Return unverified index placeholders without opening hardware."""
+
+    known_names = ("Integrated Webcam", DEFAULT_CAMERA_NAME)
+    count = max(1, min(max_index, len(known_names)))
+    devices: list[CameraInfo] = []
+    for index in range(count):
+        name = known_names[index] if index < len(known_names) else f"Camera {index}"
+        devices.append(
+            _build_camera_info(index=index, name=name, names_from_ffmpeg=False),
         )
-        for index in indices
-    ]
+    return devices
 
 
 def enumerate_cameras(*, max_index: int = 10) -> CameraEnumerationResult:
-    """Enumerate local cameras without keeping any device open."""
+    """Enumerate local cameras without opening any capture device."""
 
     if sys.platform != "win32":
         return CameraEnumerationResult(devices=[], ffmpeg_available=False, used_ffmpeg_names=False)
 
     ffmpeg_available, ffmpeg_text = _run_ffmpeg_list_devices()
     records = _parse_ffmpeg_dshow_devices(ffmpeg_text) if ffmpeg_available and ffmpeg_text else []
-    indices = _probe_opencv_indices(max_index=max_index)
+
+    indices: list[int] = []
+    if is_opencv_probe_allowed():
+        indices = _probe_opencv_indices(max_index=max_index)
 
     if records:
-        devices = _merge_ffmpeg_with_indices(records, indices)
-        if devices:
-            return CameraEnumerationResult(
-                devices=devices,
-                ffmpeg_available=ffmpeg_available,
-                used_ffmpeg_names=True,
-            )
-
-    fallback_devices = _enumerate_opencv_fallback(max_index=max_index)
-    if fallback_devices:
-        return CameraEnumerationResult(
-            devices=fallback_devices,
-            ffmpeg_available=ffmpeg_available,
-            used_ffmpeg_names=False,
+        devices = _devices_from_records(
+            records,
+            names_from_ffmpeg=True,
+            indices=indices if indices else None,
         )
-
-    if records:
-        devices = [
-            _build_camera_info(
-                index=position,
-                name=record.name,
-                alternative_name=record.alternative_name,
-                names_from_ffmpeg=True,
-            )
-            for position, record in enumerate(records)
-        ]
         return CameraEnumerationResult(
             devices=devices,
             ffmpeg_available=ffmpeg_available,
             used_ffmpeg_names=True,
+        )
+
+    pnp_records = _list_pnp_cameras_via_powershell()
+    if pnp_records:
+        devices = _devices_from_records(
+            pnp_records,
+            names_from_ffmpeg=False,
+            indices=indices if indices else None,
+        )
+        return CameraEnumerationResult(
+            devices=devices,
+            ffmpeg_available=ffmpeg_available,
+            used_ffmpeg_names=False,
+        )
+
+    if indices and is_opencv_probe_allowed():
+        devices = [
+            _build_camera_info(index=index, name=f"Camera {index}", names_from_ffmpeg=False)
+            for index in indices
+        ]
+        return CameraEnumerationResult(
+            devices=devices,
+            ffmpeg_available=ffmpeg_available,
+            used_ffmpeg_names=False,
+        )
+
+    if CAMERA_SAFE_ENUMERATION:
+        return CameraEnumerationResult(
+            devices=_placeholder_devices(max_index=min(max_index, 2)),
+            ffmpeg_available=ffmpeg_available,
+            used_ffmpeg_names=False,
         )
 
     return CameraEnumerationResult(

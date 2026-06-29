@@ -34,6 +34,7 @@ class DemoState:
     project_dirty: bool = False
     project_created_at: str | None = None
     project_updated_at: str | None = None
+    background_image_path: str | None = None
 
     @classmethod
     def from_runtime(
@@ -57,6 +58,7 @@ class DemoState:
         project_dirty: bool = False,
         project_created_at: str | None = None,
         project_updated_at: str | None = None,
+        background_image_path: str | None = None,
     ) -> DemoState:
         percent = int(snapshot.progress * 100) if snapshot.total_points > 0 else 0
         status = snapshot.status
@@ -90,6 +92,7 @@ class DemoState:
             project_dirty=project_dirty,
             project_created_at=project_created_at,
             project_updated_at=project_updated_at,
+            background_image_path=background_image_path,
         )
 
     @property

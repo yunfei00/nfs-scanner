@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QWidget
 
+from nfs_scanner.core.background.manager import BackgroundManager
 from nfs_scanner.core.device_service import DeviceServiceProtocol
 from nfs_scanner.core.project import ProjectService
 from nfs_scanner.core.project.model import ProjectSession
@@ -41,6 +42,7 @@ def build_demo_state(
     report_exported: bool,
     report_exported_for_task_id: str | None,
     has_history_tasks: bool,
+    background_manager: BackgroundManager | None = None,
 ) -> DemoState:
     """Build unified demo state including project visibility fields."""
 
@@ -50,6 +52,9 @@ def build_demo_state(
     project_file = None
     if project_dir is not None:
         project_file = str(project_dir / "project.nfsproj")
+    background_path = None
+    if background_manager is not None and background_manager.has_background():
+        background_path = background_manager.state.image_path
     return DemoState.from_runtime(
         snapshot,
         project_open=session is not None,
@@ -69,6 +74,7 @@ def build_demo_state(
         project_dirty=project_service.is_dirty(),
         project_created_at=model.created_at if model else None,
         project_updated_at=model.updated_at if model else None,
+        background_image_path=background_path,
     )
 
 
@@ -120,10 +126,10 @@ def apply_demo_state(
         data_view.update_project_context(state.project_name, state.project_root)
     if report_view is not None and hasattr(report_view, "update_project_context"):
         report_view.update_project_context(state.project_name, state.project_root)
-    if window is not None:
-        apply_window_project_title(window, state)
+        if window is not None:
+            apply_window_project_title(window, state)
 
-    buttons = state.button_states()
+        buttons = state.button_states()
     paused = state.scan_state == "paused"
     toolbar.set_scan_controls_enabled(
         start_enabled=buttons["start"],

@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from nfs_scanner.core.mock_point_data import (
+    MockPointRow,
     demo_sample_rows,
     export_table_csv,
     export_table_json,
@@ -145,6 +146,25 @@ class DataTableView(QWidget):
 
         layout.addWidget(toolbar)
         layout.addWidget(card, 1)
+
+    def append_real_scan_point(self, update) -> None:
+        """Append one live real-scan row without disturbing mock demo rows."""
+
+        freq_ghz = update.peak_frequency_hz / 1e9 if update.peak_frequency_hz else 0.0
+        self._all_rows.append(
+            MockPointRow(
+                index=update.index,
+                x=round(update.x_mm, 3),
+                y=round(update.y_mm, 3),
+                z=round(update.z_mm, 3),
+                frequency=f"{freq_ghz:.3f} GHz",
+                amplitude=round(update.peak_amplitude_dbm, 2),
+                trace="Real TRACE1",
+                timestamp=update.timestamp,
+                status=update.status,
+            )
+        )
+        self._apply_filters()
 
     def _apply_filters(self) -> None:
         rows = list(self._all_rows)

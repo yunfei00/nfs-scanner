@@ -31,6 +31,7 @@ class ProjectSummaryCard(NFSCard):
             ("path", "项目路径"),
             ("created", "创建时间"),
             ("updated", "最近保存"),
+            ("background", "扫描底图"),
         ):
             caption = QLabel(label, self.body)
             caption.setObjectName("nfsMutedLabel")
@@ -57,6 +58,7 @@ class ProjectSummaryCard(NFSCard):
             self._set("path", "--")
             self._set("created", "--")
             self._set("updated", "--")
+            self._set("background", "--")
             return
 
         storage = "已保存" if state.storage_saved else "未保存"
@@ -67,6 +69,14 @@ class ProjectSummaryCard(NFSCard):
         self._set("path", _short_path(root) if root else "--", tooltip=root)
         self._set("created", state.project_created_at or "--")
         self._set("updated", state.project_updated_at or "--")
+        if state.background_image_path:
+            self._set(
+                "background",
+                _short_path(state.background_image_path),
+                tooltip=state.background_image_path,
+            )
+        else:
+            self._set("background", "无")
 
     def summary_project_name(self) -> str:
         return self._fields["name"].text()

@@ -1,0 +1,17 @@
+{
+  "project_id": "test-project",
+  "scan_area": {
+    "x_start": 0.0,
+    "x_stop": 2.0,
+    "y_start": -2.0,
+    "y_stop": 0.0,
+    "z_height": 1.0,
+    "x_step": 2.0,
+    "y_step": 2.0
+  },
+  "total_points": 4,
+  "completed_points": 4,
+  "stopped_by_user": false,
+  "last_error": "",
+  "started_at": "2026-06-29T00:11:07"
+}

@@ -1,6 +1,6 @@
 # Commercial UI Visual Report
 
-- Generated: 2026-06-28 22:39:21
+- Generated: 2026-06-29 07:47:44
 - Default screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_default.png`
 - Top header screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_top_header.png`
 - Maximized screenshot: `D:/code_2026/nfs-scanner/.ai/visual_check/commercial_maximized.png`
@@ -21,7 +21,7 @@
 | right_panel_width | 340–380 px | 350px | PASS |
 | left_panel_width | 220–280 px | 230px | PASS |
 | workflow_panel_height | <= 360 px | 279px | PASS |
-| device_status_panel_height | expanded content height 120-650 px in left scroll | 624px | PASS |
+| device_status_panel_height | expanded content height 120-650 px in left scroll | 612px | PASS |
 | left_no_nested_device_scroll | no isolated device-status scroll area | inner_scroll=False | PASS |
 | device_status_collapsed_height | collapsed height <= 100 px | 45px | PASS |
 | property_tab_bar_fixed | tab bar visible after content scroll | True | PASS |
@@ -45,7 +45,7 @@
 | spectrum_yellow_curve_mode | yellow curve spectrum widget | true | PASS |
 | scan_stats_panel_visible | scan stats panel visible | visible=True | PASS |
 | scan_stats_demo_values | runtime stat labels populated | 2.450 GHz | PASS |
-| log_panel_visible | log panel visible with >= 6 lines | lines=12 | PASS |
+| log_panel_visible | log panel visible with >= 6 lines | lines=8 | PASS |
 | log_category_tags | INFO/WARN/ERROR/SCAN/DATA tags | True | PASS |
 | pcb_like_mock_board | photo layer mock board loaded | photo_layer_ready | PASS |
 | heatmap_smooth_mode | heatmap overlay enabled | 1 | PASS |
@@ -97,8 +97,8 @@
 | left_scrollbar_width | >= 12px when visible | 14px | PASS |
 | property_scrollbar_width | >= 12px when visible | 14px | PASS |
 | log_scrollbar_width | >= 12px when scrollable | 14px | PASS |
-| log_area_scrollable | log content scrollable | range=6 | PASS |
-| property_area_scrollable | property panel scrollable | range=547 | PASS |
+| log_area_scrollable | log content scrollable | range=2 | PASS |
+| property_area_scrollable | property panel scrollable | range=587 | PASS |
 | device_status_scrollable_or_compact | device scroll visible when needed | width=0px | PASS |
 | wheel_interaction | wheel step changes scroll value | True | PASS |
 | handle_position_interaction | handle position can be set smoothly | True | PASS |
@@ -126,7 +126,7 @@
 | right_panel_width | 340–380 px | 350px | PASS |
 | left_panel_width | 220–280 px | 230px | PASS |
 | workflow_panel_height | <= 360 px | 279px | PASS |
-| device_status_panel_height | expanded content height 120-650 px in left scroll | 624px | PASS |
+| device_status_panel_height | expanded content height 120-650 px in left scroll | 612px | PASS |
 | left_no_nested_device_scroll | no isolated device-status scroll area | inner_scroll=False | PASS |
 | device_status_collapsed_height | collapsed height <= 100 px | 45px | PASS |
 | property_tab_bar_fixed | tab bar visible after content scroll | True | PASS |
@@ -150,7 +150,7 @@
 | spectrum_yellow_curve_mode | yellow curve spectrum widget | true | PASS |
 | scan_stats_panel_visible | scan stats panel visible | visible=True | PASS |
 | scan_stats_demo_values | runtime stat labels populated | 2.450 GHz | PASS |
-| log_panel_visible | log panel visible with >= 6 lines | lines=13 | PASS |
+| log_panel_visible | log panel visible with >= 6 lines | lines=9 | PASS |
 | log_category_tags | INFO/WARN/ERROR/SCAN/DATA tags | True | PASS |
 | pcb_like_mock_board | photo layer mock board loaded | photo_layer_ready | PASS |
 | heatmap_smooth_mode | heatmap overlay enabled | 1 | PASS |

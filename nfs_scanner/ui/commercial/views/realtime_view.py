@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 
 from PySide6.QtCore import QEvent, QTimer, Qt, Signal
-from PySide6.QtGui import QMouseEvent
+from PySide6.QtGui import QImage, QMouseEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from nfs_scanner.core.background.models import BackgroundImage
 from nfs_scanner.core.runtime_service import RuntimeSnapshot
 from nfs_scanner.core.path_planner import generate_preview_points
 from nfs_scanner.core.scan_config import ScanPathConfig, ScanRegion
@@ -43,6 +44,8 @@ class RealtimeView(QWidget):
     auto_fit_changed = Signal(bool)
     heatmap_opacity_changed = Signal(int)
     lut_changed = Signal(str)
+    background_clear_requested = Signal()
+    background_opacity_changed = Signal(float)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -70,6 +73,11 @@ class RealtimeView(QWidget):
         self._lut_index = 0
         self._opacity_slider: QSlider | None = None
         self._lut_combo: QComboBox | None = None
+        self._background_label: QLabel | None = None
+        self._background_clear_button: NFSSecondaryButton | None = None
+        self._background_opacity_combo: QComboBox | None = None
+        self._custom_background_active = False
+        self._background_opacity = 1.0
         self._pan_active = False
         self._last_mouse_pos = None
         self._measure_start = None
@@ -168,6 +176,31 @@ class RealtimeView(QWidget):
         self._lut_combo = lut_combo
         toolbar_layout.addWidget(lut_label)
         toolbar_layout.addWidget(lut_combo)
+
+        toolbar_layout.addWidget(self._separator(toolbar))
+
+        background_caption = QLabel("底图", toolbar)
+        background_caption.setObjectName("nfsMutedLabel")
+        self._background_label = QLabel("无", toolbar)
+        self._background_label.setObjectName("nfsMutedLabel")
+        self._background_label.setToolTip("当前扫描底图")
+        self._background_label.setMinimumWidth(120)
+        self._background_clear_button = NFSSecondaryButton("清除底图", toolbar)
+        self._background_clear_button.setEnabled(False)
+        self._background_clear_button.clicked.connect(self._on_background_clear_clicked)
+        background_opacity_label = QLabel("底图透明度", toolbar)
+        background_opacity_label.setObjectName("nfsMutedLabel")
+        background_opacity_combo = QComboBox(toolbar)
+        for percent in (100, 70, 50, 30):
+            background_opacity_combo.addItem(f"{percent}%", percent / 100.0)
+        background_opacity_combo.setCurrentIndex(0)
+        background_opacity_combo.currentIndexChanged.connect(self._on_background_opacity_changed)
+        self._background_opacity_combo = background_opacity_combo
+        toolbar_layout.addWidget(background_caption)
+        toolbar_layout.addWidget(self._background_label)
+        toolbar_layout.addWidget(self._background_clear_button)
+        toolbar_layout.addWidget(background_opacity_label)
+        toolbar_layout.addWidget(background_opacity_combo)
         toolbar_layout.addStretch(1)
 
         canvas_row = QWidget(self)
@@ -450,6 +483,98 @@ class RealtimeView(QWidget):
             max(viewport.height() - map_height - margin, margin),
         )
 
+    def _on_background_clear_clicked(self) -> None:
+        self.background_clear_requested.emit()
+
+    def _on_background_opacity_changed(self, _index: int) -> None:
+        if self._background_opacity_combo is None:
+            return
+        opacity = float(self._background_opacity_combo.currentData())
+        self._background_opacity = opacity
+        if self._custom_background_active:
+            photo_layer = self.layer_manager.ensure_layer(LayerKind.PHOTO)
+            photo_layer.set_opacity(opacity)
+        self.background_opacity_changed.emit(opacity)
+
+    def update_background_status(self, info: BackgroundImage | None) -> None:
+        """Refresh toolbar labels for the active scan background."""
+
+        active = info is not None and info.has_image()
+        self._custom_background_active = active
+        if self._background_label is not None:
+            self._background_label.setText(info.display_name() if active and info else "无")
+            if active and info and info.image_path:
+                self._background_label.setToolTip(info.image_path)
+            else:
+                self._background_label.setToolTip("当前扫描底图")
+        if self._background_clear_button is not None:
+            self._background_clear_button.setEnabled(active)
+        if self._background_opacity_combo is not None:
+            self._background_opacity_combo.setEnabled(active)
+            if active and info is not None:
+                target = info.opacity
+                for index in range(self._background_opacity_combo.count()):
+                    if abs(float(self._background_opacity_combo.itemData(index)) - target) < 0.01:
+                        self._background_opacity_combo.blockSignals(True)
+                        self._background_opacity_combo.setCurrentIndex(index)
+                        self._background_opacity_combo.blockSignals(False)
+                        break
+
+    def apply_scan_background(self, info: BackgroundImage) -> bool:
+        """Load one validated background image into the photo layer."""
+
+        if not info.image_path:
+            return False
+        image = QImage(info.image_path)
+        if image.isNull():
+            return False
+
+        photo_layer = self.layer_manager.ensure_layer(LayerKind.PHOTO)
+        photo_layer.set_photo_image(image)
+        opacity = info.opacity if info.visible else 0.0
+        photo_layer.set_opacity(opacity)
+        self._background_opacity = info.opacity
+        self._custom_background_active = True
+
+        self.canvas.set_scene_rect(0, 0, photo_layer.canvas_width, photo_layer.canvas_height)
+        self.update_path_preview(self._current_region, self._current_path_config)
+        thumb = image.scaled(
+            112,
+            84,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        self.mini_map.set_board_image(thumb)
+        self.update_background_status(info)
+        QTimer.singleShot(0, self._finalize_canvas_layout)
+        return True
+
+    def clear_scan_background(self) -> None:
+        """Restore the default mock photo layer."""
+
+        if not self._custom_background_active:
+            self.update_background_status(None)
+            return
+
+        photo_layer = self.layer_manager.ensure_layer(LayerKind.PHOTO)
+        photo_layer.build_mock()
+        self._custom_background_active = False
+        self._background_opacity = 1.0
+        self.canvas.set_scene_rect(0, 0, photo_layer.canvas_width, photo_layer.canvas_height)
+        self.update_path_preview(self._current_region, self._current_path_config)
+        board_thumb = create_mock_board_qimage(photo_layer.canvas_width, photo_layer.canvas_height).scaled(
+            112,
+            84,
+            Qt.AspectRatioMode.IgnoreAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        self.mini_map.set_board_image(board_thumb)
+        self.update_background_status(None)
+        QTimer.singleShot(0, self._finalize_canvas_layout)
+
+    def has_custom_background(self) -> bool:
+        return self._custom_background_active
+
     def _load_mock_layers(self) -> None:
         photo_layer = self.layer_manager.ensure_layer(LayerKind.PHOTO)
         photo_layer.build_mock()
@@ -536,6 +661,17 @@ class RealtimeView(QWidget):
             current_index=snapshot.current_index,
             completed_count=snapshot.completed_points,
             active=active,
+        )
+        self.mini_map.update()
+
+    def update_real_scan_point(self, update) -> None:
+        """Advance path layer markers for one real scan point."""
+
+        path_layer = self.layer_manager.ensure_layer(LayerKind.PATH)
+        path_layer.set_progress(
+            current_index=update.index,
+            completed_count=update.index,
+            active=True,
         )
         self.mini_map.update()
 

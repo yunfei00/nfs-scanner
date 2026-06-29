@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-28T22:39:21",
+  "generated_at": "2026-06-29T07:47:44",
   "default": {
     "uses_custom_title_bar": true,
     "title_bar_height": 54,
@@ -23,7 +23,7 @@
     "screen_available_height": 720,
     "is_maximized": false,
     "workflow_panel_height": 279,
-    "device_status_panel_height": 624,
+    "device_status_panel_height": 612,
     "device_status_collapsed_height": 45,
     "device_status_has_inner_scroll": false,
     "property_tab_bar_visible_after_scroll": true,
@@ -82,13 +82,13 @@
         {
           "name": "log_area_scrollable",
           "expected": "log content scrollable",
-          "actual": "range=6",
+          "actual": "range=2",
           "passed": true
         },
         {
           "name": "property_area_scrollable",
           "expected": "property panel scrollable",
-          "actual": "range=547",
+          "actual": "range=587",
           "passed": true
         },
         {
@@ -182,7 +182,7 @@
       {
         "name": "device_status_panel_height",
         "expected": "expanded content height 120-650 px in left scroll",
-        "actual": "624px",
+        "actual": "612px",
         "passed": true
       },
       {
@@ -326,7 +326,7 @@
       {
         "name": "log_panel_visible",
         "expected": "log panel visible with >= 6 lines",
-        "actual": "lines=12",
+        "actual": "lines=8",
         "passed": true
       },
       {
@@ -584,13 +584,13 @@
       {
         "name": "log_area_scrollable",
         "expected": "log content scrollable",
-        "actual": "range=6",
+        "actual": "range=2",
         "passed": true
       },
       {
         "name": "property_area_scrollable",
         "expected": "property panel scrollable",
-        "actual": "range=547",
+        "actual": "range=587",
         "passed": true
       },
       {
@@ -655,7 +655,7 @@
     "screen_available_height": 720,
     "is_maximized": true,
     "workflow_panel_height": 279,
-    "device_status_panel_height": 624,
+    "device_status_panel_height": 612,
     "device_status_collapsed_height": 45,
     "device_status_has_inner_scroll": false,
     "property_tab_bar_visible_after_scroll": true,
@@ -714,13 +714,13 @@
         {
           "name": "log_area_scrollable",
           "expected": "log content scrollable",
-          "actual": "range=7",
+          "actual": "range=3",
           "passed": true
         },
         {
           "name": "property_area_scrollable",
           "expected": "property panel scrollable",
-          "actual": "range=547",
+          "actual": "range=587",
           "passed": true
         },
         {
@@ -814,7 +814,7 @@
       {
         "name": "device_status_panel_height",
         "expected": "expanded content height 120-650 px in left scroll",
-        "actual": "624px",
+        "actual": "612px",
         "passed": true
       },
       {
@@ -958,7 +958,7 @@
       {
         "name": "log_panel_visible",
         "expected": "log panel visible with >= 6 lines",
-        "actual": "lines=13",
+        "actual": "lines=9",
         "passed": true
       },
       {
@@ -1216,13 +1216,13 @@
       {
         "name": "log_area_scrollable",
         "expected": "log content scrollable",
-        "actual": "range=7",
+        "actual": "range=3",
         "passed": true
       },
       {
         "name": "property_area_scrollable",
         "expected": "property panel scrollable",
-        "actual": "range=547",
+        "actual": "range=587",
         "passed": true
       },
       {

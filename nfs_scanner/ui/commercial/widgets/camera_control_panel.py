@@ -36,6 +36,7 @@ class CameraControlPanel(QWidget):
     start_preview_clicked = Signal()
     stop_preview_clicked = Signal()
     snapshot_clicked = Signal()
+    set_scan_background_clicked = Signal()
     device_changed = Signal()
 
     MIN_WIDTH = 360
@@ -132,6 +133,20 @@ class CameraControlPanel(QWidget):
         action_row.addWidget(self.snapshot_button)
         layout.addLayout(action_row)
 
+        background_row = QHBoxLayout()
+        background_row.setSpacing(8)
+        self.set_background_button = NFSSecondaryButton("设为扫描底图", content)
+        self.set_background_button.setEnabled(False)
+        self.set_background_button.clicked.connect(self.set_scan_background_clicked.emit)
+        background_row.addWidget(self.set_background_button)
+        background_row.addStretch(1)
+        layout.addLayout(background_row)
+
+        self.current_background_label = QLabel("当前底图：无", content)
+        self.current_background_label.setObjectName("nfsMutedLabel")
+        self.current_background_label.setWordWrap(True)
+        layout.addWidget(self.current_background_label)
+
         layout.addStretch(1)
 
         self.hint_label = QLabel("", content)
@@ -181,6 +196,13 @@ class CameraControlPanel(QWidget):
 
     def set_last_snapshot(self, path: str) -> None:
         self.last_snapshot_label.setText(f"最近拍照：{path}")
+        self.set_background_button.setEnabled(bool(path))
+
+    def set_current_background(self, path: str | None) -> None:
+        if path:
+            self.current_background_label.setText(f"当前底图：{path}")
+        else:
+            self.current_background_label.setText("当前底图：无")
 
     def set_controls_enabled(self, *, supported: bool, previewing: bool) -> None:
         for widget in (

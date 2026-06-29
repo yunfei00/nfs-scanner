@@ -107,17 +107,33 @@ ffmpeg -list_devices true -f dshow -i dummy
     Alternative name "@device_pnp_\\?\usb#vid_1bcf&pid_2cc8&mi_00#..."
 ```
 
-NFS Scanner 在 Windows 下 **优先使用 FFmpeg 解析上述信息**，再与 OpenCV 索引按顺序配对，UI 显示格式例如：
+NFS Scanner 在 Windows 下 **优先使用 FFmpeg 解析上述信息**，按列表顺序分配 OpenCV 索引候选（0、1、…），**枚举阶段不会打开摄像头**。UI 显示格式例如：
 
 ```text
 Integrated Webcam (#0, VID_0BDA&PID_5520)
 LRCP  F1080P (#1, VID_1BCF&PID_2CC8, Recommended)
 ```
 
-若 FFmpeg 不可用，则回退到 OpenCV 索引枚举，并在 UI 提示：
+### 安全枚举（默认开启）
+
+`CAMERA_SAFE_ENUMERATION = True`（见 `nfs_scanner/devices/camera/constants.py`）时：
+
+- 进入 **相机 / 视觉** 页面、点击 **刷新设备** 时 **不会** 调用 `cv2.VideoCapture`
+- 设备枚举仅使用非侵入方式：FFmpeg 列设备 → PowerShell PnP 查询 → 占位名称
+- **只有** 用户点击 **开始预览** 后才会打开指定 index 的相机
+
+若 FFmpeg 与 PnP 均不可用，UI 会显示占位设备名（如 `Integrated Webcam`、`LRCP  F1080P`），索引为候选值，需通过预览验证。
+
+开发调试如需恢复 OpenCV index 探测，需显式设置：
+
+```powershell
+$env:NFS_SCANNER_CAMERA_PROBE="1"
+```
+
+若 FFmpeg 不可用，UI 会提示：
 
 ```text
-FFmpeg not found, device names unavailable.
+FFmpeg not found; using WMI or placeholder names. OpenCV index is unverified until preview starts.
 ```
 
 ## 如何区分内置相机与外接 LRCP

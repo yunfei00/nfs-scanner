@@ -209,6 +209,13 @@ outputs/camera/*.jpg
 outputs/camera/*.png
 !outputs/camera/.gitkeep
 
+outputs/exports/*
+!outputs/exports/.gitkeep
+outputs/reports/*
+!outputs/reports/.gitkeep
+outputs/logs/*
+!outputs/logs/.gitkeep
+
 # Marimo
 marimo/_static/
 marimo/_lsp/

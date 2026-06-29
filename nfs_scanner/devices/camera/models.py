@@ -77,7 +77,7 @@ class CameraInfo:
         lines.append(f"Backend: {self.backend}")
         lines.append(f"Recommended: {'Yes' if self.recommended else 'No'}")
         if not self.names_from_ffmpeg:
-            lines.append("Note: FFmpeg names unavailable; showing OpenCV index only.")
+            lines.append("Note: OpenCV index is unverified until preview starts.")
         return "\n".join(lines)
 
 
@@ -108,5 +108,10 @@ class CameraEnumerationResult:
         if self.ffmpeg_available and self.used_ffmpeg_names:
             return ""
         if not self.ffmpeg_available:
-            return "FFmpeg not found, device names unavailable."
+            return (
+                "FFmpeg not found; using WMI or placeholder names. "
+                "OpenCV index is unverified until preview starts."
+            )
+        if not self.used_ffmpeg_names:
+            return "Device names from PnP query; OpenCV index is unverified until preview starts."
         return ""

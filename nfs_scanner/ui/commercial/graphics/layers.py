@@ -123,6 +123,12 @@ class PhotoLayer(BaseLayer):
         item.setPos(0, 0)
         self._pixmap_item = self._register_item(item)
 
+    def set_opacity(self, opacity: float) -> None:
+        """Adjust background photo opacity (0.0–1.0)."""
+
+        if self._pixmap_item is not None:
+            self._pixmap_item.setOpacity(max(0.0, min(1.0, float(opacity))))
+
     @property
     def canvas_width(self) -> int:
         if self._pixmap_item is not None:

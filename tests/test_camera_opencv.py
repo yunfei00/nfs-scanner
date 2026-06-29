@@ -14,9 +14,18 @@ import numpy as np
 # ``nfs_scanner.devices`` during test module loading.
 import nfs_scanner.ui.commercial.views.vision_view  # noqa: F401
 
-from nfs_scanner.devices.camera.constants import DEFAULT_CAMERA_NAME, DEFAULT_FOURCC, DEFAULT_FPS, DEFAULT_VID_PID
+from unittest.mock import patch
+
+from nfs_scanner.devices.camera.constants import (
+    DEFAULT_CAMERA_NAME,
+    DEFAULT_FOURCC,
+    DEFAULT_FPS,
+    DEFAULT_VID_PID,
+    is_opencv_probe_allowed,
+)
 from nfs_scanner.devices.camera.enumeration import (
     _parse_ffmpeg_dshow_devices,
+    _probe_opencv_indices,
     enumerate_cameras,
     find_default_camera,
 )
@@ -85,6 +94,52 @@ class CameraEnumerationTestCase(unittest.TestCase):
         self.assertIsInstance(result.devices, list)
         if result.devices:
             self.assertIsInstance(result.devices[0], CameraInfo)
+
+    def test_safe_enumeration_skips_opencv_probe(self) -> None:
+        with patch(
+            "nfs_scanner.devices.camera.enumeration._run_ffmpeg_list_devices",
+            return_value=(False, ""),
+        ), patch(
+            "nfs_scanner.devices.camera.enumeration._list_pnp_cameras_via_powershell",
+            return_value=[],
+        ), patch(
+            "nfs_scanner.devices.camera.enumeration._probe_opencv_indices",
+            side_effect=AssertionError("OpenCV probe must not run in safe mode"),
+        ) as probe_mock:
+            result = enumerate_cameras(max_index=2)
+        probe_mock.assert_not_called()
+        self.assertGreaterEqual(len(result.devices), 1)
+        self.assertFalse(result.used_ffmpeg_names)
+
+    def test_enumerate_from_ffmpeg_assigns_indices_without_probe(self) -> None:
+        with patch(
+            "nfs_scanner.devices.camera.enumeration._run_ffmpeg_list_devices",
+            return_value=(True, self._SAMPLE_FFMPEG_OUTPUT),
+        ), patch(
+            "nfs_scanner.devices.camera.enumeration._probe_opencv_indices",
+            side_effect=AssertionError("OpenCV probe must not run when FFmpeg names are available"),
+        ) as probe_mock:
+            result = enumerate_cameras(max_index=2)
+        probe_mock.assert_not_called()
+        self.assertEqual(len(result.devices), 2)
+        self.assertEqual(result.devices[0].name, "Integrated Webcam")
+        self.assertEqual(result.devices[0].index, 0)
+        self.assertEqual(result.devices[1].name, DEFAULT_CAMERA_NAME)
+        self.assertEqual(result.devices[1].index, 1)
+        self.assertTrue(result.used_ffmpeg_names)
+
+    def test_opencv_probe_requires_explicit_env(self) -> None:
+        self.assertFalse(is_opencv_probe_allowed())
+        with patch.dict(os.environ, {"NFS_SCANNER_CAMERA_PROBE": "1"}, clear=False):
+            self.assertTrue(is_opencv_probe_allowed())
+
+    def test_probe_opencv_indices_respects_safe_mode(self) -> None:
+        with patch(
+            "nfs_scanner.devices.camera.enumeration.is_opencv_probe_allowed",
+            return_value=False,
+        ), patch("nfs_scanner.devices.camera.enumeration.require_opencv") as require_mock:
+            self.assertEqual(_probe_opencv_indices(max_index=2), [])
+        require_mock.assert_not_called()
 
     def test_find_default_camera_prefers_lrcp_name(self) -> None:
         devices = [

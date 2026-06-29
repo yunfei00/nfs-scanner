@@ -27,6 +27,21 @@ class MockMotionController(MotionController):
 
         self._connected = False
 
+    def is_connected(self) -> bool:
+        return self._connected
+
+    def identify(self) -> str:
+        return "MockMotionController/1.0"
+
+    def stop(self) -> None:
+        self._ensure_connected()
+
+    def emergency_stop(self) -> None:
+        self.stop()
+
+    def wait_until_idle(self, timeout_s: float = 60.0) -> None:
+        self._ensure_connected()
+
     def move_to(self, x: float, y: float, z: float) -> None:
         """Simulate moving to one absolute XYZ position."""
 
@@ -52,6 +67,9 @@ class MockMotionController(MotionController):
         return self._position
 
     def validate_target(self, x: float, y: float, z: float) -> tuple[bool, str]:
+        return self.validate_target_position(x, y, z)
+
+    def validate_target_position(self, x: float, y: float, z: float) -> tuple[bool, str]:
         """Validate one target XYZ position against the mock workspace limits."""
 
         axis_limits = self.get_axis_limits()

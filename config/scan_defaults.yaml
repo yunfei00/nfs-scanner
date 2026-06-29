@@ -1,0 +1,19 @@
+scan_defaults:
+  region:
+    x_start: 0
+    x_stop: 100
+    y_start: 0
+    y_stop: 100
+    z_height: 5
+    x_step: 5
+    y_step: 5
+  path:
+    scan_mode: snake
+    dwell_ms: 100
+    speed_mm_min: 600
+  instrument:
+    start_hz: 2400000000
+    stop_hz: 2500000000
+    points: 1001
+    rbw_hz: 10000
+    vbw_hz: 10000

@@ -63,7 +63,6 @@ class CommercialToolbar(QWidget):
         self._separators: list[QFrame] = []
         self._start_scan_button: NFSIconToolButton | None = None
         self._pause_scan_button: NFSIconToolButton | None = None
-        self._pause_scan_button: NFSIconToolButton | None = None
         self._stop_scan_button: NFSIconToolButton | None = None
         self._export_button: NFSIconToolButton | None = None
         self._report_button: NFSIconToolButton | None = None
@@ -124,6 +123,8 @@ class CommercialToolbar(QWidget):
                     self._connect_device_button = button
                 elif caption == "开始扫描":
                     self._start_scan_button = button
+                elif caption == "暂停扫描":
+                    self._pause_scan_button = button
                 elif caption == "停止扫描":
                     self._stop_scan_button = button
                 elif caption == "导出数据":

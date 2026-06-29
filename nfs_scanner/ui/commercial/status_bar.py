@@ -33,7 +33,7 @@ class CommercialStatusBar(QFrame):
         self.system_dot = QLabel("●", self)
         self.system_dot.setObjectName("commercialStatusDot")
         self.system_label = self._create_chip("系统: 就绪")
-        self.demo_label = self._create_chip("模式: Mock · Dry Run · 无硬件控制")
+        self.demo_label = self._create_chip("模式: Mock Dry Run")
         self.project_label = self._create_chip("项目: 未打开")
         self.storage_label = self._create_chip("存储: --")
         self.task_label = self._create_chip("任务: 未开始")
@@ -103,6 +103,26 @@ class CommercialStatusBar(QFrame):
         ):
             label.setMinimumWidth(label.fontMetrics().horizontalAdvance(label.text()) + 2)
 
+    def update_device_mode(
+        self,
+        *,
+        real_mode: bool,
+        motion_status: str,
+        instrument_status: str,
+        real_scan_running: bool = False,
+    ) -> None:
+        """Refresh mode / device chips for mock vs real hardware."""
+
+        if real_scan_running:
+            self.demo_label.setText("模式: Real Scan Running")
+        elif real_mode:
+            self.demo_label.setText(
+                f"模式: Real Hardware · Motion: {motion_status} · Instrument: {instrument_status}"
+            )
+        else:
+            self.demo_label.setText("模式: Mock Dry Run")
+        self._refresh_chip_widths()
+
     def is_fully_visible(self) -> bool:
         return self.isVisible() and self.height() >= 20 and self.width() > 200
 
@@ -139,7 +159,7 @@ class CommercialStatusBar(QFrame):
     ) -> None:
         """Single entry to refresh all status bar chips from DemoState."""
 
-        self.demo_label.setText("模式: Mock · Dry Run · 无硬件控制")
+        self.demo_label.setText("模式: Mock Dry Run")
         self.update_project_session(session)
         if session is not None:
             storage = "已保存" if state.storage_saved else "未保存"

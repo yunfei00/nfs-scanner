@@ -55,6 +55,56 @@ Mock / Dry Run / No Hardware Control / Real Device Disabled
 
 ---
 
+## Real Hardware Mode（真实设备，可选）
+
+商业版 UI 已支持 **Mock Dry Run** 与 **Real Hardware** 双模式并存：
+
+- **默认**：Mock Dry Run（与之前 Demo 行为一致）
+- **Real**：需在设备中心切换模式并确认，且设置 `NFS_SCANNER_REAL_DEVICES=1`
+
+### 配置
+
+编辑 `config/devices.yaml`（从 `config/devices.example.yaml` 复制）：
+
+- `mode`: `mock`（默认）| `real`
+- `motion.enabled` / `instrument.enabled`: 默认 `false`
+
+读取优先级：`config/devices.yaml` → `config/devices.json`（兼容）→ 内置 Mock 默认。
+
+### 启动（仍为 Mock）
+
+```powershell
+$env:NFS_SCANNER_UI="commercial"
+python -m nfs_scanner.main
+```
+
+### 启用真实设备
+
+```powershell
+$env:NFS_SCANNER_REAL_DEVICES="1"
+$env:NFS_SCANNER_UI="commercial"
+python -m nfs_scanner.main
+```
+
+在 **设备中心** 切换 **Real Hardware** → 连接 → Test IDN / 查询位置 → 配置小范围扫描 → 开始（有最终确认）。
+
+扫描数据输出：`outputs/scans/<project_id>/<timestamp>/`
+
+详细说明：
+
+- [docs/real_hardware_mode.md](docs/real_hardware_mode.md)
+- [docs/real_device_integration_audit.md](docs/real_device_integration_audit.md)
+- [docs/real_scan_workflow.md](docs/real_scan_workflow.md)
+
+手工检查脚本：
+
+```powershell
+python scripts/real_device_check.py --instrument-idn
+python scripts/real_device_check.py --motion-position
+```
+
+---
+
 ## Camera / Vision（商业版可选功能）
 
 商业版 UI 提供 **相机 / 视觉** 工作区，用于 USB UVC 相机预览与拍照。这是 **可选功能**：
@@ -98,6 +148,28 @@ python -m unittest tests.test_camera_opencv -v
 $env:NFS_SCANNER_CAMERA_TEST="1"
 python -m unittest tests.test_camera_opencv.CameraHardwareTestCase -v
 ```
+
+### Camera background / Scan background（v0.2）
+
+相机拍照后可设为 **实时视图** 的扫描底图：
+
+1. **相机 / 视觉** → 开始预览 → 拍照
+2. 点击 **设为扫描底图**
+3. 切换到 **实时视图** 查看底图与 overlay 叠加
+4. 工具栏 **清除底图** 恢复 mock 演示样式
+
+详见 [docs/background_image.md](docs/background_image.md)。
+
+### 商业版操作流程（Mock Dry Run）
+
+1. **新建项目** → 配置扫描参数 → **应用参数**
+2. **连接** Mock 设备
+3. **开始** Dry Run 扫描 → **停止**
+4. **导出** CSV / PNG / JSON（`outputs/exports/`）
+5. **报告** 生成 HTML（`outputs/reports/`）
+6. 可选：相机拍照 → **设为扫描底图** → 实时视图查看
+
+文档：[docs/ui_actions.md](docs/ui_actions.md) · [docs/mock_dry_run.md](docs/mock_dry_run.md) · [docs/ui_action_audit.md](docs/ui_action_audit.md)
 
 ---
 

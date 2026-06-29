@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFontMetrics, QTextCursor
+from PySide6.QtGui import QFontMetrics
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -20,26 +20,24 @@ from PySide6.QtWidgets import (
 )
 
 from nfs_scanner.core.runtime_service import RuntimeSnapshot
+from nfs_scanner.core.scan_progress import ScanPointUpdate
 from nfs_scanner.core.scan_config import ScanPreviewStats
 
+from .log_bus import LogBus
 from .preview_stats_display import update_preview_stat_labels
 from .runtime_display import format_duration_seconds
 from .scroll_helpers import configure_abstract_scroll_area
 from .widgets.mock_chart_widgets import MockSpectrumWidget
 
 _LOG_SEED_LINES = (
-    "[INFO] 2026-06-26 09:00:01 系统初始化完成",
-    "[DEVICE] 2026-06-26 09:00:03 运动平台已连接",
-    "[SCAN] 2026-06-26 09:00:05 扫描任务已配置",
-    "[INFO] 2026-06-26 09:00:06 热力图实时显示已启用",
-    "[SCAN] 2026-06-26 09:00:08 扫描执行中…",
-    "[DATA] 2026-06-26 09:00:12 采集点 #4212 已写入缓存",
-    "[WARN] 2026-06-26 09:00:15 高密度预览已抽样显示",
-    "[INFO] 2026-06-26 09:00:18 频谱视图已更新",
-    "[SCAN] 2026-06-26 09:00:22 当前频率 2.450 GHz",
-    "[DATA] 2026-06-26 09:00:25 幅度 -23.45 dBm",
-    "[ERROR] 2026-06-26 09:00:28 Mock 错误占位（可忽略）",
-    "[INFO] 2026-06-26 09:00:30 日志自动滚动已启用",
+    ("INFO", "系统初始化完成"),
+    ("DEVICE", "运动平台 Mock 已就绪"),
+    ("SCAN", "扫描任务已配置"),
+    ("INFO", "热力图实时显示已启用"),
+    ("SCAN", "等待 Dry Run 扫描启动…"),
+    ("DATA", "数据视图 Mock 已就绪"),
+    ("WARN", "当前为 Mock Dry Run 模式，不控制真实硬件"),
+    ("INFO", "频谱视图已更新"),
 )
 
 _LOG_TAGS = ("INFO", "WARN", "ERROR", "SCAN", "DATA")
@@ -49,7 +47,7 @@ class CommercialBottomDock(QWidget):
     """Bottom dock with three visible instrument panels."""
 
     _LOG_VISIBLE_LINES = 6
-    _LOG_MAX_LINES = 300
+    _LOG_MAX_LINES = 1000
     _LOG_DEDUP_SECONDS = 1.0
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -65,7 +63,16 @@ class CommercialBottomDock(QWidget):
         self._progress_bar: QProgressBar | None = None
         self._last_log_signature: str = ""
         self._last_log_time: float = 0.0
+        self._log_bus = LogBus()
+        self._active_log_filter: set[str] | None = None
+        self._tag_buttons: dict[str, QPushButton] = {}
         self._setup_ui()
+        for level, message in _LOG_SEED_LINES:
+            self._log_bus.append(message, level=level)
+        self._refresh_log_view()
+
+    def log_bus(self) -> LogBus:
+        return self._log_bus
 
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -175,8 +182,33 @@ class CommercialBottomDock(QWidget):
             self._spectrum_widget.set_view_mode("frequency")
             self._spectrum_widget.update()
 
+    def update_real_scan_point(self, update: ScanPointUpdate) -> None:
+        """Refresh runtime stat labels from one real scan point."""
+
+        percent = int(update.index / update.total * 100) if update.total > 0 else 0
+        freq_ghz = update.peak_frequency_hz / 1e9 if update.peak_frequency_hz else 0.0
+        values = {
+            "runtime_status": "运行中 (Real)",
+            "progress_percent": f"{percent}%",
+            "completed_points": f"{update.index} / {update.total}",
+            "current_xyz": f"X:{update.x_mm:.2f}  Y:{update.y_mm:.2f}  Z:{update.z_mm:.2f}",
+            "current_freq": f"{freq_ghz:.3f} GHz",
+            "current_amp": f"{update.peak_amplitude_dbm:.2f} dBm",
+            "started_at": update.timestamp,
+            "elapsed": "--",
+            "remaining": "--",
+        }
+        for key, label in self._runtime_stat_labels.items():
+            label.setText(values.get(key, "--"))
+        if self._progress_bar is not None:
+            self._progress_bar.setValue(percent)
+            self._progress_bar.setFormat(f"{percent}%")
+        if self._spectrum_widget is not None:
+            self._spectrum_widget.set_view_mode("frequency")
+            self._spectrum_widget.update()
+
     def append_log_line(self, message: str, *, level: str = "INFO") -> None:
-        if self._log_view is None or not message.strip():
+        if not message.strip():
             return
         signature = f"{level}:{message.strip()}"
         now = time.monotonic()
@@ -184,24 +216,39 @@ class CommercialBottomDock(QWidget):
             return
         self._last_log_signature = signature
         self._last_log_time = now
-        self._log_view.appendPlainText(f"[{level}] {message.strip()}")
-        document = self._log_view.document()
-        if document.blockCount() > self._LOG_MAX_LINES:
-            cursor = self._log_view.textCursor()
-            cursor.movePosition(QTextCursor.MoveOperation.Start)
-            cursor.movePosition(
-                QTextCursor.MoveOperation.Down,
-                QTextCursor.MoveMode.KeepAnchor,
-                document.blockCount() - self._LOG_MAX_LINES,
-            )
-            cursor.removeSelectedText()
+        self._log_bus.append(message, level=level)
+        self._refresh_log_view()
+
+    def clear_logs(self) -> None:
+        self._log_bus.clear()
+        self.append_log_line("Log view cleared", level="INFO")
+
+    def _refresh_log_view(self) -> None:
+        if self._log_view is None:
+            return
+        levels = self._active_log_filter
+        lines = [entry.formatted() for entry in self._log_bus.entries(levels=levels)]
+        self._log_view.setPlainText("\n".join(lines[-self._LOG_MAX_LINES :]))
         scrollbar = self._log_view.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
 
-    def clear_logs(self) -> None:
-        if self._log_view is not None:
-            self._log_view.clear()
-            self.append_log_line("日志已清空", level="INFO")
+    def _toggle_log_filter(self, tag: str) -> None:
+        if self._active_log_filter is None:
+            self._active_log_filter = {tag}
+        elif tag in self._active_log_filter and len(self._active_log_filter) == 1:
+            self._active_log_filter = None
+        elif tag in self._active_log_filter:
+            self._active_log_filter.discard(tag)
+            if not self._active_log_filter:
+                self._active_log_filter = None
+        else:
+            self._active_log_filter = {tag}
+        for level, button in self._tag_buttons.items():
+            active = self._active_log_filter is None or level in self._active_log_filter
+            button.setProperty("activeFilter", active)
+            button.style().unpolish(button)
+            button.style().polish(button)
+        self._refresh_log_view()
 
     def _build_spectrum_panel(self, parent: QWidget) -> QWidget:
         panel = QFrame(parent)
@@ -283,11 +330,14 @@ class CommercialBottomDock(QWidget):
         tag_layout.setSpacing(4)
         tag_row.setObjectName("commercialLogCategoryTags")
         for tag in _LOG_TAGS:
-            chip = QLabel(tag, tag_row)
+            chip = QPushButton(tag, tag_row)
             chip.setObjectName("commercialLogCategoryTag")
             chip.setProperty("logLevel", tag)
-            chip.style().unpolish(chip)
-            chip.style().polish(chip)
+            chip.setCheckable(True)
+            chip.setFlat(True)
+            chip.setCursor(Qt.CursorShape.PointingHandCursor)
+            chip.clicked.connect(lambda _checked=False, level=tag: self._toggle_log_filter(level))
+            self._tag_buttons[tag] = chip
             tag_layout.addWidget(chip)
         toolbar_layout.addWidget(tag_row)
         toolbar_layout.addStretch(1)
@@ -302,7 +352,6 @@ class CommercialBottomDock(QWidget):
         log_view.setReadOnly(True)
         log_view.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         configure_abstract_scroll_area(log_view)
-        log_view.setPlainText("\n".join(_LOG_SEED_LINES))
         metrics = QFontMetrics(log_view.font())
         line_height = metrics.lineSpacing()
         log_view.setMinimumHeight(max(108, line_height * self._LOG_VISIBLE_LINES + 12))
@@ -312,3 +361,7 @@ class CommercialBottomDock(QWidget):
 
     def has_log_category_tags(self) -> bool:
         return self.findChild(QWidget, "commercialLogCategoryTags") is not None
+
+    def recent_log_lines(self, *, limit: int = 20) -> list[str]:
+        entries = self._log_bus.entries()
+        return [entry.formatted() for entry in entries[-limit:]]

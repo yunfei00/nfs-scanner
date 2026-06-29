@@ -216,6 +216,10 @@ class ReportView(QWidget):
         if self._status_label is not None:
             self._status_label.setText(f"预览生成于 {preview.get('generated_at', '')} · 模板 {template}")
 
+    def set_last_report_path(self, path: str) -> None:
+        if self._status_label is not None:
+            self._status_label.setText(f"最近报告: {path}")
+
     def _generate_report(self) -> None:
         task_id = self._current_task_id()
         if task_id is None:
