@@ -1,12 +1,19 @@
 # Safe example — copy to config/devices.yaml and edit for real hardware.
 #   copy config\devices.example.yaml config\devices.yaml
+#
+# Real hardware requires ALL of:
+#   - mode: real
+#   - motion.enabled / instrument.enabled as needed
+#   - NFS_SCANNER_REAL_DEVICES=1
+#   - NFS_SCANNER_DEVICE_MODE=real
+#   - UI confirmation in Device Center
 
 mode: mock
 
 motion:
   type: serial_gcode
   enabled: false
-  port: COM3
+  port: COM6
   baudrate: 115200
   timeout_s: 3
   command_delay_ms: 50
@@ -26,12 +33,12 @@ motion:
     move_absolute: "G90 G0 X{x:.3f} Y{y:.3f} Z{z:.3f}"
 
 instrument:
-  type: fsw
+  type: FSW
   enabled: false
   transport: visa
   resource: "TCPIP0::192.168.1.100::inst0::INSTR"
   timeout_s: 10
-  trace_name: "TRACE1"
+  trace_name: TRACE1
   frequency:
     start_hz: 2400000000
     stop_hz: 2500000000
@@ -44,7 +51,7 @@ instrument:
     sweep_time_s: null
 
 camera:
-  enabled: true
+  enabled: false
   default_name: "LRCP  F1080P"
   width: 1920
   height: 1080

@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from nfs_scanner.config.devices_loader import DEVICES_CONFIG_YAML
+from nfs_scanner.core.integration_safety import REAL_DEVICE_ENV_VAR, is_real_device_control_allowed
 
 from ..widgets import NFSCard, NFSPrimaryButton, NFSSecondaryButton, NFSStatusBadge
 
@@ -72,7 +73,10 @@ class HardwareModePanel(QWidget):
         self._mode_combo.addItem("Mock Dry Run", "mock")
         self._mode_combo.addItem("Real Hardware", "real")
         self._mode_combo.currentIndexChanged.connect(self._on_mode_combo_changed)
-        mode_hint = QLabel("默认 Mock Dry Run；切换 Real 需二次确认。", mode_card.body)
+        mode_hint = QLabel(
+            f"默认 Mock Dry Run；Real 需 {REAL_DEVICE_ENV_VAR}=1、config mode:real 与二次确认。",
+            mode_card.body,
+        )
         mode_hint.setObjectName("nfsMutedLabel")
         mode_hint.setWordWrap(True)
         mode_form.addRow("当前模式", self._mode_combo)
@@ -144,6 +148,15 @@ class HardwareModePanel(QWidget):
             return
         selected = str(self._mode_combo.currentData())
         if selected == "real":
+            if not is_real_device_control_allowed():
+                self.feedback_requested.emit(
+                    "WARN",
+                    f"Real hardware blocked — set {REAL_DEVICE_ENV_VAR}=1 first",
+                )
+                self._mode_combo.blockSignals(True)
+                self._mode_combo.setCurrentIndex(0)
+                self._mode_combo.blockSignals(False)
+                return
             answer = QMessageBox.warning(
                 self,
                 "启用真实硬件模式",

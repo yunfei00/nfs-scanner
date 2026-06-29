@@ -19,12 +19,16 @@ from PySide6.QtWidgets import (
 
 from nfs_scanner.core.device_config import CameraDeviceConfig, MotionDeviceConfig, SpectrumDeviceConfig
 from nfs_scanner.core.device_service import DeviceServiceProtocol, DeviceSummary
+from nfs_scanner.core.devices.commercial_bridge import commercial_device_mode_label, is_commercial_real_bridge_armed
 from nfs_scanner.core.devices.simulation_provider import CORE_DEVICE_IDS, SimulationDeviceProvider
+from nfs_scanner.core.integration_safety import REAL_DEVICE_ENV_VAR
 from nfs_scanner.core.mock_device_config_service import MockDeviceConfigService
 from nfs_scanner.core.mock_device_service import MockDeviceService
+from nfs_scanner.devices.manager import HardwareDeviceManager
 
 from ..scroll_helpers import configure_abstract_scroll_area, configure_scroll_area
 from ..widgets import NFSCard, NFSPrimaryButton, NFSSecondaryButton, NFSStatusBadge
+from ..widgets.hardware_mode_panel import HardwareModePanel
 
 
 class DeviceCenterView(QWidget):
@@ -40,6 +44,7 @@ class DeviceCenterView(QWidget):
         config_service: MockDeviceConfigService | None = None,
         motion_connection=None,
         device_provider: SimulationDeviceProvider | None = None,
+        hardware_manager: HardwareDeviceManager | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -47,10 +52,13 @@ class DeviceCenterView(QWidget):
         self._device_service = device_service
         self._config_service = config_service or MockDeviceConfigService()
         self._provider = device_provider
+        self._hardware_manager = hardware_manager
+        self._hardware_panel: HardwareModePanel | None = None
         self._cards_layout: QVBoxLayout | None = None
         self._dry_run_log_view: QPlainTextEdit | None = None
         self._project_label: QLabel | None = None
         self._safety_label: QLabel | None = None
+        self._mode_label: QLabel | None = None
         self._setup_ui()
         self.refresh_devices()
 
@@ -71,16 +79,32 @@ class DeviceCenterView(QWidget):
         if self._dry_run_log_view is not None and line.strip():
             self._dry_run_log_view.appendPlainText(line)
 
+    def set_mode_context(self, *, using_real_bridge: bool, real_mode_confirmed: bool) -> None:
+        if self._safety_label is not None and self._hardware_manager is not None:
+            label = commercial_device_mode_label(
+                self._hardware_manager.config,
+                real_mode_confirmed=real_mode_confirmed,
+            )
+            suffix = " · Simulation cards remain Dry Run"
+            if not using_real_bridge:
+                suffix = f" · Set {REAL_DEVICE_ENV_VAR}=1 for real bridge"
+            self._safety_label.setText(f"安全模式：{label}{suffix}")
+        if self._hardware_panel is not None:
+            self._hardware_panel.refresh_status()
+
     def refresh_devices(self) -> None:
         """Rebuild device cards from the current service state."""
 
         if self._cards_layout is None:
             return
-        while self._cards_layout.count():
-            item = self._cards_layout.takeAt(0)
+        start_index = 1 if self._hardware_panel is not None else 0
+        while self._cards_layout.count() > start_index:
+            item = self._cards_layout.takeAt(start_index)
             widget = item.widget()
             if widget is not None:
                 widget.deleteLater()
+        if self._hardware_panel is not None:
+            self._hardware_panel.refresh_status()
         for device in self._device_service.list_devices():
             if device.kind == "vna":
                 continue
@@ -106,10 +130,13 @@ class DeviceCenterView(QWidget):
         meta_layout.setSpacing(2)
         self._project_label = QLabel("当前项目：（未打开项目）", meta)
         self._project_label.setObjectName("nfsMutedLabel")
-        self._safety_label = QLabel("安全模式：NO HARDWARE CONTROL · Simulation / Dry Run", meta)
+        self._safety_label = QLabel("安全模式：Simulation / Dry Run / NO HARDWARE CONTROL", meta)
         self._safety_label.setObjectName("nfsValueLabel")
+        self._mode_label = QLabel("", meta)
+        self._mode_label.setObjectName("nfsMutedLabel")
         meta_layout.addWidget(self._project_label)
         meta_layout.addWidget(self._safety_label)
+        meta_layout.addWidget(self._mode_label)
         header_layout.addWidget(meta, 1)
 
         connect_all = NFSPrimaryButton("全部连接", header)
@@ -133,6 +160,16 @@ class DeviceCenterView(QWidget):
         self._cards_layout = QVBoxLayout(container)
         self._cards_layout.setContentsMargins(8, 0, 8, 8)
         self._cards_layout.setSpacing(8)
+        if self._hardware_manager is not None:
+            self._hardware_panel = HardwareModePanel(self._hardware_manager, parent=container)
+            self._hardware_panel.feedback_requested.connect(self.feedback_requested)
+            self._hardware_panel.mode_changed.connect(lambda _mode: self.devices_changed.emit())
+            self._cards_layout.addWidget(self._hardware_panel)
+            cfg = self._hardware_manager.config
+            self._mode_label.setText(
+                f"config/devices.yaml · mode={cfg.mode} · "
+                f"motion.enabled={cfg.motion.enabled} · instrument.enabled={cfg.instrument.enabled}"
+            )
         scroll.setWidget(container)
         root_layout.addWidget(scroll, 1)
 

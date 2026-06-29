@@ -461,6 +461,10 @@ class CommercialMainShell(QMainWindow):
         )
         device_center = self.workspace.device_center_view()
         device_center.set_project_context(state.project_name)
+        device_center.set_mode_context(
+            using_real_bridge=self._services.using_real_bridge,
+            real_mode_confirmed=self._services.hardware_manager.is_real_mode(),
+        )
         device_center.sync_dry_run_log(self._services.device_provider.command_log)
         hw = self._services.hardware_manager.refresh_status()
         motion_label = hw.motion_status if hw.real_mode_confirmed else "Mock"
@@ -1403,7 +1407,7 @@ class CommercialMainShell(QMainWindow):
         self._sync_demo_state()
 
     def _start_mock_scan(self) -> None:
-        if self._services.hardware_manager.is_real_mode():
+        if self._services.hardware_manager.is_real_mode() and self._services.using_real_bridge:
             self._start_real_scan()
             return
         if self._services.project.current_session() is None:
@@ -1450,7 +1454,7 @@ class CommercialMainShell(QMainWindow):
             message = self.property_panel.validation_message() or "参数无效"
             self.bottom_dock.append_log_line(f"Real scan not started: {message}", level="WARN")
             return
-        ready, message = self._services.hardware_manager.ensure_ready_for_scan()
+        ready, message = self._services.real_device_provider.is_ready_for_scan()
         if not ready:
             self.bottom_dock.append_log_line(message, level="ERROR")
             return
@@ -1458,19 +1462,24 @@ class CommercialMainShell(QMainWindow):
         path_config = self.property_panel.current_scan_path_config()
         points = generate_preview_points(region, path_config)
         stats = calculate_preview_stats(points, region, path_config)
+        hw = self._services.hardware_manager
+        cfg = hw.config
+        limits = cfg.motion.soft_limits
         summary = (
-            f"即将开始真实扫描：\n"
-            f"X: {region.x_start} -> {region.x_stop}, step {region.x_step}\n"
-            f"Y: {region.y_start} -> {region.y_stop}, step {region.y_step}\n"
-            f"Z: {region.z_height}\n"
-            f"Total points: {stats.point_count}\n"
-            f"Instrument: {self._services.hardware_manager.instrument.instrument_id}\n"
-            f"Motion: {self._services.hardware_manager.motion.identify()}\n\n"
-            f"请确认扫描区域安全，急停可用。是否开始？"
+            "Real Scan Armed — Motion Will Move · Spectrum Will Acquire\n\n"
+            f"项目: {self._services.project.current_session().name if self._services.project.current_session() else '—'}\n"
+            f"扫描区域: X {region.x_start:g}–{region.x_stop:g} step {region.x_step:g}, "
+            f"Y {region.y_start:g}–{region.y_stop:g} step {region.y_step:g}\n"
+            f"Z 高度: {region.z_height:g} mm · 点数: {stats.point_count}\n"
+            f"Soft limits: X[{limits.get('x_min')}–{limits.get('x_max')}] "
+            f"Y[{limits.get('y_min')}–{limits.get('y_max')}] Z[{limits.get('z_min')}–{limits.get('z_max')}]\n"
+            f"Motion port: {cfg.motion.port} @ {cfg.motion.baudrate}\n"
+            f"Instrument: {cfg.instrument.type.upper()} · {cfg.instrument.resource or '—'}\n\n"
+            "请确认扫描区域安全、急停可用。是否开始真实扫描？"
         )
         answer = QMessageBox.warning(
             self,
-            "开始真实扫描",
+            "Confirm Start Real Scan",
             summary,
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
