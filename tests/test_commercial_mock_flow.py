@@ -49,7 +49,7 @@ class CommercialMockFlowTestCase(unittest.TestCase):
             self.assertEqual(core_ids, connected)
 
             center = shell.workspace.device_center_view()
-            self.assertIn("NO HARDWARE CONTROL", center._safety_label.text())
+            self.assertIn("安全模式", center._safety_label.text())
 
             lut_items = {
                 combo.itemText(index)

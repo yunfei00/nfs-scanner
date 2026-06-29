@@ -12,7 +12,7 @@ from pathlib import Path
 from PySide6.QtWidgets import QApplication
 
 from nfs_scanner.core.devices.simulation_provider import CORE_DEVICE_IDS, SimulationDeviceProvider
-from nfs_scanner.core.integration_safety import is_real_device_control_allowed
+from nfs_scanner.core.integration_safety import REAL_DEVICE_ENV_VAR, is_real_device_control_allowed
 from nfs_scanner.core.mock_device_config_service import MockDeviceConfigService
 from nfs_scanner.core.mock_device_service import MockDeviceService
 from nfs_scanner.core.project import NewProjectRequest
@@ -31,6 +31,7 @@ def _should_skip_gui_test() -> bool:
 
 class SimulationProviderTestCase(unittest.TestCase):
     def setUp(self) -> None:
+        os.environ.pop(REAL_DEVICE_ENV_VAR, None)
         self.provider = SimulationDeviceProvider(MockDeviceService())
 
     def test_initial_core_devices_disconnected(self) -> None:
