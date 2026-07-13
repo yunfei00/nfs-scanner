@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Callable
+from typing import Callable, Literal
 
 import numpy as np
 
@@ -18,6 +18,7 @@ from nfs_scanner.devices.motion.base_motion import MotionController
 
 ProgressCallback = Callable[[int, int, RealScanPointRecord], None]
 LogCallback = Callable[[str], None]
+ScanOutcome = Literal["completed", "stopped", "fast_stopped", "emergency_stopped", "failed"]
 
 
 @dataclass(slots=True)
@@ -35,6 +36,7 @@ class RealScanResult:
     output_dir: str
     stopped_by_user: bool = False
     last_error: str = ""
+    outcome: ScanOutcome = "completed"
 
 
 class RealScanEngine:
@@ -53,9 +55,26 @@ class RealScanEngine:
         self._on_progress = on_progress
         self._on_log = on_log
         self._stop_requested = False
+        self._fast_stop_requested = False
+        self._emergency_stop_requested = False
 
     def request_stop(self) -> None:
+        """Finish the active safe phase and do not start another scan point."""
         self._stop_requested = True
+
+    def request_fast_stop(self) -> None:
+        """Immediately ask motion and instrument adapters to halt current work."""
+        self._fast_stop_requested = True
+        self._stop_requested = True
+        self._stop_devices(emergency=False)
+
+    def emergency_stop(self) -> None:
+        """Immediately send the highest-priority stop command to all devices."""
+        self._emergency_stop_requested = True
+        self._fast_stop_requested = True
+        self._stop_requested = True
+        self._log("[CRITICAL] Emergency stop requested for real scan")
+        self._stop_devices(emergency=True)
 
     def run(self, config: RealScanConfig) -> RealScanResult:
         points = generate_snake_points(config.region, config.path_config)
@@ -63,18 +82,13 @@ class RealScanEngine:
         total = len(points)
         completed = 0
         last_error = ""
+        outcome: ScanOutcome = "completed"
 
         for index, (x, y, z) in enumerate(points, start=1):
-            if self._stop_requested:
-                self._log("[SCAN] Real scan stopped by user")
-                try:
-                    self._motion.stop()
-                except Exception:
-                    pass
-                try:
-                    self._instrument.abort()
-                except Exception:
-                    pass
+            requested_outcome = self._requested_outcome()
+            if requested_outcome is not None:
+                outcome = requested_outcome
+                self._log(f"[SCAN] Real scan {outcome} before point {index}")
                 break
 
             timestamp = datetime.now().isoformat(timespec="seconds")
@@ -98,9 +112,22 @@ class RealScanEngine:
 
             try:
                 self._motion.move_absolute(x, y, z)
-                if config.settle_delay_ms > 0:
-                    time.sleep(config.settle_delay_ms / 1000.0)
+                requested_outcome = self._requested_outcome()
+                if requested_outcome is not None:
+                    outcome = requested_outcome
+                    break
+                if not self._wait_settle(config.settle_delay_ms):
+                    outcome = self._requested_outcome() or "stopped"
+                    break
+                requested_outcome = self._requested_outcome()
+                if requested_outcome is not None:
+                    outcome = requested_outcome
+                    break
                 acquisition = self._instrument.measure_at_current_position()
+                requested_outcome = self._requested_outcome()
+                if requested_outcome is not None:
+                    outcome = requested_outcome
+                    break
                 frequencies, amplitudes = acquisition.to_trace()
                 peak_index = int(np.argmax(amplitudes)) if len(amplitudes) else 0
                 record = RealScanPointRecord(
@@ -119,6 +146,10 @@ class RealScanEngine:
                 self._log(f"[SCAN] point {index}/{total} X={x:.2f} Y={y:.2f}")
                 if self._on_progress is not None:
                     self._on_progress(index, total, record)
+                requested_outcome = self._requested_outcome()
+                if requested_outcome is not None:
+                    outcome = requested_outcome
+                    break
             except Exception as exc:
                 last_error = str(exc)
                 storage.append_point(
@@ -135,7 +166,11 @@ class RealScanEngine:
                     )
                 )
                 self._log(f"[ERROR] Real scan failed at point {index}: {last_error}")
+                outcome = "failed"
                 break
+
+        if outcome == "completed" and self._requested_outcome() is not None:
+            outcome = self._requested_outcome() or "stopped"
 
         metadata = {
             "project_id": config.project_id,
@@ -150,7 +185,8 @@ class RealScanEngine:
             },
             "total_points": total,
             "completed_points": completed,
-            "stopped_by_user": self._stop_requested,
+            "stopped_by_user": outcome in ("stopped", "fast_stopped", "emergency_stopped"),
+            "outcome": outcome,
             "last_error": last_error,
             "started_at": datetime.now().isoformat(timespec="seconds"),
         }
@@ -159,9 +195,41 @@ class RealScanEngine:
             completed_points=completed,
             total_points=total,
             output_dir=str(output_dir),
-            stopped_by_user=self._stop_requested,
+            stopped_by_user=outcome in ("stopped", "fast_stopped", "emergency_stopped"),
             last_error=last_error,
+            outcome=outcome,
         )
+
+    def _requested_outcome(self) -> ScanOutcome | None:
+        if self._emergency_stop_requested:
+            return "emergency_stopped"
+        if self._fast_stop_requested:
+            return "fast_stopped"
+        if self._stop_requested:
+            return "stopped"
+        return None
+
+    def _wait_settle(self, delay_ms: int) -> bool:
+        """Wait in short intervals so a stop request is observed during dwell."""
+        deadline = time.monotonic() + max(delay_ms, 0) / 1000.0
+        while time.monotonic() < deadline:
+            if self._requested_outcome() is not None:
+                return False
+            time.sleep(min(0.05, max(deadline - time.monotonic(), 0.0)))
+        return self._requested_outcome() is None
+
+    def _stop_devices(self, *, emergency: bool) -> None:
+        try:
+            if emergency:
+                self._motion.emergency_stop()
+            else:
+                self._motion.stop()
+        except Exception as exc:
+            self._log(f"[ERROR] Motion stop command failed: {exc}")
+        try:
+            self._instrument.abort()
+        except Exception as exc:
+            self._log(f"[ERROR] Instrument abort command failed: {exc}")
 
     def _log(self, message: str) -> None:
         if self._on_log is not None:

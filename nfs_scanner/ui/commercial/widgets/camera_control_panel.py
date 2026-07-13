@@ -76,7 +76,7 @@ class CameraControlPanel(QWidget):
         self.device_combo = QComboBox(content)
         self.device_combo.setObjectName("visionDeviceCombo")
         self.device_combo.setMinimumHeight(32)
-        self.device_combo.currentIndexChanged.connect(self.device_changed.emit)
+        self.device_combo.currentIndexChanged.connect(lambda _index: self.device_changed.emit())
         form.addRow("设备", self.device_combo)
 
         self.resolution_combo = QComboBox(content)

@@ -39,6 +39,7 @@ class FakeInstrumentController(InstrumentController):
     def __init__(self, *, points: int = 11) -> None:
         super().__init__(FakeSpectrumAnalyzer(points=points))
         self._connected = False
+        self.abort_calls = 0
 
     def connect(self) -> bool:
         self._connected = bool(self.analyzer.connect())
@@ -53,3 +54,7 @@ class FakeInstrumentController(InstrumentController):
 
     def identify(self) -> str:
         return "FakeSpectrum/1.0"
+
+    def abort(self) -> None:
+        self.abort_calls += 1
+        super().abort()

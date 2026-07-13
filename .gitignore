@@ -230,3 +230,8 @@ __marimo__/
 
 
 .idea
+/outputs
+outputs/scans/
+output/
+config/devices.local.yaml
+config/devices.yaml

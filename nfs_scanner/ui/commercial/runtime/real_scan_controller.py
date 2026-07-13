@@ -37,6 +37,7 @@ class RealScanWorker(QObject):
         self._project_id = project_id
         self._settle_delay_ms = settle_delay_ms
         self._engine: RealScanEngine | None = None
+        self._requested_stop: str | None = None
 
     def run(self) -> None:
         engine = RealScanEngine(
@@ -46,6 +47,12 @@ class RealScanWorker(QObject):
             on_log=self._emit_log,
         )
         self._engine = engine
+        if self._requested_stop == "normal":
+            engine.request_stop()
+        elif self._requested_stop == "fast":
+            engine.request_fast_stop()
+        elif self._requested_stop == "emergency":
+            engine.emergency_stop()
         config = RealScanConfig(
             region=self._region,
             path_config=self._path_config,
@@ -66,8 +73,20 @@ class RealScanWorker(QObject):
         self.finished.emit(result)
 
     def request_stop(self) -> None:
+        self._requested_stop = self._requested_stop or "normal"
         if self._engine is not None:
             self._engine.request_stop()
+
+    def request_fast_stop(self) -> None:
+        if self._requested_stop != "emergency":
+            self._requested_stop = "fast"
+        if self._engine is not None:
+            self._engine.request_fast_stop()
+
+    def emergency_stop(self) -> None:
+        self._requested_stop = "emergency"
+        if self._engine is not None:
+            self._engine.emergency_stop()
 
     def _on_progress(self, current: int, total: int, record: RealScanPointRecord) -> None:
         update = scan_point_update_from_record(current, total, record)
@@ -149,8 +168,23 @@ class RealScanController(QObject):
         return True, ""
 
     def stop(self) -> None:
+        """Request a normal stop after the active safe scan phase."""
         if self._worker is not None:
             self._worker.request_stop()
+
+    def request_fast_stop(self) -> None:
+        """Immediately send a soft device stop and instrument abort."""
+        if self._worker is not None:
+            self._worker.request_fast_stop()
+
+    def emergency_stop(self) -> None:
+        """Immediately issue emergency hardware stop and instrument abort."""
+        if self._worker is not None:
+            self._worker.emergency_stop()
+
+    def wait_for_finished(self, timeout_ms: int) -> bool:
+        """Boundedly wait for the worker thread during controlled shutdown."""
+        return self._thread is None or self._thread.wait(timeout_ms)
 
     def _relay_progress(self, update: ScanPointUpdate) -> None:
         self.progress.emit(update)

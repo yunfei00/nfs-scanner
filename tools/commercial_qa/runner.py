@@ -32,6 +32,23 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 QA_OUTPUT_DIR = REPO_ROOT / ".ai" / "qa" / "latest"
 SCREENSHOT_DIR = QA_OUTPUT_DIR / "screenshots"
 
+# Known benign diagnostic strings may be added here with a justification.
+# Exceptions are never whitelisted by default because they invalidate QA.
+LOG_EXCEPTION_MARKERS = (
+    "Traceback",
+    "TypeError:",
+    "RuntimeError:",
+    "AssertionError:",
+    "Segmentation fault",
+    "QThread: Destroyed while thread is still running",
+)
+
+
+def find_unexpected_log_exceptions(output: str) -> list[str]:
+    """Return exception markers that make an external QA process fail."""
+
+    return [marker for marker in LOG_EXCEPTION_MARKERS if marker in output]
+
 
 def _headless() -> bool:
     if os.getenv("NFS_SCANNER_SKIP_GUI_TESTS", "").strip() == "1":
@@ -138,15 +155,19 @@ def run_external_checks(*, venv_python: str | None = None) -> list[QACheck]:
             encoding="utf-8",
             errors="replace",
         )
-        tail = (completed.stdout + completed.stderr).strip().splitlines()
+        output = completed.stdout + completed.stderr
+        markers = find_unexpected_log_exceptions(output)
+        tail = output.strip().splitlines()
         summary = tail[-1] if tail else f"exit={completed.returncode}"
+        if markers:
+            summary = f"exception markers: {', '.join(markers)}; {summary}"
         checks.append(
             QACheck(
                 name=name,
                 category="external",
-                expected="exit code 0",
+                expected="exit code 0 and no unapproved exception markers",
                 actual=summary[:240],
-                passed=completed.returncode == 0,
+                passed=completed.returncode == 0 and not markers,
                 auto_fixable=name != "compileall",
             )
         )

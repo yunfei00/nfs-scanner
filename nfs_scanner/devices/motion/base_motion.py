@@ -58,7 +58,11 @@ class MotionController(ABC):
     def get_position(self) -> tuple[float, float, float]:
         """Return the current device position."""
 
-    def wait_until_idle(self, timeout_s: float = 60.0) -> None:
+    def wait_until_idle(
+        self,
+        target: tuple[float, float, float] | None = None,
+        timeout_s: float = 60.0,
+    ) -> None:
         """Block until motion completes or timeout."""
 
     def set_soft_limits(

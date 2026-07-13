@@ -17,6 +17,7 @@ from nfs_scanner.config.devices_loader import (
 from nfs_scanner.devices.instruments.instrument_controller import InstrumentController
 from nfs_scanner.devices.motion.base_motion import MotionController
 from nfs_scanner.devices.motion.mock_motion import MockMotionController
+from nfs_scanner.devices.motion.limits import PLATFORM_SOFT_LIMITS
 from nfs_scanner.devices.motion.serial_motion import SerialMotionCommands, SerialMotionConfig, SerialMotionController, SoftLimits
 from nfs_scanner.devices.spectrum.factory import create_spectrum_analyzer
 from nfs_scanner.devices.spectrum.mock_spectrum import MockSpectrumAnalyzer
@@ -251,12 +252,12 @@ class HardwareDeviceManager:
                 command_delay_ms=motion_cfg.command_delay_ms,
                 settle_delay_ms=motion_cfg.settle_delay_ms,
                 soft_limits=SoftLimits(
-                    x_min=float(limits.get("x_min", 0)),
-                    x_max=float(limits.get("x_max", 180)),
-                    y_min=float(limits.get("y_min", 0)),
-                    y_max=float(limits.get("y_max", 140)),
-                    z_min=float(limits.get("z_min", 0)),
-                    z_max=float(limits.get("z_max", 50)),
+                    x_min=float(limits.get("x_min", PLATFORM_SOFT_LIMITS["x_min"])),
+                    x_max=float(limits.get("x_max", PLATFORM_SOFT_LIMITS["x_max"])),
+                    y_min=float(limits.get("y_min", PLATFORM_SOFT_LIMITS["y_min"])),
+                    y_max=float(limits.get("y_max", PLATFORM_SOFT_LIMITS["y_max"])),
+                    z_min=float(limits.get("z_min", PLATFORM_SOFT_LIMITS["z_min"])),
+                    z_max=float(limits.get("z_max", PLATFORM_SOFT_LIMITS["z_max"])),
                 ),
                 commands=commands,
             )

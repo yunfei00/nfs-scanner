@@ -28,5 +28,9 @@ class FakeMotionController(MockMotionController):
         self.stop_calls += 1
         super().stop()
 
-    def wait_until_idle(self, timeout_s: float = 60.0) -> None:
+    def wait_until_idle(
+        self,
+        target: tuple[float, float, float] | None = None,
+        timeout_s: float = 60.0,
+    ) -> None:
         self._ensure_connected()

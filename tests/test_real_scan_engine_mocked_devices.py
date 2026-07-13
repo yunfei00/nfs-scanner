@@ -54,6 +54,23 @@ class TestRealScanEngineMockedDevices(unittest.TestCase):
         config = RealScanConfig(region=self.region, path_config=self.path_config, settle_delay_ms=0)
         result = engine.run(config)
         self.assertTrue(result.stopped_by_user)
+        self.assertEqual(result.outcome, "stopped")
+
+    def test_fast_stop_stops_devices_and_marks_result(self) -> None:
+        engine = RealScanEngine(motion=self.motion, instrument=self.instrument)
+        engine.request_fast_stop()
+        result = engine.run(RealScanConfig(region=self.region, path_config=self.path_config, settle_delay_ms=0))
+        self.assertEqual(result.outcome, "fast_stopped")
+        self.assertEqual(self.motion.stop_calls, 1)
+        self.assertEqual(self.instrument.abort_calls, 1)
+
+    def test_emergency_stop_stops_devices_and_marks_result(self) -> None:
+        engine = RealScanEngine(motion=self.motion, instrument=self.instrument)
+        engine.emergency_stop()
+        result = engine.run(RealScanConfig(region=self.region, path_config=self.path_config, settle_delay_ms=0))
+        self.assertEqual(result.outcome, "emergency_stopped")
+        self.assertEqual(self.motion.emergency_stop_calls, 1)
+        self.assertEqual(self.instrument.abort_calls, 1)
 
 
 if __name__ == "__main__":

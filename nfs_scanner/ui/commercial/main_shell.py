@@ -1546,6 +1546,16 @@ class CommercialMainShell(QMainWindow):
                 return
             self.real_scan.stop()
             self.bottom_dock.append_log_line("[SCAN] Real scan stop requested on window close", level="SCAN")
+            if not self.real_scan.wait_for_finished(3_000):
+                self.bottom_dock.append_log_line("[SCAN] Normal stop timed out; requesting fast stop", level="WARN")
+                self.real_scan.request_fast_stop()
+                if not self.real_scan.wait_for_finished(2_000):
+                    self.bottom_dock.append_log_line("[CRITICAL] Fast stop timed out; issuing emergency stop", level="ERROR")
+                    self.real_scan.emergency_stop()
+                    if not self.real_scan.wait_for_finished(2_000):
+                        self.bottom_dock.append_log_line("[ERROR] Scan thread did not finish; window remains open", level="ERROR")
+                        event.ignore()
+                        return
         super().closeEvent(event)
 
     def _stop_mock_scan(self) -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass, field
 
@@ -10,6 +11,7 @@ from nfs_scanner.core.integration_safety import require_real_device_control
 
 from .base_motion import MotionController
 from .grbl_status import extract_latest_status_line, parse_motion_status, position_within_tolerance
+from .limits import PLATFORM_SOFT_LIMITS
 from .serial_transport import SerialTransport, SerialTransportConfig, SerialTransportError
 
 
@@ -25,12 +27,12 @@ class SerialMotionCommands:
 
 @dataclass(slots=True)
 class SoftLimits:
-    x_min: float = 0.0
-    x_max: float = 180.0
-    y_min: float = 0.0
-    y_max: float = 140.0
-    z_min: float = 0.0
-    z_max: float = 50.0
+    x_min: float = PLATFORM_SOFT_LIMITS["x_min"]
+    x_max: float = PLATFORM_SOFT_LIMITS["x_max"]
+    y_min: float = PLATFORM_SOFT_LIMITS["y_min"]
+    y_max: float = PLATFORM_SOFT_LIMITS["y_max"]
+    z_min: float = PLATFORM_SOFT_LIMITS["z_min"]
+    z_max: float = PLATFORM_SOFT_LIMITS["z_max"]
 
 
 @dataclass(slots=True)
@@ -52,6 +54,7 @@ class SerialMotionController(MotionController):
 
     MOTION_ACTIVE_STATES = frozenset({"Run", "Busy", "Hold"})
     MOTION_BLOCKING_STATES = frozenset({"Alarm", "Door", "Check", "Jog"})
+    _logger = logging.getLogger(__name__)
 
     def __init__(self, config: SerialMotionConfig) -> None:
         self._config = config
@@ -107,7 +110,7 @@ class SerialMotionController(MotionController):
             raise ValueError(reason)
         command = self._config.commands.move_absolute.format(x=x, y=y, z=target_z)
         self._transport.write_line(command)
-        self.wait_until_idle(timeout_s=max(self._config.timeout_s, 30.0))
+        self.wait_until_idle(target=(x, y, target_z), timeout_s=max(self._config.timeout_s, 30.0))
 
     def home(self) -> None:
         require_real_device_control("motion.home")
@@ -133,29 +136,45 @@ class SerialMotionController(MotionController):
         _, position = parse_motion_status(status_line)
         return position if position is not None else (0.0, 0.0, 0.0)
 
-    def wait_until_idle(self, timeout_s: float = 60.0) -> None:
+    def wait_until_idle(
+        self,
+        target: tuple[float, float, float] | None = None,
+        timeout_s: float = 60.0,
+    ) -> None:
+        """Wait for Idle and verify the explicit target when MPos is available."""
         deadline = time.monotonic() + timeout_s
-        target = self.get_position()
+        last_state = "unknown"
+        last_position: tuple[float, float, float] | None = None
         while time.monotonic() < deadline:
             status_line = self._query_status_line()
             if status_line is None:
                 time.sleep(self._config.status_poll_interval_s)
                 continue
             state, current_pos = parse_motion_status(status_line)
+            last_state, last_position = state, current_pos
             if state in self.MOTION_ACTIVE_STATES:
                 time.sleep(self._config.status_poll_interval_s)
                 continue
             if state in self.MOTION_BLOCKING_STATES:
                 raise RuntimeError(f"Motion controller blocked state: {state}")
             if state == "Idle":
-                if current_pos is None or position_within_tolerance(
-                    current_pos,
-                    target,
-                    self._config.position_tolerance_mm,
-                ):
+                if target is None:
                     return
+                if current_pos is None:
+                    self._logger.debug("Motion reached Idle without MPos; target verification skipped: %s", target)
+                    return
+                if position_within_tolerance(current_pos, target, self._config.position_tolerance_mm):
+                    return
+                raise RuntimeError(
+                    "Motion controller became Idle away from target: "
+                    f"actual={current_pos}, target={target}, tolerance={self._config.position_tolerance_mm}"
+                )
             time.sleep(self._config.status_poll_interval_s)
-        raise TimeoutError("Timed out waiting for motion controller to become idle.")
+        raise TimeoutError(
+            "Timed out waiting for motion controller to become idle: "
+            f"last_state={last_state}, last_position={last_position}, target={target}, "
+            f"tolerance={self._config.position_tolerance_mm}, timeout_s={timeout_s}"
+        )
 
     def set_soft_limits(
         self,

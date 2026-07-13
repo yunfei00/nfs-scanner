@@ -38,6 +38,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         window = create_commercial_shell()
         window.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
     else:
+        logger.info("启动旧版 UI（NFS_SCANNER_UI=legacy）")
         window = MainWindow()
     window.show()
 

@@ -1,5 +1,29 @@
 # NFS Scanner
 
+## 启动与本地设备配置（第一阶段）
+
+默认启动商业版 UI：
+
+```powershell
+python -m nfs_scanner
+```
+
+如需调试保留的旧版 UI，请显式设置兼容环境变量：
+
+```powershell
+$env:NFS_SCANNER_UI="legacy"; python -m nfs_scanner
+```
+
+本地设备配置不提交到 Git。首次配置时执行：
+
+```powershell
+copy config\devices.example.yaml config\devices.local.yaml
+```
+
+配置读取优先级为：显式传入路径、`config/devices.local.yaml`、兼容的
+`config/devices.yaml`、内置 Mock 默认配置。默认模式始终为 Mock；真实硬件仍需
+满足现有的环境变量和 UI 确认安全门禁。
+
 > Near Field Scan System（近场扫描系统）
 >
 > 面向射频测试、近场扫描、EMC 调试与自动化测试场景的工业级扫描平台。当前仓库同时保留旧版 UI 和商业版 Demo UI。

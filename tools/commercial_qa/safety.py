@@ -106,11 +106,11 @@ def run_static_safety_checks(*, repo_root: Path) -> list[QACheck]:
     app_text = app_py.read_text(encoding="utf-8")
     checks.append(
         QACheck(
-            name="legacy_default_entry",
+            name="commercial_default_entry",
             category="safety",
-            expected="Default startup uses MainWindow unless NFS_SCANNER_UI=commercial",
-            actual="is_commercial_ui_enabled" if "is_commercial_ui_enabled" in app_text else "missing gate",
-            passed="MainWindow" in app_text and "is_commercial_ui_enabled" in app_text,
+            expected="Default startup uses CommercialMainShell; NFS_SCANNER_UI=legacy keeps MainWindow",
+            actual="commercial gate present" if "is_commercial_ui_enabled" in app_text else "missing gate",
+            passed="create_commercial_shell" in app_text and "is_commercial_ui_enabled" in app_text and "MainWindow" in app_text,
             blocked=True,
         )
     )

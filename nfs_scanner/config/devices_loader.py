@@ -1,10 +1,10 @@
 """Load device configuration from YAML/JSON files.
 
 Primary config path (recommended):
-    config/devices.yaml
+    config/devices.local.yaml
 
 Fallback (legacy):
-    config/devices.json
+    config/devices.yaml
 
 If neither exists, safe Mock defaults are used.
 """
@@ -17,10 +17,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
+from nfs_scanner.devices.motion.limits import PLATFORM_SOFT_LIMITS
+
 DeviceMode = Literal["mock", "dry_run", "real"]
 
 CONFIG_DIR = Path("config")
 DEVICES_CONFIG_YAML = CONFIG_DIR / "devices.yaml"
+DEVICES_CONFIG_LOCAL_YAML = CONFIG_DIR / "devices.local.yaml"
 DEVICES_CONFIG_JSON = CONFIG_DIR / "devices.json"
 DEVICES_CONFIG_EXAMPLE = CONFIG_DIR / "devices.example.yaml"
 
@@ -35,14 +38,7 @@ class MotionConfig:
     command_delay_ms: int = 50
     settle_delay_ms: int = 200
     soft_limits: dict[str, float] = field(
-        default_factory=lambda: {
-            "x_min": 0.0,
-            "x_max": 180.0,
-            "y_min": 0.0,
-            "y_max": 140.0,
-            "z_min": 0.0,
-            "z_max": 50.0,
-        }
+        default_factory=lambda: dict(PLATFORM_SOFT_LIMITS)
     )
     commands: dict[str, str] = field(default_factory=dict)
 
@@ -174,6 +170,8 @@ def resolve_device_mode(config: DevicesConfig) -> DeviceMode:
 def resolve_devices_config_path() -> Path | None:
     """Return the first existing devices config file, yaml preferred."""
 
+    if DEVICES_CONFIG_LOCAL_YAML.is_file():
+        return DEVICES_CONFIG_LOCAL_YAML
     if DEVICES_CONFIG_YAML.is_file():
         return DEVICES_CONFIG_YAML
     if DEVICES_CONFIG_JSON.is_file():

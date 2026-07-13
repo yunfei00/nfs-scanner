@@ -14,9 +14,13 @@ COMMERCIAL_UI_ENV_VAR = "NFS_SCANNER_UI"
 
 
 def is_commercial_ui_enabled() -> bool:
-    """Return whether the commercial UI should be used at startup."""
+    """Return whether the commercial UI should be used at startup.
 
-    return os.getenv(COMMERCIAL_UI_ENV_VAR, "").strip().lower() == "commercial"
+    Commercial UI is the default. ``NFS_SCANNER_UI=legacy`` explicitly keeps
+    the original UI available for compatibility debugging.
+    """
+
+    return os.getenv(COMMERCIAL_UI_ENV_VAR, "commercial").strip().lower() != "legacy"
 
 
 def create_commercial_shell(
