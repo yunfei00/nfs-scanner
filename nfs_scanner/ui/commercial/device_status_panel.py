@@ -75,6 +75,12 @@ class CommercialDeviceStatusPanel(QWidget):
 
         return self._panel is not None and not self._panel.is_expanded()
 
+    def set_collapsed(self, collapsed: bool) -> None:
+        """Collapse or expand the detailed device cards."""
+
+        if self._panel is not None:
+            self._panel.set_expanded(not collapsed)
+
     def _create_summary_card(self, device: DeviceSummary) -> NFSCard:
         card = NFSCard(device.display_name, self)
         card.setProperty("cardRole", "deviceSummary")

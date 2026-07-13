@@ -141,6 +141,7 @@ class CommercialMainShell(QMainWindow):
         self._services.project.open_mock_project()
         self._refresh_project_ui()
         self._apply_target_demo_presentation()
+        self._apply_preparation_view()
         apply_commercial_scroll_config(self)
 
     def _apply_target_demo_presentation(self) -> None:
@@ -168,6 +169,21 @@ class CommercialMainShell(QMainWindow):
         """Re-apply demo-only canvas presentation after deferred UI refresh."""
 
         pass
+
+    def _apply_preparation_view(self) -> None:
+        """Keep the first-open workspace focused on scan preparation."""
+
+        self.project_summary_card.setVisible(False)
+        self.device_status_panel.set_collapsed(True)
+        self.bottom_dock.setVisible(False)
+
+    def _show_runtime_panels(self) -> None:
+        """Reveal scan monitoring panels once a scan has been requested."""
+
+        if self.bottom_dock.isVisible():
+            return
+        self.bottom_dock.setVisible(True)
+        self._reapply_splitter_sizes()
 
     @property
     def title_bar(self) -> CommercialTopHeader:
@@ -1407,6 +1423,7 @@ class CommercialMainShell(QMainWindow):
         self._sync_demo_state()
 
     def _start_mock_scan(self) -> None:
+        self._show_runtime_panels()
         if self._services.hardware_manager.is_real_mode() and self._services.using_real_bridge:
             self._start_real_scan()
             return
@@ -1447,6 +1464,7 @@ class CommercialMainShell(QMainWindow):
         self._sync_demo_state(self.mock_scan.snapshot())
 
     def _start_real_scan(self) -> None:
+        self._show_runtime_panels()
         if self.real_scan.is_running:
             self.bottom_dock.append_log_line("Real scan already running", level="WARN")
             return
@@ -1846,15 +1864,17 @@ class CommercialMainShell(QMainWindow):
 
         if self._center_splitter is not None:
             compact = height <= 768
-            dock_min = 200 if compact else self.BOTTOM_DOCK_MIN_HEIGHT
-            self.bottom_dock.setMinimumHeight(dock_min)
-
             chrome_height = (
                 self.top_header.height()
                 + self.status_bar_widget.height()
                 + 36
             )
             body_height = max(height - chrome_height, 360 if compact else 420)
+            if not self.bottom_dock.isVisible():
+                self._center_splitter.setSizes([body_height, 0])
+                return
+            dock_min = 200 if compact else self.BOTTOM_DOCK_MIN_HEIGHT
+            self.bottom_dock.setMinimumHeight(dock_min)
             bottom_ratio = (
                 self.BOTTOM_DOCK_MAXIMIZED_RATIO
                 if (self.isMaximized() or self._custom_maximized)

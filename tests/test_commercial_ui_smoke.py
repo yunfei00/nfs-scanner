@@ -57,6 +57,9 @@ class CommercialUiSmokeTestCase(unittest.TestCase):
             self.assertIsNotNone(shell.workspace)
             self.assertIsNotNone(shell.property_panel)
             self.assertIsNotNone(shell.bottom_dock)
+            self.assertTrue(shell.bottom_dock.isHidden())
+            self.assertTrue(shell.project_summary_card.isHidden())
+            self.assertTrue(shell.device_status_panel.is_collapsed())
         finally:
             shell.close()
 
