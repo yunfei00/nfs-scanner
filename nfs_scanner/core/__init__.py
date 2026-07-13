@@ -1,6 +1,7 @@
 """Core application services and data models."""
 
 from .device_manager import DeviceManager
+from .device_hub import DeviceHub, DeviceOperationResult
 from .models import (
     ScanConfig,
     ScanPointResult,
@@ -14,6 +15,8 @@ from .versioning import get_major, is_major_compatible, parse_version, safe_vers
 
 __all__ = [
     "DeviceManager",
+    "DeviceHub",
+    "DeviceOperationResult",
     "ScanConfig",
     "ScanPointResult",
     "ScanManager",

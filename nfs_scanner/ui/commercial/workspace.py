@@ -90,6 +90,8 @@ class CommercialWorkspace(QWidget):
                     project=self._services.project,
                 )
                 self._report_view = view
+            elif view_type is VisionView:
+                view = VisionView(self.tab_widget, camera_manager=self._services.device_hub.camera)
             else:
                 view = view_type(self.tab_widget)
             self.tab_widget.addTab(view, title)

@@ -33,11 +33,11 @@ class VisionView(QWidget):
     camera_log = Signal(str, str)
     scan_background_requested = Signal(str)
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, *, camera_manager: CameraManager | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("visionView")
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self._manager = CameraManager()
+        self._manager = camera_manager or CameraManager()
         self._worker = None
         self._preview_active = False
         self._devices_loaded = False

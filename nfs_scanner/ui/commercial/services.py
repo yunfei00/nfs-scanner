@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from nfs_scanner.config.devices_loader import load_devices_config
 from nfs_scanner.core.background.manager import BackgroundManager
 from nfs_scanner.core.device_service import DeviceServiceProtocol
+from nfs_scanner.core.device_hub import DeviceHub
 from nfs_scanner.core.devices import SimulationDeviceProvider
 from nfs_scanner.core.devices.commercial_bridge import is_commercial_real_bridge_armed
 from nfs_scanner.core.devices.real_device_provider import RealDeviceProvider
@@ -36,6 +37,7 @@ class CommercialServiceBundle:
     real_device_provider: RealDeviceProvider
     scan_controller: ScanRuntimeController
     hardware_manager: HardwareDeviceManager
+    device_hub: DeviceHub
     real_scan_provider: RealScanProvider
     using_real_bridge: bool = False
 
@@ -44,6 +46,7 @@ def create_commercial_services() -> CommercialServiceBundle:
     """Create commercial services — simulation default + optional real bridge layer."""
 
     hardware_manager = HardwareDeviceManager(load_devices_config())
+    device_hub = DeviceHub(hardware_manager=hardware_manager)
     device_provider = SimulationDeviceProvider()
     real_device_provider = RealDeviceProvider(hardware_manager, mock_service=device_provider.mock_service)
     runtime = MockScanRuntimeService()
@@ -62,6 +65,7 @@ def create_commercial_services() -> CommercialServiceBundle:
         real_device_provider=real_device_provider,
         scan_controller=ScanRuntimeController(scan_provider),
         hardware_manager=hardware_manager,
+        device_hub=device_hub,
         real_scan_provider=real_scan_provider,
         using_real_bridge=is_commercial_real_bridge_armed(hardware_manager.config),
     )
