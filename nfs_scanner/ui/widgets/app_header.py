@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QPoint, Qt
+from PySide6.QtCore import QPoint, QTimer, Qt
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QToolButton, QVBoxLayout, QWidget
 
@@ -76,7 +76,7 @@ class ApplicationHeader(QFrame):
             window.showNormal()
         else:
             window.showMaximized()
-        self.sync_window_state()
+        QTimer.singleShot(0, self.sync_window_state)
 
     def _close_window(self) -> None:
         self.window().close()
@@ -85,7 +85,7 @@ class ApplicationHeader(QFrame):
         """Keep the maximize button aligned with the actual window state."""
 
         is_maximized = self.window().isMaximized()
-        self.maximize_button.setText("❐" if is_maximized else "□")
+        self.maximize_button.setText("↙" if is_maximized else "□")
         tooltip = "还原" if is_maximized else "最大化"
         self.maximize_button.setToolTip(tooltip)
         self.maximize_button.setAccessibleName(tooltip)

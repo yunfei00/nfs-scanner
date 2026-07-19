@@ -61,6 +61,19 @@ class UnifiedUiTestCase(unittest.TestCase):
         for object_name in ("minimizeWindowButton", "maximizeWindowButton", "closeWindowButton"):
             self.assertIsNotNone(self.window.header.findChild(QToolButton, object_name))
 
+    def test_maximized_window_uses_one_clear_restore_symbol(self) -> None:
+        self.window.setWindowState(Qt.WindowState.WindowMaximized)
+        self.window.header.sync_window_state()
+
+        self.assertEqual(self.window.header.maximize_button.text(), "↙")
+        self.assertEqual(self.window.header.maximize_button.accessibleName(), "还原")
+        self.assertEqual(len(self.window.header.maximize_button.text()), 1)
+
+        self.window.setWindowState(Qt.WindowState.WindowNoState)
+        self.window.header.sync_window_state()
+        self.assertEqual(self.window.header.maximize_button.text(), "□")
+        self.assertEqual(self.window.header.maximize_button.accessibleName(), "最大化")
+
     def test_both_workspace_columns_are_scrollable(self) -> None:
         page = self.window.scan_control_page
         left = page.findChild(QScrollArea, "controlSidebarScroll")
