@@ -19,10 +19,10 @@ class ApplicationHeader(QFrame):
         self._is_maximized = False
         self._pending_maximized_state: bool | None = None
         self.setObjectName("applicationHeader")
-        self.setFixedHeight(68)
+        self.setFixedHeight(54)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(20, 8, 8, 8)
+        layout.setContentsMargins(20, 4, 8, 4)
         layout.setSpacing(12)
 
         brand = QVBoxLayout()
@@ -36,10 +36,6 @@ class ApplicationHeader(QFrame):
         brand.addWidget(title)
         brand.addWidget(subtitle)
 
-        safety_badge = QLabel("设备操作需显式连接", self)
-        safety_badge.setObjectName("safetyBadge")
-        safety_badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-
         self.minimize_button = self._create_window_button("—", "最小化", "minimizeWindowButton")
         self.maximize_button = self._create_window_button("□", "最大化", "maximizeWindowButton")
         self.close_button = self._create_window_button("×", "关闭", "closeWindowButton")
@@ -49,7 +45,6 @@ class ApplicationHeader(QFrame):
 
         layout.addLayout(brand)
         layout.addStretch(1)
-        layout.addWidget(safety_badge)
         layout.addSpacing(4)
         layout.addWidget(self.minimize_button)
         layout.addWidget(self.maximize_button)

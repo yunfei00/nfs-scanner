@@ -69,19 +69,6 @@ QLabel#applicationSubtitle {
     font-size: 12px;
 }
 
-QLabel#safetyBadge {
-    border-radius: 12px;
-    padding: 5px 11px;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-QLabel#safetyBadge {
-    color: #f0c77c;
-    background-color: #352914;
-    border: 1px solid #685126;
-}
-
 QGroupBox {
     color: #e8eef5;
     background-color: #131e2b;

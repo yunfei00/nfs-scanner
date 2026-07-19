@@ -65,7 +65,8 @@ class UnifiedUiTestCase(unittest.TestCase):
         self.assertTrue(self.window.windowFlags() & Qt.WindowType.FramelessWindowHint)
         self.assertIsInstance(self.window.size_grip, QSizeGrip)
         self.assertIsNone(self.window.header.findChild(QLabel, "baselineBadge"))
-        self.assertIsNotNone(self.window.header.findChild(QLabel, "safetyBadge"))
+        self.assertIsNone(self.window.header.findChild(QLabel, "safetyBadge"))
+        self.assertEqual(self.window.header.height(), 54)
         for object_name in ("minimizeWindowButton", "maximizeWindowButton", "closeWindowButton"):
             self.assertIsNotNone(self.window.header.findChild(QToolButton, object_name))
 
