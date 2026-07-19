@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -92,69 +90,6 @@ class BackgroundManagerTestCase(unittest.TestCase):
             self.assertTrue(ok, error)
             self.assertTrue(restored.has_background())
             self.assertAlmostEqual(restored.get_background_info().opacity, 0.7)
-
-
-def _should_skip_gui_test() -> bool:
-    if os.getenv("NFS_SCANNER_SKIP_GUI_TESTS", "").strip() == "1":
-        return True
-    if sys.platform.startswith("linux") and not os.environ.get("DISPLAY"):
-        return True
-    return False
-
-
-@unittest.skipIf(_should_skip_gui_test(), "GUI test skipped in headless environment")
-class RealtimeBackgroundUiTestCase(unittest.TestCase):
-    def test_realtime_view_applies_and_clears_background(self) -> None:
-        from PySide6.QtWidgets import QApplication
-
-        from nfs_scanner.core.background.models import BackgroundImage
-        from nfs_scanner.ui.commercial.views.realtime_view import RealtimeView
-
-        app = QApplication.instance() or QApplication([])
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "bg.jpg"
-            cv2.imwrite(str(path), np.full((120, 160, 3), 64, dtype=np.uint8))
-            info = BackgroundImage(
-                image_path=str(path),
-                image_width=160,
-                image_height=120,
-                opacity=1.0,
-            )
-
-            view = RealtimeView()
-            try:
-                self.assertTrue(view.apply_scan_background(info))
-                self.assertTrue(view.has_custom_background())
-                view.clear_scan_background()
-                self.assertFalse(view.has_custom_background())
-            finally:
-                view.close()
-                app.processEvents()
-
-
-@unittest.skipIf(_should_skip_gui_test(), "GUI test skipped in headless environment")
-class VisionBackgroundSignalTestCase(unittest.TestCase):
-    def test_set_background_emits_requested_path(self) -> None:
-        from PySide6.QtWidgets import QApplication
-
-        from nfs_scanner.ui.commercial.views.vision_view import VisionView
-
-        app = QApplication.instance() or QApplication([])
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "camera.jpg"
-            cv2.imwrite(str(path), np.zeros((24, 32, 3), dtype=np.uint8))
-
-            view = VisionView()
-            received: list[str] = []
-            view.scan_background_requested.connect(received.append)
-            try:
-                view._last_snapshot_path = path
-                view._control_panel.set_last_snapshot(path.as_posix())
-                view._on_set_scan_background_clicked()
-                self.assertEqual(received, [path.as_posix()])
-            finally:
-                view.close()
-                app.processEvents()
 
 
 if __name__ == "__main__":

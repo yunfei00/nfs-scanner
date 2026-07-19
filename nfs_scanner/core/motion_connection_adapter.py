@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from .integration_safety import RealDeviceControlBlockedError, require_real_device_control
+from .integration_safety import require_real_device_control
 
 MotionConnectionState = Literal["disconnected", "connecting", "connected", "error"]
 
@@ -110,7 +110,7 @@ class MotionConnectionAdapter:
         self._port = safe_port
         self._baudrate = baudrate
         self._status = "connected"
-        self._append_log(f"Serial port opened (read-only connection test, no commands sent).")
+        self._append_log("Serial port opened (read-only connection test, no commands sent).")
         return self.snapshot()
 
     def close_connection(self) -> MotionConnectionSnapshot:

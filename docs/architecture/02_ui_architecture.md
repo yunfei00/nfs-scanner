@@ -1,153 +1,25 @@
-# 02 UI Architecture
+# 02 UI 架构
 
-## 1. Goal
+## 唯一窗口
 
-The commercial UI must look like a professional instrument application while remaining maintainable and responsive.
+`MainWindow` 负责窗口尺寸、产品标题区和 `ScanControlPage` 装配。它不包含设备操作实现。
 
-It must support both laptop and desktop usage.
+## 主页面
 
-## 2. Main UI Components
+`ScanControlPage` 是唯一主工作区和兼容 API。已有槽函数和构造参数必须保持稳定。
 
-```text
-MainShell
-  TopToolbar
-  LeftArea
-    WorkflowPanel
-    DeviceStatusPanel
-  WorkspaceTabs
-    RealtimeView
-    DataView
-    ThreeDView
-    DataTableView
-    ReportView
-    DeviceCenterView
-  PropertyPanel
-    ScanParametersTab
-    DisplaySettingsTab
-    InstrumentSettingsTab
-  BottomDock
-    SpectrumPanel
-    StatisticsPanel
-    LogPanel
-  StatusBar
-```
+页面由左右 QScrollArea 和水平 QSplitter 构成：
 
-## 3. Component Responsibilities
+- 左侧：串口、运动、扫描参数、测试信息、执行动作；
+- 右侧：扫描区域、仪表参数、结果路径和日志；
+- 底部：位置、时间、剩余时间和系统状态。
 
-### MainShell
+## 代码边界
 
-Owns the top-level layout.
+- `scan_control_layout.py` 只负责控件创建、排列和信号连接。
+- `scan_workers.py` 包含耗时扫描和仪表搜索 Worker。
+- `instrument_operations.py` 包含仪表查询/设置/采集操作。
+- `scan_control_support.py` 包含串口发现、配置文件和扫描输出辅助。
+- `engineering_dark.qss` 是唯一视觉事实源。
 
-Responsibilities:
-
-- create splitters and dock regions
-- load theme
-- restore layout state
-- route high-level navigation
-
-Not responsible for:
-
-- scan execution
-- device communication
-- heatmap calculation
-
-### WorkspaceTabs
-
-Hosts the main work modes.
-
-Required modes:
-
-- Real-time View
-- Data View
-- 3D View
-- Data Table
-
-Future modes:
-
-- Report Center
-- Device Center
-
-### RealtimeView
-
-Owns the live scanning visual workspace.
-
-Contains:
-
-- graphics canvas
-- local view toolbar
-- optional mini-map or colorbar
-
-### PropertyPanel
-
-Shows editable parameters.
-
-Rules:
-
-- must be scrollable
-- must use cards or collapsible sections
-- must not contain raw logs
-- must avoid taking excessive width from the canvas
-
-### BottomDock
-
-Shows data that supports the current task:
-
-- spectrum
-- scan statistics
-- logs
-
-On small screens it switches to tab mode.
-
-## 4. Communication Pattern
-
-UI should use signals or service method calls:
-
-```text
-Button click
-  -> View emits intent
-  -> Service handles command
-  -> Service emits state update
-  -> View updates display
-```
-
-Avoid this:
-
-```text
-Button click
-  -> Widget directly talks to serial port
-```
-
-## 5. State Ownership
-
-| State | Owner |
-|---|---|
-| current project | ProjectService |
-| current scan job | ScanRuntimeService / ScanManager |
-| current device connection status | DeviceService |
-| current visualization options | ViewModel or UI settings object |
-| theme | ThemeManager |
-| persistent layout | QSettings / ConfigManager |
-
-## 6. Responsiveness Rules
-
-At width below 1500px:
-
-- left workflow collapses
-- toolbar hides secondary text
-- bottom dock uses tabs
-
-At height below 800px:
-
-- bottom dock is minimized
-- logs are hidden behind tab
-- central canvas keeps priority
-
-## 7. UI Testing Targets
-
-For each UI task, verify:
-
-- app starts
-- no layout overlap at 1366x768
-- no unreadable text on dark theme
-- no critical button hidden without access
-- central canvas remains visible
+禁止在业务处理方法中拼接大段 QSS，禁止新增第二套窗口组件体系。

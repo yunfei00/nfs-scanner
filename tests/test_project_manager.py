@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from nfs_scanner.core.project.project_state import ProjectState, ProjectStateManager
+from nfs_scanner.core.project.project_state import ProjectStateManager
 
 
 class ProjectStateManagerTestCase(unittest.TestCase):

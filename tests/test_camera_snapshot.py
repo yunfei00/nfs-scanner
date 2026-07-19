@@ -9,8 +9,6 @@ from pathlib import Path
 
 import numpy as np
 
-import nfs_scanner.ui.commercial.views.vision_view  # noqa: F401
-
 from nfs_scanner.devices.camera.snapshot import build_snapshot_path, save_camera_snapshot
 
 

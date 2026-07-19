@@ -6,7 +6,6 @@ They explain why a decision was made, what alternatives were considered, and wha
 
 ## ADR List
 
-- `ADR-0001-commercial-ui-shell.md`
 - `ADR-0002-use-qgraphicsview-for-overlays.md`
 - `ADR-0003-render-heatmap-as-single-image.md`
 - `ADR-0004-device-adapter-architecture.md`

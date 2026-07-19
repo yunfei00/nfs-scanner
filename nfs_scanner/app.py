@@ -10,8 +10,8 @@ from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
 from .infra.logging_config import get_logger, setup_logging
-from .ui.commercial import create_commercial_shell, is_commercial_ui_enabled
 from .ui.main_window import MainWindow
+from .ui.theme import apply_theme
 from .version import APP_NAME, APP_VERSION
 
 
@@ -22,6 +22,7 @@ def create_application(argv: Sequence[str] | None = None) -> QApplication:
     app = QApplication(arguments)
     app.setApplicationName(f"{APP_NAME} v{APP_VERSION}")
     app.setOrganizationName("nfs-scanner")
+    apply_theme(app)
     return app
 
 
@@ -33,13 +34,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     logger.info("应用启动，日志文件：%s", log_file)
 
     app = create_application(argv)
-    if is_commercial_ui_enabled():
-        logger.info("启动商业版 UI（NFS_SCANNER_UI=commercial）")
-        window = create_commercial_shell()
-        window.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
-    else:
-        logger.info("启动旧版 UI（NFS_SCANNER_UI=legacy）")
-        window = MainWindow()
+    logger.info("启动统一主界面")
+    window = MainWindow()
     window.show()
 
     auto_close_ms = os.getenv("NFS_SCANNER_AUTOCLOSE_MS")

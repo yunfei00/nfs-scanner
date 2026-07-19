@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nfs-scanner"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Near Field Scan System"
 requires-python = ">=3.11"
 dependencies = [
@@ -17,6 +17,9 @@ dependencies = [
     "opencv-python>=4.10,<5.0",
 ]
 
+[project.scripts]
+nfs-scanner = "nfs_scanner.app:main"
+
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.8"]
 
@@ -28,5 +31,13 @@ target-version = "py311"
 line-length = 120
 extend-exclude = [".venv", "output", "outputs"]
 
+[tool.ruff.lint.per-file-ignores]
+# Standalone repository scripts adjust sys.path before importing the package.
+"scripts/*.py" = ["E402"]
+"tools/*.py" = ["E402"]
+
 [tool.setuptools.packages.find]
 include = ["nfs_scanner*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "nfs_scanner.version.APP_VERSION"}

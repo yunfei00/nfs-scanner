@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 from uuid import uuid4
 
 from .mock_scan_runtime import MockScanRuntimeService
 from .runtime_service import RuntimeSnapshot
-from .scan_config import ScanPathConfig, ScanRegion
 from .scan_config_model import ScanConfigModel
 
 ScanRuntimeStateName = Literal[
@@ -92,7 +91,7 @@ class SimulationScanProvider:
             self._state.state = snap.status  # type: ignore[assignment]
 
     def start(self, *, task_name: str | None = None) -> ScanTaskModel:
-        snap = self._runtime.start()
+        self._runtime.start()
         task = ScanTaskModel(
             task_id=f"task-{uuid4().hex[:8]}",
             name=task_name or f"Scan {datetime.now().strftime('%H:%M:%S')}",

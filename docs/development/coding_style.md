@@ -44,7 +44,8 @@ Avoid logging every UI repaint or high-frequency visual update.
 
 - Do not break existing CLI or app startup.
 - Do not break existing CSV output formats.
-- Keep old UI available during commercial UI migration.
+- Keep the `ScanControlPage` constructor and proven device/scan handlers compatible.
+- Do not add a second UI implementation or startup mode.
 
 ## 7. AI Agent Rule
 

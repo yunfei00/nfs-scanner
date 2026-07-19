@@ -1,76 +1,31 @@
-# Project Coding Standard
+# 项目编码规范
 
-This document defines project-level coding standards for NFS Scanner commercial UI and future service integration.
+## 唯一 UI
 
-## 1. File Size Guidelines
+- 主窗口只能是 `nfs_scanner.ui.main_window.MainWindow`。
+- 主控制页只能是 `ScanControlPage`。
+- 不得增加 UI 模式环境变量、演示壳或平行组件库。
 
-- Widget files should preferably stay under 500 lines.
-- Service files should preferably stay under 400 lines.
-- A single function should preferably stay under 80 lines.
-- If a file or function grows beyond these limits, split it before adding more behavior.
+## 职责
 
-These limits are guidelines, not hard compiler rules. They exist to keep AI and human review practical.
+- 布局修改进入 `scan_control_layout.py`。
+- 页面运行状态和扫描控制进入 `scan_control_page.py`。
+- 仪表行为进入 `instrument_operations.py`。
+- 串口、配置、存储和路径辅助进入 `scan_control_support.py`。
+- 后台任务进入 `scan_workers.py`。
+- 协议和设备实现进入 `devices/`。
+- 业务状态和纯计算进入 `core/`。
 
-## 2. Layering Rules
+## 兼容性
 
-- UI must not access devices directly.
-- Service code must not create `QWidget` instances.
-- Core code must not depend on UI.
-- Device adapters must not handle UI state.
-- Storage code must not handle interface state.
+- 保留 `ScanControlPage` 已有构造参数与公开操作方法。
+- 不改变真实设备命令、软限位、数据格式或默认安全状态。
+- 结构迁移后必须更新测试的内部 patch 路径，并保留行为测试。
 
-Allowed direction:
+## 质量
 
-```text
-UI -> Service -> Core / Device / Storage
-```
-
-Forbidden direction:
-
-```text
-Device -> UI
-Storage -> UI
-Core -> UI
-```
-
-## 3. UI Rules
-
-- New commercial UI code goes only under `nfs_scanner/ui/commercial/`.
-- Reusable commercial controls go under `widgets/`.
-- Graphics canvas code goes under `graphics/`.
-- QSS files go under `resources/styles/`.
-- Do not scatter color constants in Python files.
-- Use object names and dynamic properties for QSS/theme styling.
-- Right-side panels should remain scrollable.
-- The central workspace keeps the highest layout priority.
-
-## 4. Naming Rules
-
-Preferred class names:
-
-- `CommercialMainShell`
-- `RealtimeCanvas`
-- `LayerManager`
-- `PhotoLayer`
-- `HeatmapLayer`
-- `ScanPathLayer`
-- `MarkerLayer`
-- `NFSCard`
-- `NFSStatusBadge`
-- `NFSParameterGroup`
-
-Names should describe responsibility rather than implementation detail.
-
-## 5. Commit Rules
-
-- One task, one commit.
-- Do not create large mixed commits.
-- Do not mix formatting-only changes with functional changes.
-- Use existing commit prefixes from `.ai/commit_rules.md`.
-
-## 6. AI Rules
-
-- If a file becomes too large, split it.
-- If responsibilities are mixed, clarify the boundary before continuing.
-- For small implementation uncertainties, follow `.ai/assumptions.md` and continue without asking the user.
-- Record non-major assumptions in `.ai/decision_log.md` when they may matter during review.
+- Python 3.11 类型注解。
+- 关键类和方法使用 docstring。
+- 单文件优先低于 800 行。
+- 不在 UI 线程执行长耗时扫描或设备搜索。
+- 新增依赖必须有明确必要性。

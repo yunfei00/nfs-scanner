@@ -1,35 +1,24 @@
-# 真实扫描工作流
+# 真实扫描流程
 
-## 1. 连接设备
-
-1. 复制 `config/devices.example.yaml` 为 `config/devices.yaml`，启用 motion/instrument。
-2. 设置 `NFS_SCANNER_REAL_DEVICES=1`。
-3. 启动商业版 UI，设备中心切换 **Real Hardware** 并确认。
-4. 点击连接（顶部或设备中心）→ 确认对话框。
-
-## 2. 配置扫描
-
-- 右侧参数页设置 X/Y 区域、步长、Z 高度。
-- 仪表频率/RBW 可在设备中心 Apply Settings 或 config 中预设。
-
-## 3. 启动扫描
-
-- 顶部「开始」→ 最终确认（区域、点数、设备 ID）→ Real Scan Worker 后台执行。
-
-## 4. 数据保存
-
-输出目录：
+统一界面使用原有 `ScanControlPage` 和 `ScanWorker` 执行真实扫描。
 
 ```text
-outputs/scans/<project_id>/<timestamp>/
-  scan_points.csv
-  traces.npz
-  metadata.json
-  run.log
+串口选择与打开
+  → 位置查询/复位验证
+  → 设置起点、终点和步距
+  → 搜索并配置频谱仪（或明确选择模拟频谱仪）
+  → 开始扫描
+  → ScanWorker 等待运动完成并采集点数据
+  → 保存扫描计划、执行快照和仪表结果
+  → 完成/停止状态回到 UI
 ```
 
-## 5. 停止与恢复
+扫描前必须检查：
 
-- 用户停止：已采集点写入 CSV/NPZ，日志 `[SCAN] Real scan stopped by user`。
-- 异常（串口断开、超时、超限）：中断并保存已有数据。
-- 恢复：修复设备后重新连接，可缩小区域做 smoke test（`scripts/real_scan_smoke_test.py`）。
+- 运动范围符合 `X[0,200]`、`Y[-300,0]`、`Z[0,10]`；
+- 急停可用，路径周围无人和障碍物；
+- 串口与波特率正确；
+- 仪表资源与参数正确；
+- 输出目录可写。
+
+自动化验证使用 fake 设备，不访问真实硬件。

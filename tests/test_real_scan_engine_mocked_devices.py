@@ -31,7 +31,7 @@ class TestRealScanEngineMockedDevices(unittest.TestCase):
         self.path_config = ScanPathConfig(scan_mode="snake", dwell_ms=0)
 
     def test_small_scan_completes(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory():
             engine = RealScanEngine(motion=self.motion, instrument=self.instrument)
             config = RealScanConfig(
                 region=self.region,

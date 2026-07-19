@@ -1,29 +1,23 @@
-# Architecture Documentation
+# 架构文档
 
-This directory defines the long-term architecture for NFS Scanner.
+当前架构以“一套界面、稳定接口、明确职责”为原则。
 
-The goal is to keep human developers and AI coding agents aligned while the project evolves from a PySide6 engineering tool into a commercial near-field scanning product.
+- [00 架构总览](00_overview.md)
+- [01 目录与职责](01_directory_structure.md)
+- [02 UI 架构](02_ui_architecture.md)
+- [03 设备架构](03_device_architecture.md)
+- [04 数据架构](04_data_architecture.md)
+- [05 插件架构](05_plugin_architecture.md)
+- [06 信号流](06_signal_flow.md)
+- [07 状态机](07_state_machine.md)
+- [08 线程模型](08_threading_model.md)
+- [09 配置](09_configuration.md)
+- [10 应用装配](10_service_architecture.md)
 
-## Documents
+核心约束：
 
-- `00_overview.md` - system architecture overview.
-- `01_directory_structure.md` - recommended package and directory responsibilities.
-- `02_ui_architecture.md` - commercial UI architecture and widget boundaries.
-- `03_device_architecture.md` - motion, spectrum and camera adapter architecture.
-- `04_data_architecture.md` - project, scan task and data storage architecture.
-- `05_plugin_architecture.md` - plugin model for instruments, cameras and future extensions.
-- `06_signal_flow.md` - event and signal flow across UI, services and devices.
-- `07_state_machine.md` - scan and device state machines.
-- `08_threading_model.md` - threading, workers and UI responsiveness.
-- `09_configuration.md` - configuration, profiles and persistence.
-- `10_service_architecture.md` - planned service layer responsibilities and boundaries.
-
-## Architecture Principles
-
-1. UI never talks directly to hardware.
-2. Devices are accessed through adapter interfaces.
-3. Scan runtime owns scan orchestration and state.
-4. Visualization owns rendering, not data acquisition.
-5. Data storage is append-friendly and recoverable.
-6. The commercial UI can evolve without breaking existing scan logic.
-7. All large changes must be traceable to a product spec or ADR.
+1. 只有 `MainWindow` + `ScanControlPage` 一套正式 UI。
+2. `ApplicationContext` 创建并共享原有管理器。
+3. 设备协议和扫描规则不由 UI 重新实现。
+4. 耗时的扫描与仪表搜索必须在 Worker 中运行。
+5. 数据格式和真实设备安全门禁必须保持兼容。

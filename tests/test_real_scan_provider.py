@@ -10,7 +10,7 @@ from pathlib import Path
 from nfs_scanner.config.devices_loader import DevicesConfig, InstrumentConfig, MotionConfig
 from nfs_scanner.core.integration_safety import REAL_DEVICE_ENV_VAR
 from nfs_scanner.core.real_scan_provider import RealScanProvider
-from nfs_scanner.core.scan_config import ScanPathConfig, ScanRegion
+from nfs_scanner.core.scan_config import ScanRegion
 from nfs_scanner.core.scan_config_model import PathPlanConfig, ScanConfigModel
 from nfs_scanner.devices.manager import HardwareDeviceManager
 from tests.fakes.fake_motion_controller import FakeMotionController

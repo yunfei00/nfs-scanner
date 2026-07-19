@@ -37,8 +37,9 @@ Use for:
 Use for:
 
 - main window construction
-- commercial shell construction
-- key widgets import and instantiate
+- unified scan-control page construction
+- scrollable workspace and user-facing table headers
+- stable handler imports after structural refactoring
 
 ## 3. Mock Devices
 
@@ -60,6 +61,8 @@ For UI tasks, include manual notes:
 - app start command
 - screenshot if possible
 - known limitations
+
+The headless structural check is `python tools/unified_ui_check.py`.
 
 ## 5. Minimum Check for AI Tasks
 

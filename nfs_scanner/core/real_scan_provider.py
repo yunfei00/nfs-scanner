@@ -267,9 +267,6 @@ class RealScanProvider:
         return result
 
     def provider_result(self) -> RealScanProviderResult | None:
-        task = self._state.current_task or (
-            ScanTaskModel("", "", "", "stopped") if self._state.last_result else None
-        )
         if self._state.last_result is None and not self._buffer.points:
             return None
         last = self._state.last_result

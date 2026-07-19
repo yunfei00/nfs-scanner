@@ -13,8 +13,6 @@ from nfs_scanner.config.devices_loader import (
 from nfs_scanner.config import devices_loader
 from nfs_scanner.devices.motion.limits import PLATFORM_SOFT_LIMITS
 from nfs_scanner.devices.motion.serial_motion import SerialMotionConfig, SerialMotionController, SoftLimits
-from nfs_scanner.ui.commercial.entry import is_commercial_ui_enabled
-from tools.commercial_qa.runner import find_unexpected_log_exceptions
 
 
 class TestPhaseOneSafety(unittest.TestCase):
@@ -51,25 +49,6 @@ class TestPhaseOneSafety(unittest.TestCase):
         for target in ((-0.1, -300, 0), (200.1, 0, 10), (0, -300.1, 0), (0, 0.1, 0), (0, -300, -0.1), (0, -300, 10.1)):
             self.assertFalse(controller.validate_target_position(*target)[0])
         self.assertEqual(PLATFORM_SOFT_LIMITS["x_max"], 200.0)
-
-    def test_commercial_ui_is_default_and_legacy_is_explicit(self) -> None:
-        import os
-
-        old = os.environ.pop("NFS_SCANNER_UI", None)
-        try:
-            self.assertTrue(is_commercial_ui_enabled())
-            os.environ["NFS_SCANNER_UI"] = "legacy"
-            self.assertFalse(is_commercial_ui_enabled())
-        finally:
-            if old is None:
-                os.environ.pop("NFS_SCANNER_UI", None)
-            else:
-                os.environ["NFS_SCANNER_UI"] = old
-
-    def test_qa_log_exceptions_are_failures(self) -> None:
-        self.assertEqual(find_unexpected_log_exceptions("clean output"), [])
-        self.assertIn("TypeError:", find_unexpected_log_exceptions("TypeError: bad call"))
-
 
 if __name__ == "__main__":
     unittest.main()

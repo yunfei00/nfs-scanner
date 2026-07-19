@@ -1,68 +1,14 @@
-# Service Architecture
+# 10 应用装配
 
-This document defines the future service layer for the commercial NFS Scanner architecture.
+`ApplicationContext` 是唯一组合根：
 
-The service layer separates UI widgets from core workflow, device adapters, storage, and analysis logic. It is a planning document for future implementation and does not require current code changes.
+```python
+@dataclass(slots=True)
+class ApplicationContext:
+    device_manager: DeviceManager
+    scan_manager: ScanManager
+```
 
-## Planned Services
+`MainWindow` 支持注入 context，生产启动使用 `create_application_context()`，测试可注入已经配置好的管理器。
 
-- `ProjectService`
-- `DeviceService`
-- `ScanRuntimeService`
-- `AnalysisService`
-- `ReportService`
-- `ThemeService` / `ThemeManager`
-- `ConfigService`
-
-## Responsibilities
-
-### ProjectService
-
-Manages project creation, opening, saving, and historical scan tasks.
-
-It owns project-level workflow state but does not create UI widgets.
-
-### DeviceService
-
-Manages device status, connection, disconnection, and device summaries.
-
-It does not directly control UI. It exposes device status and operations to UI through service methods and signals/events.
-
-### ScanRuntimeService
-
-Manages scan task state, start, pause, stop, and resume.
-
-It owns scan runtime orchestration and should keep long-running operations off the UI thread.
-
-### AnalysisService
-
-Handles offline data loading, Trace/Frequency switching, and heatmap data preparation.
-
-It prepares data for visualization but does not render UI widgets.
-
-### ReportService
-
-Collects report data and exports reports.
-
-It should depend on stable data/export APIs rather than scraping UI state.
-
-### ThemeManager
-
-Loads QSS and manages theme switching.
-
-It provides one central place for theme application and avoids hard-coded styles in UI code.
-
-### ConfigService
-
-Saves and restores configuration, user preferences, layout state, and profiles.
-
-It should keep configuration persistence independent from individual widgets.
-
-## Rules
-
-- UI calls business behavior through services.
-- Services call core, device, and storage layers.
-- Device code must not call UI.
-- All long-running operations must consider worker/thread execution.
-- Service APIs should be small and task-oriented.
-- Services should be testable without launching the full UI.
+当前不额外包装原有管理器接口。只有当多个 UI 组件确实需要同一工作流且已有测试保护时，才增加应用服务；不得为抽象而抽象。

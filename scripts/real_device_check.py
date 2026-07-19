@@ -11,7 +11,6 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from nfs_scanner.config.devices_loader import (
-    DEVICES_CONFIG_YAML,
     load_devices_config,
     resolve_devices_config_path,
     validate_real_hardware_config,

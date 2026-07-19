@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import tempfile
 import unittest
-from pathlib import Path
 
 from nfs_scanner.core.mock_analysis_service import MockAnalysisService
 from nfs_scanner.core.mock_project_service import MockProjectService

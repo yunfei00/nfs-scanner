@@ -8,7 +8,6 @@ from nfs_scanner.config.devices_loader import DevicesConfig
 from nfs_scanner.core.device_hub import DeviceHub
 from nfs_scanner.core.device_manager import DeviceManager
 from nfs_scanner.devices.manager import HardwareDeviceManager
-from nfs_scanner.ui.commercial.services import create_commercial_services
 
 
 class TestDeviceHub(unittest.TestCase):
@@ -30,11 +29,6 @@ class TestDeviceHub(unittest.TestCase):
     def test_camera_listing_does_not_open_a_device(self) -> None:
         self.hub.list_cameras()
         self.assertEqual(self.hub.camera.state.value, "disconnected")
-
-    def test_commercial_bundle_uses_hub_hardware_manager(self) -> None:
-        services = create_commercial_services()
-        self.assertIs(services.device_hub.hardware, services.hardware_manager)
-
 
 if __name__ == "__main__":
     unittest.main()

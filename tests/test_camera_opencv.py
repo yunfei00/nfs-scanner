@@ -10,10 +10,6 @@ from pathlib import Path
 
 import numpy as np
 
-# Import commercial UI first to avoid a cold-start circular import through
-# ``nfs_scanner.devices`` during test module loading.
-import nfs_scanner.ui.commercial.views.vision_view  # noqa: F401
-
 from unittest.mock import patch
 
 from nfs_scanner.devices.camera.constants import (
@@ -33,14 +29,6 @@ from nfs_scanner.devices.camera.manager import CameraManager
 from nfs_scanner.devices.camera.mock_camera import MockCameraDevice
 from nfs_scanner.devices.camera.models import CameraInfo, CameraProfile
 from nfs_scanner.devices.camera.qt_image import bgr_frame_to_qimage
-
-
-def _should_skip_gui_test() -> bool:
-    if os.getenv("NFS_SCANNER_SKIP_GUI_TESTS", "").strip() == "1":
-        return True
-    if sys.platform.startswith("linux") and not os.environ.get("DISPLAY"):
-        return True
-    return False
 
 
 class CameraConstantsTestCase(unittest.TestCase):
@@ -204,27 +192,6 @@ class CameraManagerTestCase(unittest.TestCase):
         opened = manager.open(device, profile)
         self.assertFalse(opened)
         self.assertTrue(manager.last_error)
-
-
-@unittest.skipIf(_should_skip_gui_test(), "GUI test skipped in headless environment")
-class VisionViewSmokeTestCase(unittest.TestCase):
-    def test_vision_view_constructs(self) -> None:
-        from PySide6.QtWidgets import QApplication
-
-        from nfs_scanner.ui.commercial.views.vision_view import VisionView
-
-        app = QApplication.instance() or QApplication([])
-        view = VisionView()
-        try:
-            view.show()
-            app.processEvents()
-            self.assertEqual(view.objectName(), "visionView")
-            view._refresh_devices()
-            app.processEvents()
-            self.assertGreaterEqual(view._control_panel.device_combo.count(), 1)
-        finally:
-            view.close()
-            app.processEvents()
 
 
 @unittest.skipUnless(os.getenv("NFS_SCANNER_CAMERA_TEST") == "1", "Set NFS_SCANNER_CAMERA_TEST=1 for hardware test")

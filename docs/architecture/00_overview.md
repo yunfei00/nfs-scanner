@@ -1,166 +1,51 @@
-# 00 Architecture Overview
+# 00 架构总览
 
-## 1. Purpose
+## 目标
 
-This document defines the target architecture for NFS Scanner.
-
-The architecture must support three stages:
-
-1. Current PySide6 engineering version.
-2. Commercial PySide6 product version.
-3. Future high-performance Qt/C++ version.
-
-The architecture should keep product decisions, UI layout, scan logic, device adapters, data storage and report generation separated.
-
-## 2. Target Layers
+NFS Scanner 使用单一 PySide6 工程界面。界面重构不能改变已经调试的设备和扫描接口。
 
 ```text
-UI Layer
-  Commercial Shell
-  Work Modes
-  Visualization Widgets
-  Dialogs
-
-Application Layer
-  ProjectService
-  ScanRuntimeService
-  AnalysisService
-  ReportService
-  DeviceService
-
-Core Layer
-  ScanManager
-  PathPlanner
-  AlignmentManager
-  HeatmapManager
-  FrequencyData
-  Models
-
-Device Layer
-  Motion Adapter
-  Spectrum Adapter
-  Camera Adapter
-  Plugin Loader
-
-Infrastructure Layer
-  Storage
-  Config
-  Logging
-  License
-  Theme
+Entrypoints
+  python -m nfs_scanner / run.py / nfs-scanner
+              │
+              ▼
+ApplicationContext
+  DeviceManager + ScanManager
+              │
+              ▼
+MainWindow（唯一窗口）
+              │
+              ▼
+ScanControlPage
+  ├─ Layout
+  ├─ Scan / Instrument Workers
+  ├─ Instrument Operations
+  └─ Serial / Config / Storage Support
+              │
+       ┌──────┴──────┐
+       ▼             ▼
+     Core          Devices
+       └──────┬──────┘
+              ▼
+      Infra / Storage
 ```
 
-## 3. Layer Rules
+## 依赖规则
 
-### UI Layer
+- `application` 可以依赖 core，但不能依赖 UI。
+- `MainWindow` 只组装标题区和主页面。
+- `ScanControlPage` 保存稳定的操作方法与运行状态。
+- 布局模块不得实现设备协议。
+- Worker 不创建或修改 QWidget，只通过 Signal 汇报结果。
+- 真实设备操作必须继续经过现有安全校验、软限位和显式连接。
 
-Allowed:
-
-- show widgets
-- collect user input
-- emit commands to services
-- render visual data passed from services or managers
-
-Not allowed:
-
-- direct serial communication
-- direct VISA calls
-- direct hardware SDK calls
-- writing raw scan data formats without storage service
-
-### Application Layer
-
-Allowed:
-
-- coordinate UI commands and core managers
-- manage workflows
-- convert UI requests into scan jobs
-- expose clean signals for UI updates
-
-Not allowed:
-
-- painting widgets
-- storing UI-only state
-- vendor-specific device commands
-
-### Core Layer
-
-Allowed:
-
-- path planning
-- scan state models
-- alignment transforms
-- heatmap matrix generation
-- frequency data parsing
-
-Not allowed:
-
-- creating Qt widgets
-- talking directly to hardware
-- reading user interface controls
-
-### Device Layer
-
-Allowed:
-
-- connect to hardware
-- expose adapter APIs
-- hide vendor-specific protocols
-- report device status and errors
-
-Not allowed:
-
-- controlling UI layout
-- deciding scan workflow
-- writing report files
-
-### Infrastructure Layer
-
-Allowed:
-
-- file storage
-- configuration persistence
-- logging
-- local license checks
-- theme loading
-
-Not allowed:
-
-- scan orchestration
-- business decisions
-- UI workflow decisions
-
-## 4. Main Data Flow
+## 数据流
 
 ```text
-User Action
-  -> UI Command
-  -> Application Service
-  -> Core Manager
-  -> Device Adapter
-  -> Measurement Result
-  -> Storage
-  -> Analysis/Heatmap
-  -> UI Signal
-  -> Visualization Update
+用户操作 → ScanControlPage handler → ScanManager / DeviceManager
+        → adapter / worker → 数据保存与状态快照 → UI 更新
 ```
 
-## 5. Runtime Goals
+## 唯一基线规则
 
-- UI must remain responsive during scans.
-- Device failures must be converted to clear user-visible errors.
-- Partial scan data must remain usable after stop or failure.
-- Real-time view and offline data view should reuse heatmap and frequency data logic.
-
-## 6. Migration Strategy
-
-Do not replace the current UI in one step.
-
-Recommended migration:
-
-1. Add commercial UI shell beside existing UI.
-2. Add mock visualization and placeholder panels.
-3. Connect existing scan managers to the new UI.
-4. Move advanced device setup into Device Center.
-5. Move offline analysis into Data View.
-6. Retire old UI only after parity is reached.
+不得重新引入 UI 模式开关、演示壳或平行主窗口。需要新工作区时，应作为当前 `MainWindow` 下的明确页面或组件，并复用同一个 `ApplicationContext`。

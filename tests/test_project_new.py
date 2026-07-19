@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import json
-import os
 import tempfile
 import unittest
 from pathlib import Path
 
 from nfs_scanner.core.project import NewProjectRequest, ProjectService
 from nfs_scanner.core.project.templates import build_scan_config_for_template
-from nfs_scanner.ui.commercial.actions import CommercialActionRegistry
 
 
 class ProjectNameUtilsTestCase(unittest.TestCase):
@@ -87,53 +85,6 @@ class ProjectCreateTestCase(unittest.TestCase):
         cfg = build_scan_config_for_template("空白项目")
         self.assertGreater(cfg["region"]["x_step"], 0)
         self.assertGreater(cfg["region"]["y_step"], 0)
-
-
-@unittest.skipIf(os.getenv("NFS_SCANNER_SKIP_GUI_TESTS") == "1", "GUI tests skipped")
-class ProjectNewUiSyncTestCase(unittest.TestCase):
-    def test_project_new_action_has_handler(self) -> None:
-        from PySide6.QtWidgets import QApplication
-        import sys
-
-        from nfs_scanner.core.project import NewProjectRequest
-        from nfs_scanner.ui.commercial.entry import create_commercial_shell
-
-        app = QApplication.instance() or QApplication(sys.argv)
-        shell = create_commercial_shell()
-        try:
-            registry = shell.action_registry
-            self.assertIsNotNone(registry)
-            action = registry.get("project.new")  # type: ignore[union-attr]
-            self.assertIsNotNone(action)
-            assert action is not None
-            self.assertTrue(action.has_handler())
-
-            with tempfile.TemporaryDirectory() as tmp:
-                request = NewProjectRequest(
-                    project_name="QASyncProject",
-                    base_dir=Path(tmp),
-                    template="快速扫描",
-                )
-                shell._on_new_project(request=request)
-                app.processEvents()
-                session = shell._services.project.current_session()
-                self.assertIsNotNone(session)
-                assert session is not None
-                self.assertEqual(session.name, "QASyncProject")
-                self.assertEqual(session.storage_status, "saved")
-                self.assertIn("QASyncProject", shell.status_bar_widget.project_label.text())
-                self.assertIn("已保存", shell.status_bar_widget.storage_label.text())
-                self.assertEqual(shell.workflow_panel.step_state(0), "completed")
-                self.assertEqual(shell.mock_scan.snapshot().status, "configured")
-                self.assertEqual(len(shell.workspace.data_view().analysis_service.list_tasks()), 0)
-        finally:
-            shell.close()
-            app.processEvents()
-
-
-class ActionRegistryProjectNewTestCase(unittest.TestCase):
-    def test_project_new_in_required_actions(self) -> None:
-        self.assertIn("project.new", CommercialActionRegistry.REQUIRED_ACTION_IDS)
 
 
 if __name__ == "__main__":

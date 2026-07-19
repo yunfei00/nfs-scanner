@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from nfs_scanner.core.dry_run_adapters import DryRunCameraAdapter, DryRunMotionAdapter, DryRunSpectrumAdapter
+from nfs_scanner.core.dry_run_adapters import DryRunCameraAdapter, DryRunMotionAdapter
 from nfs_scanner.core.dry_run_bundle import create_dry_run_bundle
 from nfs_scanner.core.dry_run_log import DRY_RUN_BANNER, DryRunCommandLog
 from nfs_scanner.core.integration_safety import is_real_device_control_allowed

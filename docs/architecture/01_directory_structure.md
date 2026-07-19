@@ -1,179 +1,53 @@
-# 01 Directory Structure
-
-## 1. Target Structure
+# 01 目录与职责
 
 ```text
 nfs_scanner/
-  main.py
   app.py
+  main.py
+  version.py
+
+  application/
+    context.py                 # 管理器组合根
 
   ui/
-    commercial/
-      main_shell.py
-      toolbar.py
-      workflow_panel.py
-      device_status_panel.py
-      workspace.py
-      property_panel.py
-      bottom_dock.py
-      status_bar.py
-      views/
-        realtime_view.py
-        data_view.py
-        view_3d.py
-        data_table_view.py
-        report_view.py
-        device_center_view.py
-      widgets/
-        card.py
-        status_badge.py
-        parameter_form.py
-        collapsible_panel.py
-        toolbar_button.py
-      graphics/
-        realtime_canvas.py
-        layers.py
-        marker_items.py
-        colorbar_item.py
-      theme.py
+    main_window.py             # 唯一窗口
+    theme.py                   # 唯一主题加载
+    serial_ports.py
+    widgets/
+      app_header.py
+      scan_control_page.py     # 页面状态和核心交互
+      scan_control_layout.py   # 控件与布局
+      scan_workers.py          # 后台 Worker
+      instrument_operations.py # 仪表动作
+      scan_control_support.py  # 串口/配置/存储辅助
+      instrument_panel.py
+      collapsible_section.py
 
-    legacy/
-      # optional future home for old UI wrappers during migration
+  core/                        # 扫描、状态、项目和业务规则
+  devices/                     # 设备适配及传输实现
+  storage/                     # 数据集持久化
+  infra/                       # 日志等基础设施
+  config/                      # 配置加载
+  analysis/                    # 数据分析
 
-  services/
-    project_service.py
-    scan_runtime_service.py
-    analysis_service.py
-    report_service.py
-    device_service.py
+resources/styles/
+  engineering_dark.qss        # 唯一全局主题
 
-  core/
-    scan_manager.py
-    path_planner.py
-    alignment_manager.py
-    heatmap_manager.py
-    frequency_data.py
-    models.py
-
-  devices/
-    motion/
-    spectrum/
-    camera/
-    plugins/
-
-  storage/
-    project_store.py
-    scan_store.py
-    export_store.py
-
-  infra/
-    config_manager.py
-    logging_config.py
-    license_manager.py
-
-resources/
-  styles/
-  icons/
-  colormaps/
-
-docs/
-  product-spec/
-  architecture/
-  adr/
-  development/
-  api/
-
-.ai/
-  backlog/
-  prompts/
-  reviews/
+tests/
+tools/unified_ui_check.py
 ```
 
-## 2. Directory Responsibilities
+## 放置规则
 
-### `ui/commercial/`
+| 内容 | 位置 |
+|---|---|
+| 窗口骨架 | `ui/main_window.py` |
+| 页面控件和布局 | `ui/widgets/scan_control_layout.py` |
+| 页面交互和状态 | `ui/widgets/scan_control_page.py` |
+| 扫描/仪表后台任务 | `ui/widgets/scan_workers.py` |
+| 仪表操作 | `ui/widgets/instrument_operations.py` |
+| 串口、配置和存储辅助 | `ui/widgets/scan_control_support.py` |
+| 扫描业务规则 | `core/` |
+| 设备协议及厂商差异 | `devices/` |
 
-Commercial product UI. Contains only UI components and view-specific presentation logic.
-
-It may call application services, but must not call serial, VISA or hardware SDK APIs directly.
-
-### `ui/commercial/graphics/`
-
-QGraphicsView/QGraphicsScene based visualization system.
-
-Responsible for:
-
-- photo layer
-- heatmap layer
-- scan path layer
-- marker layer
-- annotation layer
-
-Not responsible for:
-
-- reading CSV
-- talking to devices
-- managing scan state
-
-### `services/`
-
-Application coordination layer.
-
-Responsible for converting user actions into operations on core managers and device services.
-
-### `core/`
-
-Business logic independent of UI.
-
-Responsible for:
-
-- path planning
-- heatmap matrix generation
-- alignment transforms
-- scan models
-- frequency data parsing
-
-### `devices/`
-
-Hardware adapters and plugins.
-
-Responsible for hiding hardware-specific protocols.
-
-### `storage/`
-
-Project and scan persistence.
-
-Responsible for:
-
-- project metadata
-- scan task directories
-- CSV/JSON/HDF5 or future formats
-- exports
-
-### `infra/`
-
-Cross-cutting infrastructure.
-
-Responsible for:
-
-- configuration
-- logging
-- license
-- environment checks
-
-## 3. Migration Rule
-
-Do not move existing files only for aesthetic reasons.
-
-When implementing the commercial UI, add new files first. Move legacy code only when the new implementation is stable and tested.
-
-## 4. AI Agent Rule
-
-If a coding agent is unsure where a feature belongs:
-
-- UI element -> `ui/commercial/`
-- workflow orchestration -> `services/`
-- pure computation -> `core/`
-- hardware communication -> `devices/`
-- file persistence -> `storage/`
-- config/log/license -> `infra/`
+不得创建 `ui/commercial`、`ui/legacy` 或其他平行 UI 目录。

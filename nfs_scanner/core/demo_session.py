@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .dry_run_bundle import DryRunAdapterBundle
-from .mock_analysis_service import MockAnalysisService, _default_tasks
+from .mock_analysis_service import MockAnalysisService
 from .mock_device_service import MockDeviceService
 from .mock_project_service import MockProjectService
 from .mock_scan_runtime import MockScanRuntimeService

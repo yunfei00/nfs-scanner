@@ -8,6 +8,7 @@ datas = [
     ("README.md", "."),
     ("docs", "docs"),
     ("nfs_scanner/devices", "nfs_scanner/devices"),
+    ("resources", "resources"),
 ]
 
 hiddenimports = [*collect_submodules("nfs_scanner")]

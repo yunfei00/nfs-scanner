@@ -253,7 +253,7 @@ class SerialPortDiscoveryTestCase(unittest.TestCase):
         ]
         try:
             with patch(
-                "nfs_scanner.ui.widgets.scan_control_page.collect_serial_port_candidates",
+                "nfs_scanner.ui.widgets.scan_control_support.collect_serial_port_candidates",
                 return_value=scanned_ports,
             ):
                 found_count = page._refresh_available_ports()
