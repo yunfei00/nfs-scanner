@@ -18,6 +18,46 @@ QFrame#applicationHeader {
     border-bottom: 1px solid #263548;
 }
 
+QToolButton#minimizeWindowButton,
+QToolButton#maximizeWindowButton,
+QToolButton#closeWindowButton {
+    min-height: 0;
+    padding: 0;
+    color: #b8c7d8;
+    background-color: transparent;
+    border: 0;
+    border-radius: 5px;
+    font-family: "Segoe UI Symbol", "Microsoft YaHei UI";
+    font-size: 17px;
+    font-weight: 500;
+}
+
+QToolButton#minimizeWindowButton:hover,
+QToolButton#maximizeWindowButton:hover {
+    color: #ffffff;
+    background-color: #24364a;
+}
+
+QToolButton#closeWindowButton:hover {
+    color: #ffffff;
+    background-color: #c42b3a;
+}
+
+QToolButton#minimizeWindowButton:pressed,
+QToolButton#maximizeWindowButton:pressed {
+    background-color: #30465e;
+}
+
+QToolButton#closeWindowButton:pressed {
+    background-color: #9d1f2b;
+}
+
+QSizeGrip#windowSizeGrip {
+    width: 18px;
+    height: 18px;
+    background-color: transparent;
+}
+
 QLabel#applicationTitle {
     color: #f4f8fc;
     font-size: 20px;

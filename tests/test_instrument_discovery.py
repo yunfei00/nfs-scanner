@@ -34,6 +34,11 @@ class _FakePyvisa:
         return _FakeResourceManager(self._resources)
 
 
+class _MissingBackendPyvisa:
+    def ResourceManager(self) -> _FakeResourceManager:  # noqa: N802 - keep pyvisa naming style
+        raise ValueError("Could not locate a VISA implementation")
+
+
 class _FakeVisaInstrument:
     def __init__(self, idn_text: str) -> None:
         self.timeout = 0
@@ -161,6 +166,28 @@ class InstrumentDiscoveryTestCase(unittest.TestCase):
                 "TCPIP0::192.168.0.61::inst0::INSTR",
             ],
         )
+
+    def test_missing_visa_backend_returns_actionable_result(self) -> None:
+        """An installed pyvisa package without a backend should not raise."""
+
+        original_has_pyvisa = zna_discovery._HAS_PYVISA
+        original_pyvisa = getattr(zna_discovery, "pyvisa", None)
+        try:
+            zna_discovery._HAS_PYVISA = True
+            zna_discovery.pyvisa = _MissingBackendPyvisa()
+
+            result = zna_discovery.discover_supported_instruments_via_visa()
+        finally:
+            zna_discovery._HAS_PYVISA = original_has_pyvisa
+            if original_pyvisa is None:
+                del zna_discovery.pyvisa
+            else:
+                zna_discovery.pyvisa = original_pyvisa
+
+        self.assertTrue(result.pyvisa_available)
+        self.assertFalse(result.visa_backend_available)
+        self.assertIn("VISA implementation", result.visa_backend_error)
+        self.assertEqual(result.probes, [])
 
 
 if __name__ == "__main__":

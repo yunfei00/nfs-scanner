@@ -14,7 +14,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from PySide6.QtWidgets import QApplication, QScrollArea  # noqa: E402
+from PySide6.QtCore import Qt  # noqa: E402
+from PySide6.QtWidgets import QApplication, QScrollArea, QToolButton  # noqa: E402
 
 from nfs_scanner.ui.main_window import MainWindow  # noqa: E402
 from nfs_scanner.ui.theme import apply_theme, load_theme  # noqa: E402
@@ -38,6 +39,11 @@ def main(argv: list[str] | None = None) -> int:
         "single_ui_source": not (REPO_ROOT / "nfs_scanner" / "ui" / "commercial").exists(),
         "main_window": window.objectName() == "mainWindow",
         "header": window.header.objectName() == "applicationHeader",
+        "frameless_window": bool(window.windowFlags() & Qt.WindowType.FramelessWindowHint),
+        "window_controls": all(
+            window.header.findChild(QToolButton, name) is not None
+            for name in ("minimizeWindowButton", "maximizeWindowButton", "closeWindowButton")
+        ),
         "left_scroll": page.findChild(QScrollArea, "controlSidebarScroll") is not None,
         "right_scroll": page.findChild(QScrollArea, "measurementWorkspaceScroll") is not None,
         "chinese_scan_headers": page.scan_table.horizontalHeaderItem(0).text() == "起点 X",

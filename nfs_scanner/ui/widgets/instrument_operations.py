@@ -60,6 +60,14 @@ class InstrumentOperationsMixin:
             self.append_log("仪表搜索失败：未安装 pyvisa")
             return
 
+        if not result.visa_backend_available:
+            message = "VISA 后端不可用；请安装 NI-VISA，或安装 pyvisa-py 作为软件后端"
+            for panel in self.instrument_panels:
+                panel.set_discovered_message(message)
+            self._write_instrument_search_log(f"仪表搜索已跳过：{message}；{result.visa_backend_error}")
+            self.append_log(f"仪表搜索已跳过：{message}")
+            return
+
         matched_resources: dict[str, list[str]] = {}
         first_matched_panel: InstrumentPanel | None = None
 

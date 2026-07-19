@@ -6,7 +6,8 @@ import os
 import sys
 import unittest
 
-from PySide6.QtWidgets import QApplication, QScrollArea
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication, QScrollArea, QSizeGrip, QToolButton
 
 from nfs_scanner.application import ApplicationContext
 from nfs_scanner.core import DeviceManager, ScanManager
@@ -54,6 +55,12 @@ class UnifiedUiTestCase(unittest.TestCase):
         self.assertGreaterEqual(self.window.minimumWidth(), 1180)
         self.assertGreaterEqual(self.window.minimumHeight(), 700)
 
+    def test_window_uses_custom_frameless_title_bar(self) -> None:
+        self.assertTrue(self.window.windowFlags() & Qt.WindowType.FramelessWindowHint)
+        self.assertIsInstance(self.window.size_grip, QSizeGrip)
+        for object_name in ("minimizeWindowButton", "maximizeWindowButton", "closeWindowButton"):
+            self.assertIsNotNone(self.window.header.findChild(QToolButton, object_name))
+
     def test_both_workspace_columns_are_scrollable(self) -> None:
         page = self.window.scan_control_page
         left = page.findChild(QScrollArea, "controlSidebarScroll")
@@ -95,6 +102,7 @@ class UnifiedThemeTestCase(unittest.TestCase):
         stylesheet = load_theme()
 
         self.assertIn("QFrame#applicationHeader", stylesheet)
+        self.assertIn("QToolButton#closeWindowButton", stylesheet)
         self.assertIn("QPushButton#primaryButton", stylesheet)
         self.assertIn("QPushButton#dangerButton", stylesheet)
         self.assertIn("QScrollArea", stylesheet)

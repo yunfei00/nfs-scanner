@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QMainWindow, QVBoxLayout, QWidget
+from PySide6.QtCore import QEvent, Qt
+from PySide6.QtGui import QResizeEvent
+from PySide6.QtWidgets import QApplication, QMainWindow, QSizeGrip, QVBoxLayout, QWidget
 
 from nfs_scanner.application import ApplicationContext, create_application_context
 from nfs_scanner.version import APP_NAME, APP_VERSION
@@ -28,9 +29,26 @@ class MainWindow(QMainWindow):
 
         self.setObjectName("mainWindow")
         self.setWindowTitle(f"{APP_NAME} v{APP_VERSION} - 近场扫描系统")
+        self.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
         self.setMinimumSize(self.MINIMUM_WIDTH, self.MINIMUM_HEIGHT)
-        self.resize(self.DEFAULT_WIDTH, self.DEFAULT_HEIGHT)
+        self._resize_for_available_screen()
         self._setup_ui()
+
+    def _resize_for_available_screen(self) -> None:
+        """Keep the initial frameless window and its controls inside the desktop."""
+
+        screen = QApplication.primaryScreen()
+        if screen is None:
+            self.resize(self.DEFAULT_WIDTH, self.DEFAULT_HEIGHT)
+            return
+        available = screen.availableGeometry()
+        width = min(self.DEFAULT_WIDTH, max(self.MINIMUM_WIDTH, int(available.width() * 0.94)))
+        height = min(self.DEFAULT_HEIGHT, max(self.MINIMUM_HEIGHT, int(available.height() * 0.94)))
+        self.resize(width, height)
+        self.move(
+            available.x() + max((available.width() - width) // 2, 0),
+            available.y() + max((available.height() - height) // 2, 0),
+        )
 
     def _setup_ui(self) -> None:
         central_widget = QWidget(self)
@@ -49,5 +67,28 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.header)
         layout.addWidget(self.scan_control_page, 1)
         self.setCentralWidget(central_widget)
+        self.size_grip = QSizeGrip(central_widget)
+        self.size_grip.setObjectName("windowSizeGrip")
+        self.size_grip.setFixedSize(18, 18)
+        self.size_grip.raise_()
         self.setDockOptions(QMainWindow.DockOption.AnimatedDocks)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+
+    def changeEvent(self, event: QEvent) -> None:
+        """Synchronize custom chrome when Windows changes the window state."""
+
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.WindowStateChange:
+            self.header.sync_window_state()
+            self.size_grip.setVisible(not self.isMaximized())
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        """Keep the frameless resize grip anchored to the lower-right corner."""
+
+        super().resizeEvent(event)
+        margin = 3
+        self.size_grip.move(
+            self.centralWidget().width() - self.size_grip.width() - margin,
+            self.centralWidget().height() - self.size_grip.height() - margin,
+        )
+        self.size_grip.raise_()

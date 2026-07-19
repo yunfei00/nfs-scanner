@@ -39,6 +39,13 @@ class InstrumentDiscoveryResult:
 
     probes: list[InstrumentProbeResult]
     pyvisa_available: bool
+    visa_backend_error: str = ""
+
+    @property
+    def visa_backend_available(self) -> bool:
+        """Return whether PyVISA can open an installed VISA backend."""
+
+        return self.pyvisa_available and not self.visa_backend_error
 
     @property
     def matched_resources(self) -> list[InstrumentProbeResult]:
@@ -74,10 +81,20 @@ def discover_supported_instruments_via_visa(timeout_ms: int = 1200) -> Instrumen
     if not _HAS_PYVISA:
         return InstrumentDiscoveryResult(probes=[], pyvisa_available=False)
 
-    resource_manager = pyvisa.ResourceManager()
-    resources = _filter_tcpip_resources(resource_manager.list_resources())
-    probes = probe_resources(resource_names=resources, timeout_ms=timeout_ms)
-    resource_manager.close()
+    try:
+        resource_manager = pyvisa.ResourceManager()
+    except Exception as error:  # pragma: no cover - depends on the local VISA runtime
+        return InstrumentDiscoveryResult(
+            probes=[],
+            pyvisa_available=True,
+            visa_backend_error=str(error),
+        )
+
+    try:
+        resources = _filter_tcpip_resources(resource_manager.list_resources())
+        probes = probe_resources(resource_names=resources, timeout_ms=timeout_ms)
+    finally:
+        resource_manager.close()
     return InstrumentDiscoveryResult(probes=probes, pyvisa_available=True)
 
 
@@ -93,7 +110,10 @@ def probe_resources(resource_names: tuple[str, ...], timeout_ms: int = 1200) -> 
     if not _HAS_PYVISA:
         return []
 
-    resource_manager = pyvisa.ResourceManager()
+    try:
+        resource_manager = pyvisa.ResourceManager()
+    except Exception:  # pragma: no cover - depends on the local VISA runtime
+        return []
     probes: list[InstrumentProbeResult] = []
 
     ordered_resource_names = _sort_resource_names(resource_names)
