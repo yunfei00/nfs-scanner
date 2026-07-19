@@ -25,10 +25,12 @@ class CollapsibleSection(QWidget):
         body_widget: QWidget,
         summary_widget: QWidget | None = None,
         expanded: bool = True,
+        compact: bool = False,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._expanded = expanded
+        self._compact = compact
         self._body_widget = body_widget
         self._summary_widget = summary_widget or QLabel("", self)
         self._setup_ui(title)
@@ -37,19 +39,24 @@ class CollapsibleSection(QWidget):
     def _setup_ui(self, title: str) -> None:
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(0, 0, 0, 0)
-        root_layout.setSpacing(6)
+        root_layout.setSpacing(2 if self._compact else 6)
 
         header = QFrame(self)
-        header.setObjectName("summaryBar")
+        header.setObjectName("compactSectionHeader" if self._compact else "summaryBar")
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(10, 6, 8, 6)
+        if self._compact:
+            header_layout.setContentsMargins(10, 2, 6, 2)
+        else:
+            header_layout.setContentsMargins(10, 6, 8, 6)
 
         title_label = QLabel(title, header)
-        title_label.setStyleSheet("font-weight: 700;")
+        title_label.setObjectName("compactSectionTitle" if self._compact else "sectionTitle")
 
         self.toggle_button = QToolButton(header)
         self.toggle_button.setObjectName("toggleButton")
         self.toggle_button.setText("▾" if self._expanded else "▸")
+        if self._compact:
+            self.toggle_button.setFixedSize(38, 24)
         self.toggle_button.clicked.connect(self._on_toggle_clicked)
 
         header_layout.addWidget(title_label)
@@ -65,9 +72,12 @@ class CollapsibleSection(QWidget):
         summary_layout.addWidget(self._summary_widget)
 
         self.body_frame = QFrame(self)
-        self.body_frame.setObjectName("sectionBody")
+        self.body_frame.setObjectName("compactSectionBody" if self._compact else "sectionBody")
         body_layout = QVBoxLayout(self.body_frame)
-        body_layout.setContentsMargins(10, 8, 10, 10)
+        if self._compact:
+            body_layout.setContentsMargins(8, 4, 8, 6)
+        else:
+            body_layout.setContentsMargins(10, 8, 10, 10)
         body_layout.addWidget(self._body_widget)
 
         root_layout.addWidget(header)

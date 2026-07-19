@@ -115,6 +115,16 @@ class UnifiedUiTestCase(unittest.TestCase):
         self.assertEqual(headers[0], "起点 X")
         self.assertEqual(headers[-1], "步距 Z")
         self.assertNotIn("start_x", headers)
+        self.assertEqual(page.scan_table.horizontalScrollBarPolicy(), Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+    def test_instrument_panels_scroll_only_when_needed(self) -> None:
+        page = self.window.scan_control_page
+
+        self.assertEqual(page.instrument_tabs.objectName(), "instrumentTabs")
+        self.assertEqual(page.instrument_section.body_frame.objectName(), "compactSectionBody")
+        for panel in page.instrument_panels:
+            self.assertEqual(panel.scroll_area.verticalScrollBarPolicy(), Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            self.assertEqual(panel.scroll_area.horizontalScrollBarPolicy(), Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
     def test_refactored_page_preserves_public_handlers(self) -> None:
         page = self.window.scan_control_page

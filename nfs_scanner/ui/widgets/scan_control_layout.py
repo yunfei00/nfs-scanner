@@ -357,6 +357,8 @@ class ScanControlLayoutMixin:
         layout = QVBoxLayout(group)
 
         self.scan_table = QTableWidget(1, len(self.TABLE_COLUMNS), group)
+        self.scan_table.setObjectName("scanAreaTable")
+        self.scan_table.setMinimumWidth(0)
         self.scan_table.setHorizontalHeaderLabels(self.TABLE_HEADERS)
         self.scan_table.verticalHeader().setVisible(False)
         self.scan_table.setAlternatingRowColors(True)
@@ -367,12 +369,19 @@ class ScanControlLayoutMixin:
         )
         self.scan_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
         self.scan_table.horizontalHeader().setStretchLastSection(True)
-        self.scan_table.horizontalHeader().setDefaultSectionSize(100)
+        self.scan_table.horizontalHeader().setMinimumSectionSize(52)
+        self.scan_table.horizontalHeader().setDefaultSectionSize(88)
         self.scan_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.scan_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.scan_table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        table_height = self.scan_table.horizontalHeader().height() + self.scan_table.verticalHeader().defaultSectionSize() * 2 + 4
+        table_height = (
+            self.scan_table.horizontalHeader().sizeHint().height()
+            + self.scan_table.verticalHeader().defaultSectionSize()
+            + self.scan_table.frameWidth() * 2
+        )
         self.scan_table.setFixedHeight(table_height)
         group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        group.setMinimumWidth(0)
         layout.addWidget(self.scan_table)
         return group
 
@@ -382,13 +391,14 @@ class ScanControlLayoutMixin:
         content_layout.setContentsMargins(0, 0, 0, 0)
 
         self.instrument_tabs = QTabWidget(content)
-        self.instrument_tabs.setMinimumHeight(250)
+        self.instrument_tabs.setObjectName("instrumentTabs")
+        self.instrument_tabs.setMinimumHeight(280)
         self.instrument_panels = [InstrumentPanel(name, self) for name in self.INSTRUMENT_ORDER]
         for panel in self.instrument_panels:
             self.instrument_tabs.addTab(panel, panel.instrument_name)
         content_layout.addWidget(self.instrument_tabs)
 
-        section = CollapsibleSection("仪表区域", body_widget=content, expanded=True, parent=self)
+        section = CollapsibleSection("仪表区域", body_widget=content, expanded=True, compact=True, parent=self)
         section.update_summary_text("开始频率: 80.000 MHz | 终止频率: 6000.000 MHz")
         self.instrument_section = section
         return section

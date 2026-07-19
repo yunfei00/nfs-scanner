@@ -240,6 +240,21 @@ QTabBar::tab:selected {
     border-top: 2px solid #3aa6e8;
 }
 
+QTabWidget#instrumentTabs QTabBar::tab {
+    min-height: 26px;
+    padding: 0 12px;
+}
+
+QTableWidget#scanAreaTable {
+    font-size: 12px;
+}
+
+QTableWidget#scanAreaTable QHeaderView::section {
+    min-height: 28px;
+    padding: 2px 3px;
+    font-size: 12px;
+}
+
 QTableWidget,
 QTableView {
     color: #e7eef6;
@@ -280,11 +295,38 @@ QFrame#summaryBar {
     border-radius: 5px;
 }
 
+QFrame#compactSectionHeader {
+    background-color: #172434;
+    border: 1px solid #2e4053;
+    border-radius: 5px;
+}
+
+QLabel#sectionTitle,
+QLabel#compactSectionTitle {
+    font-weight: 700;
+}
+
+QLabel#compactSectionTitle {
+    font-size: 12px;
+}
+
 QFrame#sectionBody {
     background-color: #111b27;
     border: 1px solid #2b3c4e;
     border-top: 0;
     border-radius: 0 0 5px 5px;
+}
+
+QFrame#compactSectionBody {
+    background-color: #111b27;
+    border: 1px solid #2b3c4e;
+    border-top: 0;
+    border-radius: 0 0 5px 5px;
+}
+
+QScrollArea#instrumentPanelScroll,
+QWidget#instrumentPanelContent {
+    background-color: #111b27;
 }
 
 QLabel#sectionSummary {

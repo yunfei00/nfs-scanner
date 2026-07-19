@@ -28,6 +28,8 @@ def main(argv: list[str] | None = None) -> int:
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--screenshot", type=Path, help="可选：保存离屏渲染截图")
+    parser.add_argument("--width", type=int, default=1274, help="窗口检查宽度")
+    parser.add_argument("--height", type=int, default=720, help="窗口检查高度")
     args = parser.parse_args(argv)
 
     app = QApplication.instance() or QApplication([])
@@ -41,10 +43,13 @@ def main(argv: list[str] | None = None) -> int:
             data_dir=runtime_root / "data",
         )
         window = MainWindow(context=create_application_context(paths=paths))
-        window.resize(1274, 720)
+        window.resize(args.width, args.height)
         window.show()
         app.processEvents()
         page = window.scan_control_page
+        fsw_index = page.INSTRUMENT_ORDER.index("FSW")
+        page.instrument_tabs.setCurrentIndex(fsw_index)
+        app.processEvents()
         checks = {
             "single_ui_source": not (REPO_ROOT / "nfs_scanner" / "ui" / "commercial").exists(),
             "single_runtime_chain": not any(
@@ -67,6 +72,14 @@ def main(argv: list[str] | None = None) -> int:
             "left_scroll": page.findChild(QScrollArea, "controlSidebarScroll") is not None,
             "right_scroll": page.findChild(QScrollArea, "measurementWorkspaceScroll") is not None,
             "chinese_scan_headers": page.scan_table.horizontalHeaderItem(0).text() == "起点 X",
+            "scan_table_no_horizontal_scroll": (
+                page.scan_table.horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+            ),
+            "instrument_scroll_fallback": all(
+                panel.scroll_area.verticalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAsNeeded
+                and panel.scroll_area.horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAsNeeded
+                for panel in page.instrument_panels
+            ),
             "theme_loaded": bool(load_theme()),
         }
         if args.screenshot is not None:

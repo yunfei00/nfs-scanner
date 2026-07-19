@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QButtonGroup,
     QComboBox,
+    QFrame,
     QGridLayout,
     QLabel,
     QLineEdit,
     QPushButton,
     QRadioButton,
+    QScrollArea,
+    QVBoxLayout,
     QWidget,
 )
 
@@ -59,6 +62,8 @@ class InstrumentPanel(QWidget):
         self._trace_mode_buttons: dict[str, QRadioButton] = {}
         self._query_keys: tuple[str, ...] = ()
         self._action_keys: tuple[str, ...] = ()
+        self.content_widget: QWidget
+        self.scroll_area: QScrollArea
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -75,10 +80,23 @@ class InstrumentPanel(QWidget):
     def _setup_standard_ui(self) -> None:
         """Create the shared query/set UI for supported instruments."""
 
-        layout = QGridLayout(self)
+        root_layout = QVBoxLayout(self)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
+
+        self.scroll_area = QScrollArea(self)
+        self.scroll_area.setObjectName("instrumentPanelScroll")
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+
+        self.content_widget = QWidget(self.scroll_area)
+        self.content_widget.setObjectName("instrumentPanelContent")
+        layout = QGridLayout(self.content_widget)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setHorizontalSpacing(8)
-        layout.setVerticalSpacing(8)
+        layout.setVerticalSpacing(6)
 
         self._add_frequency_field(
             layout=layout,
@@ -183,6 +201,12 @@ class InstrumentPanel(QWidget):
 
         for column in (1, 2, 3, 4, 5, 6, 7, 8):
             layout.setColumnStretch(column, 1)
+
+        layout.activate()
+        self.content_widget.setMinimumWidth(layout.minimumSize().width())
+        self.content_widget.setMinimumHeight(layout.sizeHint().height())
+        self.scroll_area.setWidget(self.content_widget)
+        root_layout.addWidget(self.scroll_area)
 
     def _add_frequency_field(
         self,
