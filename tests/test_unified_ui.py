@@ -7,7 +7,7 @@ import sys
 import unittest
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QScrollArea, QSizeGrip, QToolButton
+from PySide6.QtWidgets import QApplication, QLabel, QScrollArea, QSizeGrip, QToolButton
 
 from nfs_scanner.application import ApplicationContext
 from nfs_scanner.core import DeviceManager, ScanManager
@@ -64,6 +64,8 @@ class UnifiedUiTestCase(unittest.TestCase):
     def test_window_uses_custom_frameless_title_bar(self) -> None:
         self.assertTrue(self.window.windowFlags() & Qt.WindowType.FramelessWindowHint)
         self.assertIsInstance(self.window.size_grip, QSizeGrip)
+        self.assertIsNone(self.window.header.findChild(QLabel, "baselineBadge"))
+        self.assertIsNotNone(self.window.header.findChild(QLabel, "safetyBadge"))
         for object_name in ("minimizeWindowButton", "maximizeWindowButton", "closeWindowButton"):
             self.assertIsNotNone(self.window.header.findChild(QToolButton, object_name))
 

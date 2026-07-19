@@ -69,18 +69,11 @@ QLabel#applicationSubtitle {
     font-size: 12px;
 }
 
-QLabel#baselineBadge,
 QLabel#safetyBadge {
     border-radius: 12px;
     padding: 5px 11px;
     font-size: 12px;
     font-weight: 600;
-}
-
-QLabel#baselineBadge {
-    color: #a9d7ff;
-    background-color: #132c43;
-    border: 1px solid #24557c;
 }
 
 QLabel#safetyBadge {

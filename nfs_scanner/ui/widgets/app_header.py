@@ -36,11 +36,8 @@ class ApplicationHeader(QFrame):
         brand.addWidget(title)
         brand.addWidget(subtitle)
 
-        baseline_badge = QLabel("统一控制台", self)
-        baseline_badge.setObjectName("baselineBadge")
         safety_badge = QLabel("设备操作需显式连接", self)
         safety_badge.setObjectName("safetyBadge")
-        baseline_badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         safety_badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
 
         self.minimize_button = self._create_window_button("—", "最小化", "minimizeWindowButton")
@@ -52,7 +49,6 @@ class ApplicationHeader(QFrame):
 
         layout.addLayout(brand)
         layout.addStretch(1)
-        layout.addWidget(baseline_badge)
         layout.addWidget(safety_badge)
         layout.addSpacing(4)
         layout.addWidget(self.minimize_button)
