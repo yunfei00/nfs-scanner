@@ -16,6 +16,8 @@ class ApplicationHeader(QFrame):
         super().__init__(parent)
         self._drag_offset = QPoint()
         self._system_move_started = False
+        self._is_maximized = False
+        self._pending_maximized_state: bool | None = None
         self.setObjectName("applicationHeader")
         self.setFixedHeight(68)
 
@@ -72,21 +74,55 @@ class ApplicationHeader(QFrame):
 
     def _toggle_maximize(self) -> None:
         window = self.window()
-        if window.isMaximized():
-            window.showNormal()
-        else:
+        should_maximize = not (
+            self._is_maximized
+            or bool(window.windowState() & Qt.WindowState.WindowMaximized)
+        )
+        self._pending_maximized_state = should_maximize
+        if should_maximize:
             window.showMaximized()
-        QTimer.singleShot(0, self.sync_window_state)
+        else:
+            window.showNormal()
+        # Frameless windows on Windows can report the previous Qt state briefly
+        # after their geometry has already changed. Apply the requested state
+        # directly so the title-bar control never lags one click behind.
+        self.sync_window_state(should_maximize)
+        QTimer.singleShot(
+            100,
+            lambda state=should_maximize: self._finish_window_state_request(state),
+        )
 
     def _close_window(self) -> None:
         self.window().close()
 
-    def sync_window_state(self) -> None:
+    @property
+    def is_maximized(self) -> bool:
+        """Return the logical state represented by the custom title bar."""
+
+        return self._is_maximized
+
+    @property
+    def pending_maximized_state(self) -> bool | None:
+        """Return the in-flight state requested by a custom title-bar action."""
+
+        return self._pending_maximized_state
+
+    def _finish_window_state_request(self, expected_state: bool) -> None:
+        if self._pending_maximized_state != expected_state:
+            return
+        self.sync_window_state(expected_state)
+        self._pending_maximized_state = None
+
+    def sync_window_state(self, is_maximized: bool | None = None) -> None:
         """Keep the maximize button aligned with the actual window state."""
 
-        is_maximized = self.window().isMaximized()
-        self.maximize_button.setText("↙" if is_maximized else "□")
-        tooltip = "还原" if is_maximized else "最大化"
+        if is_maximized is None:
+            is_maximized = bool(
+                self.window().windowState() & Qt.WindowState.WindowMaximized
+            )
+        self._is_maximized = is_maximized
+        self.maximize_button.setText("↙" if self._is_maximized else "□")
+        tooltip = "还原" if self._is_maximized else "最大化"
         self.maximize_button.setToolTip(tooltip)
         self.maximize_button.setAccessibleName(tooltip)
 

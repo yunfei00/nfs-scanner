@@ -33,6 +33,8 @@ class UnifiedUiTestCase(unittest.TestCase):
         cls.app = QApplication.instance() or QApplication([])
 
     def setUp(self) -> None:
+        self._previous_startup_setting = os.environ.get("NFS_SCANNER_DISABLE_AUTO_STARTUP_TASKS")
+        os.environ["NFS_SCANNER_DISABLE_AUTO_STARTUP_TASKS"] = "1"
         self.context = ApplicationContext(DeviceManager(), ScanManager())
         self.window = MainWindow(context=self.context)
 
@@ -41,6 +43,10 @@ class UnifiedUiTestCase(unittest.TestCase):
         page.clock_timer.stop()
         page._serial_reconnect_timer.stop()
         self.window.close()
+        if self._previous_startup_setting is None:
+            os.environ.pop("NFS_SCANNER_DISABLE_AUTO_STARTUP_TASKS", None)
+        else:
+            os.environ["NFS_SCANNER_DISABLE_AUTO_STARTUP_TASKS"] = self._previous_startup_setting
 
     def test_main_window_uses_injected_proven_interfaces(self) -> None:
         self.assertIs(self.window.device_manager, self.context.device_manager)
@@ -62,17 +68,30 @@ class UnifiedUiTestCase(unittest.TestCase):
             self.assertIsNotNone(self.window.header.findChild(QToolButton, object_name))
 
     def test_maximized_window_uses_one_clear_restore_symbol(self) -> None:
-        self.window.setWindowState(Qt.WindowState.WindowMaximized)
-        self.window.header.sync_window_state()
+        self.window.header.sync_window_state(True)
 
         self.assertEqual(self.window.header.maximize_button.text(), "↙")
         self.assertEqual(self.window.header.maximize_button.accessibleName(), "还原")
         self.assertEqual(len(self.window.header.maximize_button.text()), 1)
 
-        self.window.setWindowState(Qt.WindowState.WindowNoState)
-        self.window.header.sync_window_state()
+        self.window.header.sync_window_state(False)
         self.assertEqual(self.window.header.maximize_button.text(), "□")
         self.assertEqual(self.window.header.maximize_button.accessibleName(), "最大化")
+
+    def test_first_maximize_request_updates_control_without_state_lag(self) -> None:
+        header = self.window.header
+        self.assertFalse(header.is_maximized)
+
+        header._toggle_maximize()
+        header._finish_window_state_request(True)
+
+        self.assertTrue(header.is_maximized)
+        self.assertEqual(header.maximize_button.accessibleName(), "还原")
+
+        header._toggle_maximize()
+        header._finish_window_state_request(False)
+        self.assertFalse(header.is_maximized)
+        self.assertEqual(header.maximize_button.accessibleName(), "最大化")
 
     def test_both_workspace_columns_are_scrollable(self) -> None:
         page = self.window.scan_control_page

@@ -79,8 +79,19 @@ class MainWindow(QMainWindow):
 
         super().changeEvent(event)
         if event.type() == QEvent.Type.WindowStateChange:
-            self.header.sync_window_state()
-            self.size_grip.setVisible(not self.isMaximized())
+            current_state = self.windowState()
+            old_state = event.oldState()
+            is_minimized = bool(current_state & Qt.WindowState.WindowMinimized)
+            pending_state = self.header.pending_maximized_state
+            if pending_state is not None:
+                self.header.sync_window_state(pending_state)
+            elif current_state & Qt.WindowState.WindowMaximized:
+                self.header.sync_window_state(True)
+            elif old_state & Qt.WindowState.WindowMaximized and not is_minimized:
+                self.header.sync_window_state(False)
+            self.size_grip.setVisible(
+                not self.header.is_maximized and not is_minimized
+            )
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         """Keep the frameless resize grip anchored to the lower-right corner."""
