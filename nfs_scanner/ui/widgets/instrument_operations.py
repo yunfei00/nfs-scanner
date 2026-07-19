@@ -18,6 +18,7 @@ from nfs_scanner.devices.spectrum import (
 )
 from nfs_scanner.core import SpectrumConfig
 from nfs_scanner.infra.logging_config import get_logger
+from nfs_scanner.storage.atomic import append_text_durable, atomic_write_json
 
 from .instrument_panel import InstrumentPanel
 
@@ -52,6 +53,9 @@ class InstrumentOperationsMixin:
 
     def _on_instrument_search_finished(self, result: InstrumentDiscoveryResult) -> None:
         """处理异步仪表搜索结果，并同步更新 UI。"""
+
+        if self._is_shutting_down:
+            return
 
         if not result.pyvisa_available:
             for panel in self.instrument_panels:
@@ -100,7 +104,9 @@ class InstrumentOperationsMixin:
                 self._refresh_all_instrument_queries(instrument_name)
 
         self._write_instrument_search_log(f"仪表搜索完成：共扫描 {len(result.probes)} 个 VISA 资源")
-        self.append_log(f"仪表搜索完成：共扫描 {len(result.probes)} 个 VISA 资源，详见 output/instrument_search.log")
+        self.append_log(
+            f"仪表搜索完成：共扫描 {len(result.probes)} 个 VISA 资源，详见 {self.INSTRUMENT_SEARCH_LOG_PATH}"
+        )
         for probe in result.probes:
             if probe.error_message:
                 self._write_instrument_search_log(f"VISA 资源探测失败: {probe.resource_name} | {probe.error_message}")
@@ -148,11 +154,11 @@ class InstrumentOperationsMixin:
             self.append_log(f"仪表同步: {instrument_name} - {label} = {value}{suffix}")
 
     def _query_instrument_value(self, instrument_name: str, query_key: str) -> tuple[str, str | None]:
-        """查询仪表参数：优先真实设备，失败后回退占位值。"""
+        """Query one real instrument value without substituting synthetic data."""
 
         if instrument_name in self.INSTRUMENT_ORDER:
             return self._query_scpi_instrument_value(instrument_name, query_key)
-        return self._mock_query_value(instrument_name, query_key)
+        return "不支持", None
 
     def _query_scpi_instrument_value(self, instrument_name: str, query_key: str) -> tuple[str, str | None]:
         """查询支持的 SCPI 仪表参数。优先走 VISA，ZNA67 再尝试串口回退。"""
@@ -161,8 +167,8 @@ class InstrumentOperationsMixin:
             analyzer = self._get_instrument_adapter(instrument_name)
             return self._format_query_value(query_key, analyzer.query_setting(query_key))
         except SpectrumAnalyzerError as error:
-            self.append_log(f"{instrument_name} 参数查询失败，已使用占位值: {error}")
-            return self._mock_query_value(instrument_name, query_key)
+            self.append_log(f"{instrument_name} 参数查询失败: {error}")
+            return "查询失败", None
 
     def _query_via_visa(
         self,
@@ -415,6 +421,8 @@ class InstrumentOperationsMixin:
         query_keys = panel.get_supported_query_keys()
         for query_key in query_keys:
             value, unit = self._query_instrument_value(instrument_name, query_key)
+            if value in {"查询失败", "不支持"}:
+                return False, f"{instrument_name} 参数 {query_key} 查询失败，未生成误导性快照"
             panel.set_query_result(query_key, value, unit)
             snapshot_values[query_key] = {"value": value, "unit": unit}
 
@@ -429,7 +437,7 @@ class InstrumentOperationsMixin:
 
         try:
             self.SNAPSHOT_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-            snapshot_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+            atomic_write_json(snapshot_path, payload)
         except OSError as error:
             return False, str(error)
 
@@ -649,7 +657,7 @@ class InstrumentOperationsMixin:
 
         self._instrument_search_thread = None
         self._instrument_search_worker = None
-        self.search_button.setEnabled(True)
+        self.search_button.setEnabled(not self._is_shutting_down)
         self.search_button.setText("搜索仪表")
 
     def _write_instrument_search_log(self, message: str) -> None:
@@ -657,18 +665,8 @@ class InstrumentOperationsMixin:
 
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.INSTRUMENT_SEARCH_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with self.INSTRUMENT_SEARCH_LOG_PATH.open("a", encoding="utf-8") as log_file:
-            log_file.write(f"[{timestamp}] {message}\n")
+        append_text_durable(self.INSTRUMENT_SEARCH_LOG_PATH, f"[{timestamp}] {message}\n")
         get_logger(__name__).info("instrument-search | %s", message)
-
-    def _mock_query_value(self, instrument_name: str, query_key: str) -> tuple[str, str | None]:
-        """返回对应仪表的占位查询值。"""
-
-        instrument_values = self.INSTRUMENT_PLACEHOLDER_VALUES.get(
-            instrument_name,
-            self.INSTRUMENT_PLACEHOLDER_VALUES["ZNA67"],
-        )
-        return instrument_values.get(query_key, ("-", None))
 
     def _read_serial_response_text(self, timeout_ms: int = 500) -> str:
         """读取一段串口响应文本，优先使用已累积的接收缓存。"""
@@ -763,8 +761,4 @@ class InstrumentOperationsMixin:
             "resources": all_resources,
             "updated_at": datetime.now().isoformat(timespec="seconds"),
         }
-        self.INSTRUMENT_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        self.INSTRUMENT_CACHE_PATH.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        atomic_write_json(self.INSTRUMENT_CACHE_PATH, payload)

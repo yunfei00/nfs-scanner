@@ -203,6 +203,8 @@ cython_debug/
 
 # Runtime instrument discovery cache (see config/instrument_devices.example.json)
 config/instrument_devices.json
+config/scan_area_config.json
+config/serial_port_config.json
 
 # Runtime camera snapshots (keep directory via .gitkeep)
 outputs/camera/*.jpg
@@ -230,7 +232,6 @@ __marimo__/
 
 
 .idea
-/outputs
 outputs/scans/
 output/
 config/devices.local.yaml

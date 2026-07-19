@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QEvent, Qt
-from PySide6.QtGui import QResizeEvent
-from PySide6.QtWidgets import QApplication, QMainWindow, QSizeGrip, QVBoxLayout, QWidget
+from PySide6.QtGui import QCloseEvent, QResizeEvent
+from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox, QSizeGrip, QVBoxLayout, QWidget
 
 from nfs_scanner.application import ApplicationContext, create_application_context
 from nfs_scanner.version import APP_NAME, APP_VERSION
@@ -33,6 +33,7 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(self.MINIMUM_WIDTH, self.MINIMUM_HEIGHT)
         self._resize_for_available_screen()
         self._setup_ui()
+        self._shutdown_complete = False
 
     def _resize_for_available_screen(self) -> None:
         """Keep the initial frameless window and its controls inside the desktop."""
@@ -62,6 +63,7 @@ class MainWindow(QMainWindow):
             central_widget,
             scan_manager=self.scan_manager,
             device_manager=self.device_manager,
+            app_paths=self.context.paths,
         )
 
         layout.addWidget(self.header)
@@ -103,3 +105,34 @@ class MainWindow(QMainWindow):
             self.centralWidget().height() - self.size_grip.height() - margin,
         )
         self.size_grip.raise_()
+
+    def shutdown(self) -> bool:
+        """Stop background work and release application-owned resources once."""
+
+        if self._shutdown_complete:
+            return True
+        if not self.scan_control_page.shutdown():
+            return False
+        self.context.shutdown()
+        self._shutdown_complete = True
+        return True
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        """Match native close behavior while preventing orphaned hardware work."""
+
+        if self.scan_control_page.has_active_operations() and self.isVisible():
+            choice = QMessageBox.question(
+                self,
+                "退出程序",
+                "仍有设备任务正在运行。退出将先安全停止任务并关闭设备，是否继续？",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if choice != QMessageBox.StandardButton.Yes:
+                event.ignore()
+                return
+        if not self.shutdown():
+            QMessageBox.warning(self, "暂时无法退出", "设备任务仍在收尾，请稍候后再次关闭。")
+            event.ignore()
+            return
+        event.accept()

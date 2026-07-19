@@ -7,6 +7,8 @@ from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
+from nfs_scanner.storage.atomic import atomic_write_json
+
 
 def _now_text() -> str:
     return datetime.now().isoformat(timespec="seconds")
@@ -116,10 +118,7 @@ class ProjectStateManager:
         target = Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
         self._state.mark_saved(str(target))
-        target.write_text(
-            __import__("json").dumps(self._state.to_dict(), ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        atomic_write_json(target, self._state.to_dict())
 
     @classmethod
     def open_json(cls, path: str) -> ProjectStateManager:

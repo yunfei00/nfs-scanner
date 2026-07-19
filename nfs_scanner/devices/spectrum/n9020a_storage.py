@@ -11,6 +11,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Sequence
 
+from nfs_scanner.storage.atomic import append_text_durable, atomic_write_text
+
 
 def save_n9020a_trace_csv(
     *,
@@ -30,9 +32,7 @@ def save_n9020a_trace_csv(
     header = "fre," + ",".join(f"{value:g}" for value in normalized_frequencies)
     row = f"{x:g}_{y:g}_{z:g}," + ",".join(f"{value:g}" for value in normalized_values)
 
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-    with file_path.open("w", encoding="utf-8", newline="") as csv_file:
-        csv_file.write(f"{header}\n{row}\n")
+    atomic_write_text(file_path, f"{header}\n{row}\n")
 
     return len(normalized_values)
 
@@ -54,10 +54,8 @@ def append_n9020a_trace_csv(
 
     file_path.parent.mkdir(parents=True, exist_ok=True)
     if not file_path.exists():
-        with file_path.open("w", encoding="utf-8", newline="") as csv_file:
-            csv_file.write(f"{header}\n")
-    with file_path.open("a", encoding="utf-8", newline="") as csv_file:
-        csv_file.write(f"{row}\n")
+        atomic_write_text(file_path, f"{header}\n")
+    append_text_durable(file_path, f"{row}\n")
 
     return len(normalized_values)
 

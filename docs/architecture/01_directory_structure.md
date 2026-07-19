@@ -8,6 +8,7 @@ nfs_scanner/
 
   application/
     context.py                 # 管理器组合根
+    paths.py                   # 用户配置、状态、日志和数据目录
 
   ui/
     main_window.py             # 唯一窗口
@@ -17,6 +18,7 @@ nfs_scanner/
       app_header.py
       scan_control_page.py     # 页面状态和核心交互
       scan_control_layout.py   # 控件与布局
+      scan_control_lifecycle.py # 时钟、诊断和安全关闭
       scan_workers.py          # 后台 Worker
       instrument_operations.py # 仪表动作
       scan_control_support.py  # 串口/配置/存储辅助
@@ -25,10 +27,9 @@ nfs_scanner/
 
   core/                        # 扫描、状态、项目和业务规则
   devices/                     # 设备适配及传输实现
-  storage/                     # 数据集持久化
-  infra/                       # 日志等基础设施
+  storage/                     # 数据集、原子写入和扫描会话清单
+  infra/                       # 日志、诊断和异常处理
   config/                      # 配置加载
-  analysis/                    # 数据分析
 
 resources/styles/
   engineering_dark.qss        # 唯一全局主题
@@ -44,6 +45,7 @@ tools/unified_ui_check.py
 | 窗口骨架 | `ui/main_window.py` |
 | 页面控件和布局 | `ui/widgets/scan_control_layout.py` |
 | 页面交互和状态 | `ui/widgets/scan_control_page.py` |
+| 页面时钟、诊断和关闭 | `ui/widgets/scan_control_lifecycle.py` |
 | 扫描/仪表后台任务 | `ui/widgets/scan_workers.py` |
 | 仪表操作 | `ui/widgets/instrument_operations.py` |
 | 串口、配置和存储辅助 | `ui/widgets/scan_control_support.py` |

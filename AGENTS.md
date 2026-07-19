@@ -23,6 +23,7 @@ Near Field Scan System（nfs-scanner），Python 3.11 + PySide6 近场扫描桌�
 - `ui/main_window.py`：唯一窗口骨架。
 - `ui/widgets/scan_control_page.py`：页面状态、扫描生命周期和稳定公开操作方法。
 - `ui/widgets/scan_control_layout.py`：只构建布局和控件。
+- `ui/widgets/scan_control_lifecycle.py`：时钟、诊断导出与协作式关闭。
 - `ui/widgets/scan_workers.py`：后台线程 Worker。
 - `ui/widgets/instrument_operations.py`：仪表搜索、查询、设置和采集动作。
 - `ui/widgets/scan_control_support.py`：串口发现、配置、存储和路径辅助。

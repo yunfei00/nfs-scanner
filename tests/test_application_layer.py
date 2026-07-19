@@ -40,9 +40,21 @@ def test_only_one_ui_implementation_exists() -> None:
     app_source = (project_root / "nfs_scanner" / "app.py").read_text(encoding="utf-8")
 
     assert not (project_root / "nfs_scanner" / "ui" / "commercial").exists()
-    assert "MainWindow()" in app_source
+    assert "MainWindow(context=context)" in app_source
     assert "NFS_SCANNER_UI" not in app_source
     assert "create_commercial_shell" not in app_source
+
+
+def test_only_one_scan_runtime_chain_exists() -> None:
+    project_root = Path(__file__).parents[1]
+    removed_parallel_modules = (
+        "nfs_scanner/core/real_scan_provider.py",
+        "nfs_scanner/core/real_scan_engine.py",
+        "nfs_scanner/core/scan_runtime.py",
+        "nfs_scanner/core/devices/real_device_provider.py",
+        "nfs_scanner/core/devices/simulation_provider.py",
+    )
+    assert not [path for path in removed_parallel_modules if (project_root / path).exists()]
 
 
 def test_package_metadata_uses_runtime_version_as_single_source() -> None:

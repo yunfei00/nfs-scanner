@@ -6,6 +6,8 @@ import json
 import shutil
 from pathlib import Path
 
+from nfs_scanner.storage.atomic import atomic_write_json
+
 from .model import ProjectModel
 
 
@@ -42,12 +44,7 @@ class ProjectSerializer:
         cls.ensure_project_structure(project_dir)
         model.project_root = str(project_dir)
         target = cls.project_file_path(project_dir)
-        tmp = target.with_suffix(target.suffix + ".tmp")
-        tmp.write_text(
-            json.dumps(model.to_dict(), ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        tmp.replace(target)
+        atomic_write_json(target, model.to_dict())
         return target
 
     @classmethod

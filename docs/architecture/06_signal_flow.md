@@ -1,95 +1,34 @@
-# 06 Signal Flow
+# 06 信号与执行流
 
-## 1. Goal
-
-This document defines how commands and updates move through the application.
-
-The goal is to keep UI responsive and avoid direct coupling between widgets and hardware.
-
-## 2. Command Flow
+## 扫描启动
 
 ```text
-User clicks button
-  -> UI emits intent
-  -> Application service validates request
-  -> Core manager creates or updates model
-  -> Device service performs hardware action if needed
-  -> Result is emitted back as state update
-  -> UI updates display
+用户点击开始
+  -> ScanControlPage 校验扫描区域、连接状态与输出路径
+  -> ScanManager 建立运行状态
+  -> ScanSessionStore 写入 running 清单
+  -> ScanWorker 在线程中逐点执行运动、等待、仪表采集和原子落盘
+  -> Worker 仅通过 Qt Signal 汇报进度、日志与最终结果
+  -> ScanControlPage 更新 ScanManager、会话清单和界面状态
 ```
 
-## 3. Scan Start Flow
+## 停止与急停
 
-```text
-Start Scan button
-  -> RealtimeView / PropertyPanel emits start_scan_requested
-  -> ScanRuntimeService validates project, devices and scan config
-  -> PathPlanner generates scan points
-  -> ScanManager creates scan job
-  -> Worker thread starts scan loop
-  -> UI receives scan_started signal
-```
+- “停止扫描”设置协作式停止事件；Worker 在运动、等待、采集和落盘检查点退出。
+- “软件急停”设置急停事件并向已打开的运动控制器发送实时停止字节。
+- 完成、失败、停止、急停使用不同的会话状态，不将残缺数据伪装为成功数据。
+- 关闭窗口时先停止 Worker，再关闭串口和仪表连接。
 
-## 4. Point Acquisition Flow
+## 设备发现与连接
 
-```text
-Worker moves platform
-  -> motion adapter confirms position
-  -> spectrum adapter acquires trace
-  -> storage appends point and trace data
-  -> HeatmapManager updates matrix
-  -> UI receives point_acquired
-  -> canvas updates heatmap/path/marker
-  -> spectrum panel updates trace
-  -> statistics panel updates progress
-```
+- 启动时仅发现串口与 VISA 资源，不自动连接设备。
+- 用户显式确认后才能打开运动串口。
+- 串口掉线后定时器只刷新可用性并提示用户，不自动重连。
+- 仪表查询失败直接报告失败，不生成模拟测量值。
 
-## 5. Device Status Flow
+## 线程边界
 
-```text
-Device connect request
-  -> DeviceService
-  -> Adapter connect
-  -> status model update
-  -> DeviceStatusPanel refresh
-  -> DeviceCenter log entry
-```
-
-## 6. Error Flow
-
-```text
-Adapter error
-  -> typed exception or error result
-  -> DeviceService/ScanRuntimeService catches it
-  -> state changes to error
-  -> UI shows status badge and message
-  -> log panel records details
-```
-
-## 7. UI Update Rule
-
-Only the main UI thread may update Qt widgets.
-
-Workers must communicate with signals, queues or service callbacks that return to the UI thread.
-
-## 8. Event Categories
-
-Recommended event categories:
-
-- project_loaded
-- device_status_changed
-- scan_started
-- scan_paused
-- scan_resumed
-- scan_stopped
-- scan_completed
-- point_started
-- point_acquired
-- heatmap_updated
-- spectrum_updated
-- error_reported
-- log_appended
-
-## 9. AI Agent Rule
-
-If implementing a new feature, describe its event flow before writing complex code.
+- QWidget 只在主线程创建和修改。
+- `ScanWorker` 在独立 `QThread` 中独占扫描期间的串口对象。
+- Worker 完成后先把串口对象迁回主线程，再释放线程对象。
+- 应用退出等待后台任务结束；超时会保留明确日志，不静默销毁运行中的线程。

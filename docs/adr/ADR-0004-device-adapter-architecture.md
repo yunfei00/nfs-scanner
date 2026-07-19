@@ -39,5 +39,5 @@ Costs:
 
 - UI must not call serial, VISA or camera SDK APIs directly.
 - Device errors must be converted to clear status and messages.
-- Device Center handles advanced setup.
+- The unified device operations area handles discovery, explicit connection and diagnostics.
 - Main scan screen shows summaries only.

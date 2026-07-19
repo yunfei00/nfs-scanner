@@ -100,16 +100,11 @@ Rules:
 - UI displays status and recovery hints
 - UI must not crash because a device fails
 
-## 9. Device Center
+## 9. Unified Device Operations
 
-Advanced setup belongs to Device Center.
-
-Main UI only shows summaries:
-
-- connected / disconnected
-- model
-- address
-- quick connect or open setup
+Device discovery, explicit connection and diagnostics belong to the single
+`ScanControlPage`. Device protocol details remain in `devices/`; layout code
+must not issue transport commands.
 
 ## 10. Plugin Compatibility
 
@@ -123,6 +118,6 @@ Every device family should have a mock adapter.
 
 Mock adapters are required for:
 
-- UI demo mode
+- the explicit offline instrument option in the unified UI
 - automated tests
 - development without instruments

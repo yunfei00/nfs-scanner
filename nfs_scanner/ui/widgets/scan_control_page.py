@@ -6,14 +6,12 @@ from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import QIODevice, QThread, QTimer
-from PySide6.QtGui import QDesktopServices
 from PySide6.QtSerialPort import QSerialPort
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QLabel,
     QLineEdit,
-    QMessageBox,
     QPlainTextEdit,
     QPushButton,
     QTableWidget,
@@ -22,15 +20,18 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from nfs_scanner.application import AppPaths
 from nfs_scanner.devices.spectrum import (
     MockSpectrumAnalyzer,
     SUPPORTED_INSTRUMENTS,
     SpectrumAnalyzerError,
 )
-from nfs_scanner.core import DeviceManager, ScanManager, ScanRuntimeSnapshot, SpectrumConfig
+from nfs_scanner.core import DeviceManager, ScanManager, SpectrumConfig
 from nfs_scanner.ui.serial_ports import (
     SerialPortCandidate,
 )
+from nfs_scanner.devices.motion.limits import PLATFORM_SOFT_LIMITS
+from nfs_scanner.storage import ScanSessionStore
 
 from .collapsible_section import CollapsibleSection
 from .instrument_operations import InstrumentOperationsMixin
@@ -39,9 +40,16 @@ from .scan_control_support import ScanControlSupportMixin
 
 from .scan_workers import InstrumentSearchWorker, ScanWorker
 from .scan_control_layout import ScanControlLayoutMixin
+from .scan_control_lifecycle import ScanControlLifecycleMixin
 
 
-class ScanControlPage(InstrumentOperationsMixin, ScanControlSupportMixin, ScanControlLayoutMixin, QWidget):
+class ScanControlPage(
+    InstrumentOperationsMixin,
+    ScanControlSupportMixin,
+    ScanControlLayoutMixin,
+    ScanControlLifecycleMixin,
+    QWidget,
+):
     """扫描控制页面。
 
     当前版本仅实现 UI 骨架、假数据联动与日志输出，后续可扩展真实硬件控制。
@@ -59,20 +67,11 @@ class ScanControlPage(InstrumentOperationsMixin, ScanControlSupportMixin, ScanCo
         "step_z",
     ]
     TABLE_HEADERS = ["起点 X", "起点 Y", "起点 Z", "终点 X", "终点 Y", "终点 Z", "步距 X", "步距 Y", "步距 Z"]
-    X_RANGE = (0.0, 200.0)
-    Y_RANGE = (-300.0, 0.0)
-    Z_RANGE = (0.0, 10.0)
-    INSTRUMENT_SEARCH_LOG_PATH = Path("output") / "instrument_search.log"
-    INSTRUMENT_CACHE_PATH = Path("config") / "instrument_devices.json"
-    SNAPSHOT_OUTPUT_DIR = Path("output") / "instrument_snapshots"
-    ZNA67_DEMO_FILE_PATH = Path(r"D:/zna67_demo.csv")
-    FSW_DEMO_FILE_PATH = Path(r"D:/fsw_demo.csv")
-    N9020A_DEMO_FILE_PATH = Path(r"D:/n9020a_demo.csv")
-    ZNA67_TEMP_TRACE_PATH = r"C:\temp\data.csv"
+    X_RANGE = (PLATFORM_SOFT_LIMITS["x_min"], PLATFORM_SOFT_LIMITS["x_max"])
+    Y_RANGE = (PLATFORM_SOFT_LIMITS["y_min"], PLATFORM_SOFT_LIMITS["y_max"])
+    Z_RANGE = (PLATFORM_SOFT_LIMITS["z_min"], PLATFORM_SOFT_LIMITS["z_max"])
     INSTRUMENT_ORDER = tuple(SUPPORTED_INSTRUMENTS)
     SERIAL_FALLBACK_INSTRUMENTS = frozenset({"ZNA67"})
-    SCAN_AREA_CONFIG_PATH = Path("config") / "scan_area_config.json"
-    SERIAL_CONFIG_PATH = Path("config") / "serial_port_config.json"
     SERIAL_RECONNECT_INTERVAL_MS = 5000
     SPECTRUM_WAIT_SECONDS = 0.12
     FIXED_SCAN_POINT_DWELL_SECONDS = 0.1
@@ -84,39 +83,6 @@ class ScanControlPage(InstrumentOperationsMixin, ScanControlSupportMixin, ScanCo
         "completed": "完成",
         "failed": "失败",
         "stopped": "停止",
-    }
-    INSTRUMENT_PLACEHOLDER_VALUES = {
-        "ZNA67": {
-            "start_freq": ("80.000", "MHz"),
-            "center_freq": ("3040.000", "MHz"),
-            "stop_freq": ("6000.000", "MHz"),
-            "span": ("5920.000", "MHz"),
-            "rbw": ("100.000", "kHz"),
-            "points": ("1601", None),
-            "scale": ("10.000", None),
-        },
-        "N9020A": {
-            "start_freq": ("10.000", "MHz"),
-            "center_freq": ("4005.000", "MHz"),
-            "stop_freq": ("8000.000", "MHz"),
-            "span": ("7990.000", "MHz"),
-            "rbw": ("100.000", "kHz"),
-            "points": ("1001", None),
-            "scale": ("10.000", None),
-            "trace_mode": ("WRIT", None),
-        },
-        "FSW": {
-            "start_freq": ("10.000", "MHz"),
-            "center_freq": ("13255.000", "MHz"),
-            "stop_freq": ("26500.000", "MHz"),
-            "span": ("26490.000", "MHz"),
-            "rbw": ("100.000", "kHz"),
-            "points": ("2001", None),
-            "scale": ("10.000", None),
-            "att": ("10.000", None),
-            "preamp": ("OFF", None),
-            "trace_mode": ("WRIT", None),
-        },
     }
     QUERY_LABELS = {
         "start_freq": "起始频率",
@@ -138,8 +104,20 @@ class ScanControlPage(InstrumentOperationsMixin, ScanControlSupportMixin, ScanCo
         *,
         scan_manager: ScanManager | None = None,
         device_manager: DeviceManager | None = None,
+        app_paths: AppPaths | None = None,
     ) -> None:
         super().__init__(parent)
+        self.app_paths = app_paths or AppPaths.default()
+        self.app_paths.ensure_runtime_directories()
+        self.INSTRUMENT_SEARCH_LOG_PATH = self.app_paths.instrument_search_log
+        self.INSTRUMENT_CACHE_PATH = self.app_paths.instrument_cache
+        self.SNAPSHOT_OUTPUT_DIR = self.app_paths.instrument_snapshots
+        instrument_test_dir = self.app_paths.data_dir / "instrument_tests"
+        self.ZNA67_DEMO_FILE_PATH = instrument_test_dir / "zna67_demo.csv"
+        self.FSW_DEMO_FILE_PATH = instrument_test_dir / "fsw_demo.csv"
+        self.N9020A_DEMO_FILE_PATH = instrument_test_dir / "n9020a_demo.csv"
+        self.SCAN_AREA_CONFIG_PATH = self.app_paths.scan_area_config
+        self.SERIAL_CONFIG_PATH = self.app_paths.serial_config
         self.current_x = 0.0
         self.current_y = 0.0
         self.current_z = 0.0
@@ -157,15 +135,19 @@ class ScanControlPage(InstrumentOperationsMixin, ScanControlSupportMixin, ScanCo
         self._executed_scan_points: list[tuple[float, float, float]] = []
         self._is_updating_scan_table = False
         self._active_scan_output_dir: Path | None = None
+        self._scan_session_store: ScanSessionStore | None = None
         self._scan_thread: QThread | None = None
         self._scan_worker: ScanWorker | None = None
         self._scan_stop_requested = False
+        self._scan_final_outcome: str | None = None
+        self._is_shutting_down = False
         self._instrument_search_thread: QThread | None = None
         self._instrument_search_worker: InstrumentSearchWorker | None = None
         self._pending_serial_port_name: str = ""
         self._last_serial_port_scan: list[SerialPortCandidate] = []
         self._last_serial_port_diagnostic_signature: tuple[str, ...] = ()
         self._auto_reconnect_notified = False
+        self._connection_safety_confirmed = False
 
         self._serial_reconnect_timer = QTimer(self)
         self._serial_reconnect_timer.setInterval(self.SERIAL_RECONNECT_INTERVAL_MS)
@@ -192,6 +174,7 @@ class ScanControlPage(InstrumentOperationsMixin, ScanControlSupportMixin, ScanCo
         self.start_button: QPushButton
         self.pause_button: QPushButton
         self.stop_button: QPushButton
+        self.emergency_stop_button: QPushButton
         self.search_button: QPushButton
         self.mock_spectrum_checkbox: QCheckBox
 
@@ -210,12 +193,12 @@ class ScanControlPage(InstrumentOperationsMixin, ScanControlSupportMixin, ScanCo
         self.log_section: CollapsibleSection
 
         self._setup_ui()
+        self._recover_interrupted_scan_sessions()
         self._connect_signals()
         self._load_scan_area_config()
         self._load_serial_config()
         self._start_clock()
         self._schedule_startup_device_tasks()
-
 
     def _connect_signals(self) -> None:
         self.step_x_edit.textChanged.connect(self._update_step_values_to_table)
@@ -315,6 +298,8 @@ class ScanControlPage(InstrumentOperationsMixin, ScanControlSupportMixin, ScanCo
         can_edit_serial = self._scan_thread is None
         self.open_serial_button.setEnabled(can_edit_serial and (not self.serial_is_open))
         self.close_serial_button.setEnabled(can_edit_serial and self.serial_is_open)
+        if hasattr(self, "emergency_stop_button"):
+            self.emergency_stop_button.setEnabled(self.serial_is_open or self._scan_thread is not None)
 
     def _enable_serial_monitoring(self) -> None:
         """绑定手动串口监控信号。"""
@@ -355,44 +340,21 @@ class ScanControlPage(InstrumentOperationsMixin, ScanControlSupportMixin, ScanCo
             self.pause_button.setText("暂停")
             self.pause_button.setEnabled(True)
             self.stop_button.setEnabled(True)
+            self.emergency_stop_button.setEnabled(True)
         elif state == "暂停":
             self.start_button.setText("开始")
             self.start_button.setEnabled(False)
             self.pause_button.setText("继续")
             self.pause_button.setEnabled(True)
             self.stop_button.setEnabled(True)
+            self.emergency_stop_button.setEnabled(True)
         else:
             self.start_button.setText("开始")
             self.start_button.setEnabled(not is_worker_active)
             self.pause_button.setText("暂停")
             self.pause_button.setEnabled(False)
             self.stop_button.setEnabled(False)
-
-    def _start_clock(self) -> None:
-        self.clock_timer = QTimer(self)
-        self.clock_timer.timeout.connect(self._refresh_clock)
-        self.clock_timer.start(1000)
-        self._refresh_clock()
-
-    def _refresh_clock(self) -> None:
-        snapshot = self._get_scan_runtime_snapshot()
-        time_text = f"时间: {datetime.now().strftime('%H:%M:%S')}"
-        remaining_seconds = snapshot.remaining_seconds
-        if remaining_seconds is None:
-            remaining_text = "剩余: --"
-        else:
-            remaining_text = f"剩余: {remaining_seconds} 秒"
-        if snapshot.estimated_completion_time is None:
-            eta_text = "预计完成: --"
-        else:
-            eta_text = f"预计完成: {snapshot.estimated_completion_time.strftime('%H:%M:%S')}"
-        self.time_status_label.setText(f"{time_text} | {remaining_text} | {eta_text}")
-        self.update_system_status(self.RUNTIME_STATUS_LABELS[snapshot.status])
-
-    def _get_scan_runtime_snapshot(self) -> ScanRuntimeSnapshot:
-        """返回当前扫描运行态快照。"""
-
-        return self.scan_manager.get_scan_runtime_snapshot()
+            self.emergency_stop_button.setEnabled(self.serial_is_open or is_worker_active)
 
     def append_log(self, message: str) -> None:
         """Append a timestamped message to the log area."""
@@ -412,6 +374,8 @@ class ScanControlPage(InstrumentOperationsMixin, ScanControlSupportMixin, ScanCo
         self._set_scan_button_states(status_text)
 
     def on_open_serial(self) -> None:
+        if not self._confirm_motion_connection_safety():
+            return
         self._open_serial_port_for_manual_control(emit_success_log=True, prompt_reset=True)
 
     def _open_serial_port_for_manual_control(
@@ -469,6 +433,7 @@ class ScanControlPage(InstrumentOperationsMixin, ScanControlSupportMixin, ScanCo
         if self._serial_port.isOpen():
             self._serial_port.close()
         self.serial_is_open = False
+        self._connection_safety_confirmed = False
         self._serial_reconnect_timer.stop()
         self._auto_reconnect_notified = False
         self._sync_serial_buttons()
@@ -580,6 +545,7 @@ class ScanControlPage(InstrumentOperationsMixin, ScanControlSupportMixin, ScanCo
         self._scan_point_index = 0
         self._executed_scan_points = []
         self._scan_stop_requested = False
+        self._scan_final_outcome = None
         try:
             spectrum_wait_seconds = self._read_spectrum_wait_seconds()
         except ValueError as error:
@@ -629,12 +595,17 @@ class ScanControlPage(InstrumentOperationsMixin, ScanControlSupportMixin, ScanCo
                 self._refresh_clock()
                 return
 
-        self._prepare_scan_storage_workspace()
+        try:
+            self._prepare_scan_storage_workspace()
+        except OSError as error:
+            self.scan_manager.fail_scan(f"扫描存储初始化失败：{error}")
+            self.append_log(f"开始扫描失败：无法初始化结果目录：{error}")
+            self._refresh_clock()
+            return
         self._refresh_clock()
         self._save_scan_plan_snapshot()
         self.append_log(
-            "扫描开始："
-            f"共 {len(self._scan_points)} 点，顺序为 Z 外层（增大）、Y 中层（减小）、X 内层（增大）"
+            f"扫描开始：共 {len(self._scan_points)} 点，顺序为 Z 外层（增大）、Y 中层（减小）、X 内层（增大）"
         )
         self.append_log(f"扫描点驻留（固定）: {self.FIXED_SCAN_POINT_DWELL_SECONDS:.2f} 秒")
         self.append_log(f"频谱等待时间: {spectrum_wait_seconds:.2f} 秒")
@@ -686,6 +657,24 @@ class ScanControlPage(InstrumentOperationsMixin, ScanControlSupportMixin, ScanCo
         self._scan_stop_requested = True
         self._scan_worker.request_stop()
         self.append_log("已请求停止扫描，正在等待当前阶段安全退出。")
+
+    def on_emergency_stop(self) -> None:
+        """Request the fastest available software stop and preserve fault state."""
+
+        self._scan_stop_requested = True
+        if self._scan_worker is not None:
+            self._scan_worker.request_emergency_stop()
+            self.append_log("已触发软件急停，正在发送控制器复位停止命令")
+            return
+
+        if self.serial_is_open and self._serial_port.isOpen():
+            written = self._serial_port.write(b"\x18")
+            if written > 0 and self._serial_port.waitForBytesWritten(200):
+                self.append_log("已发送软件急停命令；请检查设备并重新复位后再运行")
+            else:
+                self.append_log(f"软件急停命令发送失败: {self._serial_port.errorString() or '写入失败'}")
+            return
+        self.append_log("软件急停未发送：运动控制串口未打开")
 
     def _start_scan_worker(
         self,
@@ -753,18 +742,29 @@ class ScanControlPage(InstrumentOperationsMixin, ScanControlSupportMixin, ScanCo
         self._executed_scan_points.append((x, y, z))
         self._scan_point_index = point_index
         self.scan_manager.record_completed_point()
+        if self._scan_session_store is not None:
+            try:
+                self._scan_session_store.update_progress(point_index)
+            except OSError as error:
+                self.append_log(f"扫描清单更新失败，已请求安全停止：{error}")
+                if self._scan_worker is not None:
+                    self._scan_worker.request_stop()
         self._refresh_clock()
         self.append_log(f"扫描点 {point_index}/{total_points} 完成")
 
     def _on_scan_worker_finished(self, outcome: str, message: str) -> None:
+        self._scan_final_outcome = outcome
         if outcome == "completed":
             self.scan_manager.complete_scan()
             self._save_scan_execution_snapshot(completed=True)
             self.append_log("扫描结束：全部路径点执行完成")
-        elif outcome == "stopped":
+        elif outcome in {"stopped", "emergency_stopped"}:
             self.scan_manager.stop_scan()
             self._save_scan_execution_snapshot(completed=False)
-            self.append_log("扫描已停止")
+            if outcome == "emergency_stopped":
+                self.append_log("扫描已由软件急停终止；恢复前必须检查设备并重新复位")
+            else:
+                self.append_log("扫描已停止")
         else:
             self.scan_manager.fail_scan(message)
             self._save_scan_execution_snapshot(completed=False)
@@ -784,23 +784,5 @@ class ScanControlPage(InstrumentOperationsMixin, ScanControlSupportMixin, ScanCo
         self._sync_serial_buttons()
         self._refresh_clock()
 
-    def on_clear_log(self) -> None:
-        self.log_edit.clear()
-        self.append_log("日志已清空")
 
-
-    def on_open_result_folder(self) -> None:
-        if self._active_scan_output_dir is not None and self._active_scan_output_dir.exists():
-            path = self._active_scan_output_dir
-        else:
-            path = Path(self.result_path_edit.text().strip() or "output")
-        if path.exists():
-            QDesktopServices.openUrl(path.resolve().as_uri())
-            self.append_log(f"打开结果目录: {path}")
-        else:
-            QMessageBox.warning(self, "路径不存在", f"结果路径不存在: {path}")
-            self.append_log(f"结果路径不存在: {path}")
-
-    def on_show_heatmap(self) -> None:
-        QMessageBox.information(self, "占位提示", "热力图显示功能将在后续版本接入。")
-        self.append_log("显示热力图操作触发（占位）")
+__all__ = ["ScanControlPage"]

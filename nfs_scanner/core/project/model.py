@@ -1,4 +1,4 @@
-"""Project data model for Commercial V1."""
+"""Project data model for the unified application."""
 
 from __future__ import annotations
 

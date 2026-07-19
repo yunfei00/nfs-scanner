@@ -14,6 +14,7 @@ from nfs_scanner.core import DeviceManager, ScanManager
 from nfs_scanner.ui.main_window import MainWindow
 from nfs_scanner.ui.theme import load_theme
 from nfs_scanner.ui.widgets.scan_control_layout import ScanControlLayoutMixin
+from nfs_scanner.ui.widgets.scan_control_lifecycle import ScanControlLifecycleMixin
 from nfs_scanner.ui.widgets.scan_control_page import ScanControlPage, ScanWorker
 from nfs_scanner.ui.widgets.scan_control_support import ScanControlSupportMixin
 from nfs_scanner.ui.widgets.instrument_operations import InstrumentOperationsMixin
@@ -119,6 +120,7 @@ class UnifiedUiTestCase(unittest.TestCase):
         page = self.window.scan_control_page
 
         self.assertIsInstance(page, ScanControlLayoutMixin)
+        self.assertIsInstance(page, ScanControlLifecycleMixin)
         self.assertIsInstance(page, ScanControlSupportMixin)
         self.assertIsInstance(page, InstrumentOperationsMixin)
         self.assertIs(ScanWorker, ExtractedScanWorker)

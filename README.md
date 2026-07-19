@@ -9,7 +9,8 @@ Near Field Scan System（近场扫描系统）是基于 Python 3.11 与 PySide6 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev]"
+python -m pip install -r requirements-windows.lock -r requirements-dev.lock
+python -m pip install --no-build-isolation --no-deps -e .
 python -m nfs_scanner
 ```
 
@@ -20,21 +21,21 @@ python run.py
 nfs-scanner
 ```
 
-仅安装运行依赖时可使用：
+仅安装运行依赖时使用锁定文件：
 
 ```powershell
-python -m pip install -r requirements.txt
+python -m pip install -r requirements-windows.lock
 ```
 
 ## 唯一界面
 
 统一界面保留已经调试的原始操作接口：
 
-- 串口枚举、打开、关闭和自动重连；
+- 串口枚举、显式打开、关闭和掉线监测（不会自动重连）；
 - X/Y/Z 点动、绝对坐标、复位、位置与版本查询；
 - 扫描起点、终点、步距、等待时间和执行控制；
 - ZNA67、N9020A、FSW 搜索、参数查询/设置和数据保存；
-- 结果路径、热力图入口、运行日志和坐标/时间/状态显示。
+- 结果路径、诊断包导出、运行日志和坐标/时间/状态显示。
 
 界面使用左右双滚动工作区，可在常见屏幕高度下访问全部控件。内部扫描字段保持不变，表头改为中文用户文案。
 
@@ -50,6 +51,7 @@ app.py
             ↓
         ScanControlPage（稳定公开页面 API）
             ├─ scan_control_layout.py      布局构建
+            ├─ scan_control_lifecycle.py   时钟、诊断和安全关闭
             ├─ scan_workers.py             后台扫描/搜索 Worker
             ├─ instrument_operations.py    仪表操作
             └─ scan_control_support.py     串口、配置、存储和路径辅助
@@ -76,14 +78,16 @@ tools/           # 结构验收工具
 
 - 不修改已调试的串口、运动和频谱仪命令接口。
 - 真实设备操作仍受现有配置、软限位和安全检查保护。
-- 未连接设备时，界面只展示状态和诊断信息。
+- 启动只发现设备，不自动打开任何真实控制通道。
+- 串口掉线恢复后必须由操作员再次确认并手动连接。
 - 真实运动联调前必须阅读 [安全检查清单](docs/safety_checklist.md)。
 - 自动化测试默认不连接或操作真实硬件。
 
 本地设备配置可从示例创建：
 
 ```powershell
-Copy-Item config\devices.example.yaml config\devices.local.yaml
+New-Item -ItemType Directory -Force "$env:APPDATA\NFSScanner"
+Copy-Item config\devices.example.yaml "$env:APPDATA\NFSScanner\devices.local.yaml"
 ```
 
 ## 验证
@@ -106,6 +110,8 @@ python -m nfs_scanner
 ## 文档
 
 - [实施状态](docs/implementation_status.md)
+- [用户手册](docs/USER_GUIDE.md)
+- [硬件验收矩阵](docs/hardware_acceptance_matrix.md)
 - [架构设计](docs/architecture/README.md)
 - [开发与测试](docs/development/README.md)
 - [运动控制](docs/motion_controller.md)

@@ -1,32 +1,34 @@
-# 导出与报告
+# 扫描数据、导出与诊断
 
-## 导出目录
+## 数据目录
 
-| 类型 | 路径 | 触发 |
-|------|------|------|
-| CSV | `outputs/exports/scan_data_YYYYMMDD_HHMMSS.csv` | 工具栏导出 → CSV |
-| JSON | `outputs/exports/scan_result_YYYYMMDD_HHMMSS.json` | 工具栏导出 → JSON |
-| PNG | `outputs/exports/realtime_view_YYYYMMDD_HHMMSS.png` | 工具栏导出 → PNG |
-| 相机 JPG | `outputs/camera/camera_YYYYMMDD_HHMMSS.jpg` | 相机 Tab 拍照 |
-| HTML 报告 | `outputs/reports/report_YYYYMMDD_HHMMSS.html` | 工具栏报告 / 报告中心 |
+正式运行数据不再写入源码目录。默认位置为当前用户“文档”目录下的
+`NFSScanner/Scans`，可通过 `NFS_SCANNER_DATA_DIR` 由部署环境覆盖。
 
-## CSV 字段
+每次扫描创建独立目录，包含：
 
-```text
-index,x_mm,y_mm,z_mm,frequency_hz,amplitude_dbm,timestamp
-```
+- `scan_manifest.json`：版本、计划点数、已完成点数、运行状态和错误信息。
+- 扫描计划与执行快照。
+- 各仪表沿用现有格式保存的逐点测量数据。
+- `checksums.sha256`：扫描结束后生成的结果文件校验清单。
 
-## HTML 报告内容
+配置文件、日志和扫描数据分别进入用户配置目录、用户状态目录和用户文档目录。历史仓库相对配置只在首次启动时复制一次，不覆盖用户已经修改的配置。
 
-- 项目名称、编号、扫描区域、点数、状态
-- 设备连接摘要
-- 相机底图路径（如有）
-- 最近导出路径
-- 运行日志摘要（最近 20 条）
+## 中断识别
 
-PDF 导出暂未实现；报告页可导出 Mock PDF placeholder。
+扫描开始时清单状态为 `running`。正常完成、普通停止、软件急停和失败分别记录为
+`completed`、`stopped`、`emergency_stopped`、`failed`。应用下次启动会把上次遗留的
+`running` 扫描标记为 `interrupted`，避免残缺数据被误认为成功结果。
 
-## 模块
+## 诊断包
 
-- `nfs_scanner/core/export_manager.py`
-- `nfs_scanner/core/report_generator.py`
+界面可导出 ZIP 诊断包，内容仅包括：
+
+- 应用、构建、配置和数据格式版本。
+- Python 与操作系统信息。
+- 最近日志。
+- 已脱敏的 JSON 配置。
+
+诊断包不包含扫描测量文件；密码、令牌、密钥等字段会替换为 `***`。
+
+当前正式界面没有报告中心、PDF 或热力图导出入口。新增结果可视化时必须直接读取上述唯一扫描数据格式，不能建立第二套数据落盘链路。

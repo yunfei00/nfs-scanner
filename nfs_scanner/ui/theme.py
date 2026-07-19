@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
 THEME_PATH = Path(__file__).resolve().parents[2] / "resources" / "styles" / "engineering_dark.qss"
+APP_ICON_PATH = Path(__file__).resolve().parents[2] / "resources" / "icons" / "nfs_scanner.svg"
 
 
 def load_theme() -> str:
@@ -23,3 +25,5 @@ def apply_theme(app: QApplication) -> None:
 
     app.setStyle("Fusion")
     app.setStyleSheet(load_theme())
+    if APP_ICON_PATH.is_file():
+        app.setWindowIcon(QIcon(str(APP_ICON_PATH)))

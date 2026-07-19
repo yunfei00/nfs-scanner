@@ -1,22 +1,27 @@
 # 设备配置说明
 
-## 主配置文件（唯一推荐入口）
+## 推荐配置位置
+
+正式安装后的可写配置位于当前用户目录：
 
 ```text
-config/devices.yaml
+%APPDATA%\NFSScanner\devices.local.yaml
 ```
 
-首次使用请复制示例文件：
+从源码运行时可复制安全示例：
 
 ```powershell
-copy config\devices.example.yaml config\devices.yaml
+New-Item -ItemType Directory -Force "$env:APPDATA\NFSScanner"
+Copy-Item config\devices.example.yaml "$env:APPDATA\NFSScanner\devices.local.yaml"
 ```
 
 ## 读取优先级
 
-1. `config/devices.yaml`（优先）
-2. `config/devices.json`（兼容旧版，仅当 yaml 不存在时）
-3. 内置 Mock 默认（两者都不存在时）
+1. 用户目录 `devices.local.yaml`。
+2. 用户目录 `devices.yaml`。
+3. 用户目录 `devices.json`。
+4. 仓库相对 `config/` 下的同名旧配置（只为兼容开发环境）。
+5. 安全的 Mock 默认值。
 
 ## 安全默认值
 
@@ -25,4 +30,4 @@ copy config\devices.example.yaml config\devices.yaml
 - `instrument.enabled: false`
 - `camera.safe_enumeration: true`
 
-真实硬件需手动启用上述项，并在 UI 中切换 **Real Hardware** 且设置 `NFS_SCANNER_REAL_DEVICES=1`。
+统一界面的运动串口仍由操作员在界面中显式选择和确认后打开。配置文件不能绕过界面确认、软件急停或软限位。

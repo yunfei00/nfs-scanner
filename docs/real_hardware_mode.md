@@ -1,38 +1,31 @@
-# Real Hardware 模式说明
+# 真实硬件运行说明
 
-## 与 Mock Dry Run 的区别
+## 统一界面连接方式
 
-| | Mock Dry Run | Real Hardware |
-|---|--------------|---------------|
-| 运动 | 内存模拟 | 串口 GRBL/G-code |
-| 频谱仪 | 合成 trace | VISA/SCPI 真实采集 |
-| 默认 | **是** | 否，需 UI 确认 |
-| 环境变量 | 无要求 | `NFS_SCANNER_REAL_DEVICES=1` |
+### 运动平台
 
-## 启用方式
+1. 启动后应用只枚举串口，不自动打开。
+2. 操作员选择端口和波特率，确认工作区无人、行程无障碍且物理急停可用。
+3. 点击“打开串口”；需要时再执行复位、位置查询或小距离点动。
+4. 串口掉线恢复后必须重新检查设备并手动连接，应用不会自动重连。
 
-1. **UI**：设备中心 →「设备运行模式」→ Real Hardware → 确认对话框。
-2. **配置**：复制 `config/devices.example.yaml` 为 `config/devices.yaml`，再设置 `motion.enabled` / `instrument.enabled` 为 `true`。
-3. **环境变量**（可选）：
-   - `NFS_SCANNER_DEVICE_MODE=real`（仅预选，仍需 UI 确认）
-   - `NFS_SCANNER_REAL_DEVICES=1`（允许真实连接与运动）
+### 频谱仪
 
-## 安全注意事项
+1. 安装 NI-VISA，或安装并验证适合现场的 PyVISA 后端。
+2. 点击仪表搜索，确认 ZNA67、N9020A 或 FSW 的 VISA 资源和 `*IDN?` 结果。
+3. 查询、设置和保存操作均使用现有仪表适配器；查询失败不会使用模拟数据替代。
+4. 只有显式勾选“模拟频谱仪”时才生成模拟频谱数据，运动平台仍是真实设备。
 
-- 上电前确认急停可用、扫描区域无人无物。
-- 首次使用先执行 Test IDN、查询位置、Single Sweep Test。
-- Test Move 仅 +1mm X，且需确认。
-- Home / 真实扫描开始前均有二次确认。
+## 停止与急停
 
-## Stop / Emergency Stop
+- “停止扫描”是协作式停止，会保留已经成功采集的数据并记录为 `stopped`。
+- “软件急停”会立即设置急停事件并向已打开串口发送实时停止字节，记录为 `emergency_stopped`。
+- 软件急停不能替代独立的物理急停回路。
+- 急停后必须检查机械和控制器状态，重新复位后才能继续工作。
 
-- **停止扫描**：工具栏停止 → 设置 stop flag → motion.stop + instrument abort → 保存已采集数据。
-- **Emergency Stop**：设备中心 Emergency Stop → `motion.emergency_stop()` + abort。
+## 程序化设备适配器
 
-## 常见问题
+仓库保留的 `HardwareDeviceManager` / `SerialMotionController` API 仍使用
+`NFS_SCANNER_REAL_DEVICES=1` 和真实模式配置作为额外门禁。这套 API 不会让统一界面在启动时自动连接设备。
 
-**Q: 切换 Real 后连接失败？**  
-A: 检查 `NFS_SCANNER_REAL_DEVICES=1`、`enabled=true`、串口/VISA 资源是否正确。
-
-**Q: Mock Demo 是否受影响？**  
-A: 默认仍为 Mock；不切换模式则行为与之前一致。
+现场操作必须遵循[硬件验收矩阵](hardware_acceptance_matrix.md)与[安全检查清单](safety_checklist.md)。

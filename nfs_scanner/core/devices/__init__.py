@@ -1,25 +1,5 @@
-"""Device abstraction layer for Commercial V1."""
+"""Shared safety boundary for hardware adapters."""
 
-from .protocols import (
-    CameraDeviceProtocol,
-    DeviceCommandResult,
-    DeviceConnectionState,
-    DeviceProviderProtocol,
-    DeviceStateModel,
-    MotionDeviceProtocol,
-    SpectrumDeviceProtocol,
-)
 from .safety_gate import SafetyGate
-from .simulation_provider import SimulationDeviceProvider
 
-__all__ = [
-    "CameraDeviceProtocol",
-    "DeviceCommandResult",
-    "DeviceConnectionState",
-    "DeviceProviderProtocol",
-    "DeviceStateModel",
-    "MotionDeviceProtocol",
-    "SafetyGate",
-    "SimulationDeviceProvider",
-    "SpectrumDeviceProtocol",
-]
+__all__ = ["SafetyGate"]

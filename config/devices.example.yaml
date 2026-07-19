@@ -1,12 +1,13 @@
-# Safe example — copy to config/devices.yaml and edit for real hardware.
-#   copy config\devices.example.yaml config\devices.yaml
+# Safe example — copy to the current user's NFSScanner config directory.
+#   New-Item -ItemType Directory -Force "$env:APPDATA\NFSScanner"
+#   Copy-Item config\devices.example.yaml "$env:APPDATA\NFSScanner\devices.local.yaml"
 #
 # Real hardware requires ALL of:
 #   - mode: real
 #   - motion.enabled / instrument.enabled as needed
 #   - NFS_SCANNER_REAL_DEVICES=1
 #   - NFS_SCANNER_DEVICE_MODE=real
-#   - UI confirmation in Device Center
+#   - explicit operator confirmation before opening a real control channel
 
 mode: mock
 

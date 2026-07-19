@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
@@ -26,6 +27,7 @@ from nfs_scanner.devices.spectrum import (
 )
 from nfs_scanner.core import ScanManager
 from nfs_scanner.infra.logging_config import get_logger
+from nfs_scanner.storage.atomic import append_text_durable, atomic_write_json
 
 
 class InstrumentSearchWorker(QObject):
@@ -36,10 +38,19 @@ class InstrumentSearchWorker(QObject):
     def __init__(self, preferred_resources: tuple[str, ...] = ()) -> None:
         super().__init__()
         self.preferred_resources = preferred_resources
+        self._cancel_event = threading.Event()
+
+    def request_cancel(self) -> None:
+        """Suppress discovery processing after the current backend call returns."""
+
+        self._cancel_event.set()
 
     def run(self) -> None:
         """执行搜索并发出结果。"""
         try:
+            if self._cancel_event.is_set():
+                self.finished.emit(InstrumentDiscoveryResult(probes=[], pyvisa_available=True))
+                return
             if self.preferred_resources:
                 tcpip_resources = tuple(
                     resource_name
@@ -53,11 +64,14 @@ class InstrumentSearchWorker(QObject):
                     for name in SUPPORTED_INSTRUMENTS
                     if cached_result.matched_resources_for(name)
                 }
-                if cached_matches:
+                if cached_matches and not self._cancel_event.is_set():
                     self.finished.emit(cached_result)
                     return
             result = discover_supported_instruments_via_visa()
-            self.finished.emit(result)
+            if self._cancel_event.is_set():
+                self.finished.emit(InstrumentDiscoveryResult(probes=[], pyvisa_available=True))
+            else:
+                self.finished.emit(result)
         except Exception as error:  # pragma: no cover - depends on local VISA runtime status
             get_logger(__name__).exception("仪表搜索线程发生异常，已回退为空结果: %s", error)
             self.finished.emit(InstrumentDiscoveryResult(probes=[], pyvisa_available=True))
@@ -103,12 +117,22 @@ class ScanWorker(QObject):
         self._scan_manager = scan_manager
         self._stop_requested = False
         self._pause_requested = False
+        self._stop_event = threading.Event()
+        self._emergency_stop_event = threading.Event()
         self._serial_rx_buffer = ""
 
     def request_stop(self) -> None:
         """请求停止扫描，worker 会在阶段检查点尽快退出。"""
 
         self._stop_requested = True
+        self._stop_event.set()
+
+    def request_emergency_stop(self) -> None:
+        """Request an urgent software stop at the next device-I/O checkpoint."""
+
+        self._stop_requested = True
+        self._stop_event.set()
+        self._emergency_stop_event.set()
 
     def request_pause(self) -> None:
         """请求暂停扫描。"""
@@ -133,13 +157,13 @@ class ScanWorker(QObject):
                 return
 
             for point_index, (x, y, z) in enumerate(self._scan_points, start=1):
-                if self._stop_requested:
+                if self._stop_is_requested():
                     self._send_stop(self._serial_port)
-                    self.finished.emit("stopped", "扫描已停止")
+                    self._emit_stopped()
                     return
                 if not self._wait_if_paused():
                     self._send_stop(self._serial_port)
-                    self.finished.emit("stopped", "扫描已停止")
+                    self._emit_stopped()
                     return
 
                 self.point_started.emit(point_index, len(self._scan_points), x, y, z)
@@ -156,21 +180,25 @@ class ScanWorker(QObject):
                     timeout_seconds=self._motion_timeout_seconds,
                 )
                 if not done:
+                    if self._stop_is_requested():
+                        self._send_stop(self._serial_port)
+                        self._emit_stopped()
+                        return
                     self.finished.emit("error", reason)
                     return
 
                 if not self._wait_with_stop_check(self._dwell_seconds):
                     self._send_stop(self._serial_port)
-                    self.finished.emit("stopped", "扫描已停止")
+                    self._emit_stopped()
                     return
 
-                if self._stop_requested:
+                if self._stop_is_requested():
                     self._send_stop(self._serial_port)
-                    self.finished.emit("stopped", "扫描已停止")
+                    self._emit_stopped()
                     return
                 if not self._wait_if_paused():
                     self._send_stop(self._serial_port)
-                    self.finished.emit("stopped", "扫描已停止")
+                    self._emit_stopped()
                     return
 
                 try:
@@ -182,6 +210,11 @@ class ScanWorker(QObject):
                     )
                 except SpectrumAnalyzerError as error:
                     self.finished.emit("error", f"采集失败: {error}")
+                    return
+
+                if self._stop_is_requested():
+                    self._send_stop(self._serial_port)
+                    self._emit_stopped()
                     return
 
                 saved, message = self._save_scan_point_data(
@@ -201,6 +234,7 @@ class ScanWorker(QObject):
 
             self.finished.emit("completed", "扫描完成")
         except Exception as error:  # noqa: BLE001
+            get_logger(__name__).exception("扫描线程发生未处理异常: %s", error)
             self.finished.emit("error", f"扫描线程异常: {error}")
         finally:
             self._finalize_serial_session()
@@ -228,7 +262,7 @@ class ScanWorker(QObject):
         latest_state = ""
         latest_status_line = ""
         while time.monotonic() < deadline:
-            if self._stop_requested:
+            if self._stop_is_requested():
                 return False, "扫描已停止"
             status_line = self._query_motion_status(serial_port)
             if status_line is None:
@@ -274,6 +308,8 @@ class ScanWorker(QObject):
         latest_state = ""
         latest_status_line = ""
         while time.monotonic() < deadline:
+            if self._stop_is_requested():
+                return False, "扫描已停止"
             status_line = self._query_motion_status(serial_port)
             if status_line is None:
                 time.sleep(self.STATUS_POLL_INTERVAL_SECONDS)
@@ -302,7 +338,7 @@ class ScanWorker(QObject):
 
         end_time = time.monotonic() + seconds
         while time.monotonic() < end_time:
-            if self._stop_requested:
+            if self._stop_is_requested():
                 return False
             if not self._wait_if_paused():
                 return False
@@ -313,7 +349,7 @@ class ScanWorker(QObject):
         """暂停期间阻塞执行，持续监听停止请求。"""
 
         while self._pause_requested:
-            if self._stop_requested:
+            if self._stop_is_requested():
                 return False
             time.sleep(0.05)
         return True
@@ -334,6 +370,9 @@ class ScanWorker(QObject):
         """Best-effort serial cleanup so the next scan starts from a clean state."""
 
         if not self._serial_port.isOpen():
+            return
+        if self._emergency_stop_is_requested():
+            self._reset_serial_rx_state(self._serial_port)
             return
         self._reset_serial_rx_state(self._serial_port)
         ready, reason = self._ensure_controller_ready(self._serial_port)
@@ -361,6 +400,20 @@ class ScanWorker(QObject):
     def _send_stop(self, serial_port: QSerialPort) -> None:
         serial_port.write(b"\x18")
         serial_port.waitForBytesWritten(200)
+
+    def _stop_is_requested(self) -> bool:
+        stop_event = getattr(self, "_stop_event", None)
+        return bool(getattr(self, "_stop_requested", False)) or bool(stop_event and stop_event.is_set())
+
+    def _emergency_stop_is_requested(self) -> bool:
+        emergency_event = getattr(self, "_emergency_stop_event", None)
+        return bool(emergency_event and emergency_event.is_set())
+
+    def _emit_stopped(self) -> None:
+        if self._emergency_stop_is_requested():
+            self.finished.emit("emergency_stopped", "扫描已由软件急停终止")
+        else:
+            self.finished.emit("stopped", "扫描已停止")
 
     def _read_serial_response_line(self, serial_port: QSerialPort, timeout_ms: int = 300) -> str | None:
         if not serial_port.waitForReadyRead(timeout_ms):
@@ -507,28 +560,28 @@ class ScanWorker(QObject):
                 }
             )
             try:
-                data_file.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
+                atomic_write_json(data_file, snapshot)
             except OSError as error:
                 return False, str(error)
 
         index_file = data_dir / "point_index.jsonl"
         try:
-            with index_file.open("a", encoding="utf-8") as handle:
-                handle.write(
-                    json.dumps(
-                        {
-                            "point_index": point_index,
-                            "instrument_name": instrument_name,
-                            "x": x,
-                            "y": y,
-                            "z": z,
-                            "saved_at": datetime.now().isoformat(timespec="seconds"),
-                            "file_name": data_file.name,
-                        },
-                        ensure_ascii=False,
-                    )
-                    + "\n"
+            append_text_durable(
+                index_file,
+                json.dumps(
+                    {
+                        "point_index": point_index,
+                        "instrument_name": instrument_name,
+                        "x": x,
+                        "y": y,
+                        "z": z,
+                        "saved_at": datetime.now().isoformat(timespec="seconds"),
+                        "file_name": data_file.name,
+                    },
+                    ensure_ascii=False,
                 )
+                + "\n",
+            )
         except OSError as error:
             return False, str(error)
         return True, "ok"

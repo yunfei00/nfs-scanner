@@ -180,6 +180,21 @@ QPushButton#dangerButton {
     border-color: #b44b58;
 }
 
+QPushButton#emergencyButton {
+    background-color: #8b1e2d;
+    border: 1px solid #ef5b6c;
+    color: #ffffff;
+    font-weight: 700;
+}
+
+QPushButton#emergencyButton:hover {
+    background-color: #a82436;
+}
+
+QPushButton#emergencyButton:pressed {
+    background-color: #6f1723;
+}
+
 QPushButton#dangerButton:hover {
     background-color: #963744;
 }

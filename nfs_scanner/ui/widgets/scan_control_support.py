@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import io
 import json
 import os
 from datetime import datetime
@@ -20,12 +21,28 @@ from nfs_scanner.ui.serial_ports import (
     filter_target_serial_ports,
     format_serial_port_diagnostic_lines,
 )
+from nfs_scanner.storage.atomic import atomic_write_json, atomic_write_text
+from nfs_scanner.storage import ScanSessionStore
 
 
 
 
 class ScanControlSupportMixin:
     """Support handlers retained behind the unified page API."""
+
+    def _recover_interrupted_scan_sessions(self) -> None:
+        """Identify sessions left running by an abnormal previous process exit."""
+
+        try:
+            interrupted = ScanSessionStore.mark_abandoned_sessions_interrupted(self.app_paths.data_dir)
+        except OSError as error:
+            self.append_log(f"中断任务检查失败: {error}")
+            return
+        if not interrupted:
+            return
+        self.append_log(f"发现 {len(interrupted)} 个上次异常中断的扫描任务，已保留全部已采集数据")
+        for path in interrupted[:3]:
+            self.append_log(f"中断任务目录: {path}")
 
     def _refresh_available_ports(self, selected_port: str | None = None) -> int:
         """刷新可用串口列表；没有匹配设备时展示全部枚举结果。"""
@@ -89,10 +106,7 @@ class ScanControlSupportMixin:
         payload = self._collect_scan_area_values()
         try:
             self.SCAN_AREA_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-            self.SCAN_AREA_CONFIG_PATH.write_text(
-                json.dumps(payload, ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
+            atomic_write_json(self.SCAN_AREA_CONFIG_PATH, payload)
         except OSError:
             return
 
@@ -207,12 +221,27 @@ class ScanControlSupportMixin:
             self._handle_serial_lost()
 
     def _schedule_startup_device_tasks(self) -> None:
-        """启动后自动执行仪表搜索与串口连接尝试。"""
+        """启动后只发现设备，不自动打开任何真实控制通道。"""
 
         if os.getenv("NFS_SCANNER_DISABLE_AUTO_STARTUP_TASKS") == "1":
             return
         QTimer.singleShot(0, self.on_search_instruments)
-        QTimer.singleShot(0, self._try_auto_open_serial_from_config)
+        QTimer.singleShot(0, self._discover_serial_ports_on_startup)
+
+    def _discover_serial_ports_on_startup(self) -> None:
+        """Load the preferred port and enumerate devices without connecting."""
+
+        configured_port = self._pending_serial_port_name.strip()
+        self.append_log("开始搜索可用串口设备...")
+        found_count = self._refresh_available_ports(selected_port=configured_port or None)
+        if found_count <= 0:
+            self._append_serial_port_scan_diagnostics(force=True)
+            return
+        if configured_port:
+            index = self.port_combo.findData(configured_port)
+            if index >= 0:
+                self.port_combo.setCurrentIndex(index)
+        self.append_log(f"已找到 {found_count} 个匹配串口设备，请确认安全后手动打开")
 
     def _load_serial_config(self) -> None:
         """加载串口配置（无文件时使用默认值）。"""
@@ -253,48 +282,26 @@ class ScanControlSupportMixin:
         }
         try:
             self.SERIAL_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-            self.SERIAL_CONFIG_PATH.write_text(
-                json.dumps(payload, ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
+            atomic_write_json(self.SERIAL_CONFIG_PATH, payload)
         except OSError:
             return
 
     def _try_auto_open_serial_from_config(self) -> None:
-        """尝试根据配置自动查找并打开串口。"""
+        """Compatibility alias retained without automatic real-device connection."""
 
-        if self.serial_is_open:
-            return
-        self.append_log("开始搜索可用串口设备...")
-        configured_port = self._pending_serial_port_name.strip()
-        found_count = self._refresh_available_ports(selected_port=configured_port or None)
-        if found_count <= 0:
-            self._append_serial_port_scan_diagnostics(force=True)
-            self._start_serial_reconnect_monitoring()
-            return
-        self._last_serial_port_diagnostic_signature = ()
-        self.append_log(f"已找到 {found_count} 个匹配串口设备")
-
-        if configured_port:
-            index = self.port_combo.findData(configured_port)
-            if index >= 0:
-                self.port_combo.setCurrentIndex(index)
-        if self._open_serial_port_for_manual_control(emit_success_log=True, prompt_reset=True):
-            self.append_log("已根据配置自动打开串口")
-        else:
-            self._start_serial_reconnect_monitoring()
+        self._discover_serial_ports_on_startup()
 
     def _start_serial_reconnect_monitoring(self) -> None:
-        """串口丢失后进入自动重连监控，每 5 秒提示一次。"""
+        """串口丢失后只监控设备重新出现，不自动重新连接。"""
 
         if not self._auto_reconnect_notified:
-            self.append_log("串口丢失或未连接，已启动自动重连（每 5 秒尝试一次）")
+            self.append_log("串口丢失，正在监控设备状态；设备恢复后需手动重新打开")
             self._auto_reconnect_notified = True
         if not self._serial_reconnect_timer.isActive():
             self._serial_reconnect_timer.start()
 
     def _attempt_auto_reconnect(self) -> None:
-        """自动尝试重新查找并打开串口。"""
+        """Detect a restored serial device without opening it automatically."""
 
         if self.serial_is_open:
             self._serial_reconnect_timer.stop()
@@ -315,16 +322,16 @@ class ScanControlSupportMixin:
             index = self.port_combo.findData(configured_port)
             if index >= 0:
                 self.port_combo.setCurrentIndex(index)
-
-        if self._open_serial_port_for_manual_control(emit_success_log=True, prompt_reset=False):
-            self.append_log("串口已恢复，自动重连成功")
+        self._serial_reconnect_timer.stop()
+        self.append_log("串口设备已恢复，请检查设备状态后手动点击“打开串口”")
 
     def _handle_serial_lost(self) -> None:
-        """处理串口断连并启动自动重连流程。"""
+        """处理串口断连并启动仅发现、不自动打开的恢复监测。"""
 
         if self._serial_port.isOpen():
             self._serial_port.close()
         self.serial_is_open = False
+        self._connection_safety_confirmed = False
         self._sync_serial_buttons()
         self._start_serial_reconnect_monitoring()
 
@@ -345,6 +352,26 @@ class ScanControlSupportMixin:
         if choice == QMessageBox.StandardButton.Yes:
             self.on_home_command()
 
+    def _confirm_motion_connection_safety(self) -> bool:
+        """Require one explicit operator confirmation before opening motion I/O."""
+
+        if self._connection_safety_confirmed:
+            return True
+        if os.getenv("QT_QPA_PLATFORM") == "offscreen":
+            return True
+        choice = QMessageBox.warning(
+            self,
+            "连接运动设备",
+            "即将打开真实运动控制串口。请确认工作区域无人、行程无障碍，且物理急停可用。是否继续？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if choice != QMessageBox.StandardButton.Yes:
+            self.append_log("已取消打开串口：未确认运动设备安全条件")
+            return False
+        self._connection_safety_confirmed = True
+        return True
+
     def _prepare_scan_storage_workspace(self) -> None:
         """准备扫描过程中的数据存储目录和索引文件。"""
 
@@ -360,6 +387,21 @@ class ScanControlSupportMixin:
         combined_csv_file = data_dir / "all_points.csv"
         if combined_csv_file.exists():
             combined_csv_file.unlink()
+        panel = self.instrument_tabs.currentWidget()
+        instrument_name = str(getattr(panel, "instrument_name", "unknown"))
+        self._scan_session_store = ScanSessionStore(output_dir)
+        self._scan_session_store.start(
+            planned_points=self._scan_points,
+            metadata={
+                "project_name": self.project_name_edit.text().strip(),
+                "test_name": self.test_name_edit.text().strip(),
+                "instrument_name": instrument_name,
+                "mock_spectrum": self.mock_spectrum_checkbox.isChecked(),
+                "motion_port": str(self.port_combo.currentData() or self.port_combo.currentText()).strip(),
+                "motion_baudrate": int(self.baudrate_combo.currentText() or "115200"),
+                "scan_area": self._collect_scan_area_values(),
+            },
+        )
         self.append_log(f"已初始化扫描数据目录: {data_dir}")
 
     def _save_scan_plan_snapshot(self) -> None:
@@ -369,11 +411,12 @@ class ScanControlSupportMixin:
         output_dir.mkdir(parents=True, exist_ok=True)
         plan_file = output_dir / "scan_plan_points.csv"
 
-        with plan_file.open("w", encoding="utf-8", newline="") as file:
-            writer = csv.writer(file)
-            writer.writerow(["index", "x", "y", "z"])
-            for index, (x, y, z) in enumerate(self._scan_points, start=1):
-                writer.writerow([index, x, y, z])
+        buffer = io.StringIO(newline="")
+        writer = csv.writer(buffer)
+        writer.writerow(["index", "x", "y", "z"])
+        for index, (x, y, z) in enumerate(self._scan_points, start=1):
+            writer.writerow([index, x, y, z])
+        atomic_write_text(plan_file, buffer.getvalue())
 
         self.append_log(f"已保存扫描规划: {plan_file}")
 
@@ -384,11 +427,12 @@ class ScanControlSupportMixin:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         points_file = output_dir / "scan_executed_points.csv"
-        with points_file.open("w", encoding="utf-8", newline="") as file:
-            writer = csv.writer(file)
-            writer.writerow(["index", "x", "y", "z"])
-            for index, (x, y, z) in enumerate(self._executed_scan_points, start=1):
-                writer.writerow([index, x, y, z])
+        buffer = io.StringIO(newline="")
+        writer = csv.writer(buffer)
+        writer.writerow(["index", "x", "y", "z"])
+        for index, (x, y, z) in enumerate(self._executed_scan_points, start=1):
+            writer.writerow([index, x, y, z])
+        atomic_write_text(points_file, buffer.getvalue())
 
         status_file = output_dir / "scan_execution_status.json"
         payload = {
@@ -397,7 +441,22 @@ class ScanControlSupportMixin:
             "executed_points": len(self._executed_scan_points),
             "updated_at": datetime.now().isoformat(timespec="seconds"),
         }
-        status_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        atomic_write_json(status_file, payload)
+        if self._scan_session_store is not None:
+            snapshot = self.scan_manager.get_scan_runtime_snapshot()
+            status = self._scan_final_outcome or snapshot.status
+            if status not in {"completed", "failed", "stopped"}:
+                if status != "emergency_stopped":
+                    status = "completed" if completed else "stopped"
+            try:
+                checksum_path = self._scan_session_store.finalize(
+                    status=status,
+                    completed_points=len(self._executed_scan_points),
+                    error=snapshot.last_error,
+                )
+                self.append_log(f"已生成扫描数据校验清单: {checksum_path}")
+            except (OSError, RuntimeError) as error:
+                self.append_log(f"扫描清单最终写入失败: {error}")
         self.append_log(f"已保存扫描执行状态: {status_file}")
 
     def _create_scan_output_dir(self) -> Path:

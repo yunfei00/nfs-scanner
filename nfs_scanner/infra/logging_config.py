@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import logging
 import os
+from logging.handlers import RotatingFileHandler
 from datetime import datetime
 from pathlib import Path
+
+from nfs_scanner.application.paths import AppPaths
 
 DEFAULT_LOG_FORMAT = "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
 DEFAULT_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 DEFAULT_LOG_FILENAME_FORMAT = "%Y-%m-%d.log"
 LOG_DIRECTORY_ENV_VAR = "NFS_SCANNER_LOG_DIR"
+DEFAULT_MAX_LOG_BYTES = 10 * 1024 * 1024
+DEFAULT_LOG_BACKUP_COUNT = 10
 
 
 def get_log_directory() -> Path:
@@ -19,7 +24,7 @@ def get_log_directory() -> Path:
     override = os.getenv(LOG_DIRECTORY_ENV_VAR)
     if override:
         return Path(override).expanduser()
-    return Path.home() / ".nfs_scanner" / "logs"
+    return AppPaths.default().log_dir
 
 
 def _resolve_daily_log_file(log_directory: Path, now: datetime | None = None) -> Path:
@@ -29,18 +34,28 @@ def _resolve_daily_log_file(log_directory: Path, now: datetime | None = None) ->
     return log_directory / current_time.strftime(DEFAULT_LOG_FILENAME_FORMAT)
 
 
-def setup_logging(level: int = logging.INFO, *, force: bool = False) -> Path:
+def setup_logging(
+    level: int = logging.INFO,
+    *,
+    force: bool = False,
+    log_directory: Path | None = None,
+) -> Path:
     """Configure root logging with console output and daily file persistence."""
 
-    log_directory = get_log_directory()
-    log_directory.mkdir(parents=True, exist_ok=True)
-    log_file = _resolve_daily_log_file(log_directory)
+    resolved_log_directory = log_directory or get_log_directory()
+    resolved_log_directory.mkdir(parents=True, exist_ok=True)
+    log_file = _resolve_daily_log_file(resolved_log_directory)
 
     formatter = logging.Formatter(DEFAULT_LOG_FORMAT, datefmt=DEFAULT_DATE_FORMAT)
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(formatter)
 
-    file_handler = logging.FileHandler(log_file, encoding="utf-8")
+    file_handler = RotatingFileHandler(
+        log_file,
+        maxBytes=DEFAULT_MAX_LOG_BYTES,
+        backupCount=DEFAULT_LOG_BACKUP_COUNT,
+        encoding="utf-8",
+    )
     file_handler.setFormatter(formatter)
 
     logging.basicConfig(

@@ -7,11 +7,13 @@ from dataclasses import asdict, fields
 from pathlib import Path
 from typing import Any, TypeVar
 
+from nfs_scanner.application.paths import AppPaths
 from nfs_scanner.core.models import ScanConfig, SerialConfig, SpectrumConfig
+from nfs_scanner.storage.atomic import atomic_write_json
 
 T = TypeVar("T")
 
-DEFAULT_CONFIG_PATH = Path("config") / "app_config.json"
+DEFAULT_CONFIG_PATH = AppPaths.default().config_dir / "runtime_config.json"
 
 
 class ConfigManager:
@@ -66,8 +68,7 @@ class ConfigManager:
         """Write raw JSON payload to disk."""
 
         self._config_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._config_path.open("w", encoding="utf-8") as file:
-            json.dump(payload, file, ensure_ascii=False, indent=2)
+        atomic_write_json(self._config_path, payload)
 
     def _build_model(self, data: Any, model_type: type[T]) -> T:
         """Create a dataclass model from a possibly partial JSON section."""

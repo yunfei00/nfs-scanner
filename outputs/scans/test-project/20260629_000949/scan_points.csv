@@ -1,2 +1,0 @@
-index,x_mm,y_mm,z_mm,timestamp,peak_frequency_hz,peak_amplitude_dbm,status,error
-1,0.0,0.0,1.0,2026-06-29T00:09:49,0.0,0.0,error,Mock spectrum analyzer is not connected.

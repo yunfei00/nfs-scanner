@@ -324,6 +324,19 @@ class ScanControlPageSerialConfigTestCase(unittest.TestCase):
         self.assertFalse(self.page.serial_is_open)
         self.assertTrue(self.page._serial_reconnect_timer.isActive())
 
+    def test_reconnect_monitor_never_opens_the_port_automatically(self) -> None:
+        """A restored port requires an explicit operator action."""
+
+        self.page._pending_serial_port_name = "COM3"
+        with (
+            patch.object(self.page, "_refresh_available_ports", return_value=1),
+            patch.object(self.page, "_open_serial_port_for_manual_control") as open_port,
+        ):
+            self.page._attempt_auto_reconnect()
+
+        open_port.assert_not_called()
+        self.assertFalse(self.page.serial_is_open)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,4 +1,4 @@
-"""Recent projects list persisted under ~/.nfs_scanner."""
+"""Recent projects list persisted under the per-user application config directory."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from nfs_scanner.application.paths import AppPaths
+from nfs_scanner.storage.atomic import atomic_write_json
 
 @dataclass(slots=True)
 class RecentProjectEntry:
@@ -36,7 +38,7 @@ class RecentProjectService:
     """Track up to 10 recently opened project.nfsproj files."""
 
     MAX_ENTRIES = 10
-    _STORE = Path.home() / ".nfs_scanner" / "recent_projects.json"
+    _STORE = AppPaths.default().config_dir / "recent_projects.json"
 
     @property
     def store_path(self) -> Path:
@@ -147,4 +149,4 @@ class RecentProjectService:
                 for e in entries[: self.MAX_ENTRIES]
             ]
         }
-        self._STORE.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        atomic_write_json(self._STORE, payload)

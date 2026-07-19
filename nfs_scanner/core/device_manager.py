@@ -103,3 +103,10 @@ class DeviceManager:
 
     def get_connected_spectrum_devices(self) -> dict[str, ConnectedSpectrumDevice]:
         return self._hub.connected_spectrum_devices()
+
+    def shutdown(self) -> None:
+        """Release all device resources owned by the canonical hub."""
+
+        self._hub.shutdown()
+        for key in self._device_states:
+            self._device_states[key] = "disconnected"

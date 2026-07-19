@@ -11,8 +11,6 @@ dependencies = [
     "PySide6>=6.8,<7.0",
     "PyYAML>=6.0,<7.0",
     "numpy>=2.0,<3.0",
-    "matplotlib>=3.9,<4.0",
-    "pyqtgraph>=0.13,<0.14",
     "pyvisa>=1.14,<2.0",
     "opencv-python>=4.10,<5.0",
 ]
@@ -38,6 +36,11 @@ extend-exclude = [".venv", "output", "outputs"]
 
 [tool.setuptools.packages.find]
 include = ["nfs_scanner*"]
+
+[tool.setuptools.data-files]
+"resources/styles" = ["resources/styles/engineering_dark.qss"]
+"resources/icons" = ["resources/icons/nfs_scanner.svg"]
+"config" = ["config/devices.example.yaml", "config/scan_defaults.yaml"]
 
 [tool.setuptools.dynamic]
 version = {attr = "nfs_scanner.version.APP_VERSION"}

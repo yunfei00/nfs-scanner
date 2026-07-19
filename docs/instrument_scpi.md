@@ -12,7 +12,7 @@
 
 ## 配置
 
-`config/devices.yaml` → `instrument`：
+`%APPDATA%\NFSScanner\devices.local.yaml` → `instrument`（程序化适配器配置）：
 
 ```json
 {

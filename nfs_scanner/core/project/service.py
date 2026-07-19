@@ -1,14 +1,15 @@
-"""Commercial V1 project lifecycle service."""
+"""Project lifecycle service for the unified application."""
 
 from __future__ import annotations
 
-import json
 import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from nfs_scanner.application.paths import AppPaths
+from nfs_scanner.storage.atomic import atomic_write_json
 from .create_request import NewProjectRequest
 from .model import ProjectModel, ProjectSession
 from .recent import RecentProjectEntry, RecentProjectService
@@ -20,7 +21,7 @@ from .templates import (
     default_instrument_config,
 )
 
-_PROJECTS_ROOT = Path.home() / ".nfs_scanner" / "projects"
+_PROJECTS_ROOT = AppPaths.default().data_dir.parent / "Projects"
 _DEMO_PROJECT_DIR = _PROJECTS_ROOT / "DemoNearFieldScan"
 _DEMO_PROJECT_NAME = "Demo Near Field Scan"
 
@@ -114,12 +115,7 @@ class ProjectService:
     def safe_write_json(path: Path, data: dict[str, Any]) -> None:
         """Atomically write UTF-8 JSON without destroying the old file on failure."""
 
-        path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        text = json.dumps(data, ensure_ascii=False, indent=2)
-        tmp.write_text(text, encoding="utf-8")
-        tmp.replace(path)
+        atomic_write_json(path, data)
 
     @staticmethod
     def create_project_directories(project_root: Path) -> None:

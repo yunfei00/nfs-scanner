@@ -9,7 +9,9 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Mapping
 
+from nfs_scanner.application.paths import AppPaths
 from nfs_scanner.core.versioning import is_major_compatible, safe_version_str
+from nfs_scanner.storage.atomic import atomic_write_json
 from nfs_scanner.version import CONFIG_VERSION
 
 LOGGER = logging.getLogger(__name__)
@@ -43,7 +45,7 @@ def get_config_path() -> Path:
     override = os.getenv(CONFIG_PATH_ENV_VAR)
     if override:
         return Path(override).expanduser()
-    return Path.home() / ".nfs_scanner" / "config.json"
+    return AppPaths.default().config_dir / "app_config.json"
 
 
 def load_config() -> dict[str, Any]:
@@ -79,8 +81,7 @@ def save_config(config: Mapping[str, Any]) -> None:
     )
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with config_path.open("w", encoding="utf-8") as file:
-        json.dump(normalized_config, file, ensure_ascii=False, indent=2)
+    atomic_write_json(config_path, normalized_config)
 
     LOGGER.info("[CONFIG] config saved: version=%s", normalized_config.get("config_version"))
 

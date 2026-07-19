@@ -6,7 +6,6 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QButtonGroup,
     QComboBox,
-    QFormLayout,
     QGridLayout,
     QLabel,
     QLineEdit,
@@ -17,11 +16,7 @@ from PySide6.QtWidgets import (
 
 
 class InstrumentPanel(QWidget):
-    """仪表配置面板。
-
-    当前阶段为 `ZNA67`、`N9020A`、`FSW` 提供统一的基础参数编辑界面。
-    其他型号暂时只显示占位信息，避免过早引入不确定字段。
-    """
+    """ZNA67, N9020A and FSW configuration panel."""
 
     STANDARD_INSTRUMENTS = frozenset({"ZNA67", "N9020A", "FSW"})
     STANDARD_QUERY_KEYS = (
@@ -69,15 +64,13 @@ class InstrumentPanel(QWidget):
     def _setup_ui(self) -> None:
         """Build the panel according to the selected instrument type."""
 
-        if self.instrument_name in self.STANDARD_INSTRUMENTS:
-            self._query_keys = self.STANDARD_QUERY_KEYS
-            if self.instrument_name in {"FSW", "N9020A"}:
-                self._query_keys = self.ADVANCED_TRACE_QUERY_KEYS
-            self._action_keys = self.STANDARD_ACTION_KEYS
-            self._setup_standard_ui()
-            return
-
-        self._setup_placeholder_ui()
+        if self.instrument_name not in self.STANDARD_INSTRUMENTS:
+            raise ValueError(f"Unsupported instrument panel: {self.instrument_name}")
+        self._query_keys = self.STANDARD_QUERY_KEYS
+        if self.instrument_name in {"FSW", "N9020A"}:
+            self._query_keys = self.ADVANCED_TRACE_QUERY_KEYS
+        self._action_keys = self.STANDARD_ACTION_KEYS
+        self._setup_standard_ui()
 
     def _setup_standard_ui(self) -> None:
         """Create the shared query/set UI for supported instruments."""
@@ -328,20 +321,6 @@ class InstrumentPanel(QWidget):
             if button.isChecked():
                 return mode_code
         return "WRIT"
-
-    def _setup_placeholder_ui(self) -> None:
-        """Create a minimal placeholder panel for unsupported instruments."""
-
-        layout = QFormLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(8)
-
-        layout.addRow("仪表名称", QLabel(self.instrument_name, self))
-        layout.addRow("连接状态", QLabel("未连接", self))
-        layout.addRow("说明", QLabel("当前阶段暂未定义该型号参数面板", self))
-
-        self.discovered_label = QLabel("未发现设备", self)
-        layout.addRow("设备发现", self.discovered_label)
 
     def get_supported_query_keys(self) -> tuple[str, ...]:
         """Return the query keys currently exposed by the panel."""

@@ -2,7 +2,7 @@
 
 ## 配置
 
-见 `config/devices.yaml` → `motion`（主配置文件；示例见 `config/devices.example.yaml`）：
+程序化运动适配器配置见 `%APPDATA%\NFSScanner\devices.local.yaml` → `motion`（示例见 `config/devices.example.yaml`）：
 
 - `port`：如 `COM3`
 - `baudrate`：默认 `115200`

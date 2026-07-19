@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import sys
+import tempfile
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("NFS_SCANNER_DISABLE_AUTO_STARTUP_TASKS", "1")
@@ -19,6 +20,7 @@ from PySide6.QtWidgets import QApplication, QScrollArea, QToolButton  # noqa: E4
 
 from nfs_scanner.ui.main_window import MainWindow  # noqa: E402
 from nfs_scanner.ui.theme import apply_theme, load_theme  # noqa: E402
+from nfs_scanner.application import AppPaths, create_application_context  # noqa: E402
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -30,31 +32,49 @@ def main(argv: list[str] | None = None) -> int:
 
     app = QApplication.instance() or QApplication([])
     apply_theme(app)
-    window = MainWindow()
-    window.resize(1274, 720)
-    window.show()
-    app.processEvents()
-    page = window.scan_control_page
-    checks = {
-        "single_ui_source": not (REPO_ROOT / "nfs_scanner" / "ui" / "commercial").exists(),
-        "main_window": window.objectName() == "mainWindow",
-        "header": window.header.objectName() == "applicationHeader",
-        "frameless_window": bool(window.windowFlags() & Qt.WindowType.FramelessWindowHint),
-        "window_controls": all(
-            window.header.findChild(QToolButton, name) is not None
-            for name in ("minimizeWindowButton", "maximizeWindowButton", "closeWindowButton")
-        ),
-        "left_scroll": page.findChild(QScrollArea, "controlSidebarScroll") is not None,
-        "right_scroll": page.findChild(QScrollArea, "measurementWorkspaceScroll") is not None,
-        "chinese_scan_headers": page.scan_table.horizontalHeaderItem(0).text() == "起点 X",
-        "theme_loaded": bool(load_theme()),
-    }
-    if args.screenshot is not None:
-        args.screenshot.parent.mkdir(parents=True, exist_ok=True)
-        checks["screenshot_saved"] = window.grab().save(str(args.screenshot), "PNG")
-    page.clock_timer.stop()
-    page._serial_reconnect_timer.stop()
-    window.close()
+    with tempfile.TemporaryDirectory(prefix="nfs-scanner-ui-check-") as temporary_directory:
+        runtime_root = Path(temporary_directory)
+        paths = AppPaths(
+            config_dir=runtime_root / "config",
+            state_dir=runtime_root / "state",
+            log_dir=runtime_root / "logs",
+            data_dir=runtime_root / "data",
+        )
+        window = MainWindow(context=create_application_context(paths=paths))
+        window.resize(1274, 720)
+        window.show()
+        app.processEvents()
+        page = window.scan_control_page
+        checks = {
+            "single_ui_source": not (REPO_ROOT / "nfs_scanner" / "ui" / "commercial").exists(),
+            "single_runtime_chain": not any(
+                path.exists()
+                for path in (
+                    REPO_ROOT / "nfs_scanner" / "core" / "real_scan_provider.py",
+                    REPO_ROOT / "nfs_scanner" / "core" / "real_scan_engine.py",
+                    REPO_ROOT / "nfs_scanner" / "core" / "scan_runtime.py",
+                    REPO_ROOT / "nfs_scanner" / "core" / "devices" / "real_device_provider.py",
+                    REPO_ROOT / "nfs_scanner" / "core" / "devices" / "simulation_provider.py",
+                )
+            ),
+            "main_window": window.objectName() == "mainWindow",
+            "header": window.header.objectName() == "applicationHeader",
+            "frameless_window": bool(window.windowFlags() & Qt.WindowType.FramelessWindowHint),
+            "window_controls": all(
+                window.header.findChild(QToolButton, name) is not None
+                for name in ("minimizeWindowButton", "maximizeWindowButton", "closeWindowButton")
+            ),
+            "left_scroll": page.findChild(QScrollArea, "controlSidebarScroll") is not None,
+            "right_scroll": page.findChild(QScrollArea, "measurementWorkspaceScroll") is not None,
+            "chinese_scan_headers": page.scan_table.horizontalHeaderItem(0).text() == "起点 X",
+            "theme_loaded": bool(load_theme()),
+        }
+        if args.screenshot is not None:
+            args.screenshot.parent.mkdir(parents=True, exist_ok=True)
+            checks["screenshot_saved"] = window.grab().save(str(args.screenshot), "PNG")
+        page.clock_timer.stop()
+        page._serial_reconnect_timer.stop()
+        window.close()
     print(json.dumps(checks, ensure_ascii=False, indent=2))
     return 0 if all(checks.values()) else 1
 

@@ -313,26 +313,41 @@ class ScanControlLayoutMixin:
         self.pause_button = QPushButton("暂停", self)
         self.stop_button = QPushButton("停止", self)
         self.stop_button.setObjectName("dangerButton")
+        self.emergency_stop_button = QPushButton("软件急停", self)
+        self.emergency_stop_button.setObjectName("emergencyButton")
         clear_log_button = QPushButton("清除日志", self)
+        diagnostics_button = QPushButton("导出诊断", self)
         self.search_button = QPushButton("搜索仪表", self)
         self.mock_spectrum_checkbox = QCheckBox("模拟频谱仪（仅运动平台真实运行）", self)
         self.mock_spectrum_checkbox.setChecked(False)
 
-        for button in [self.start_button, self.pause_button, self.stop_button, clear_log_button, self.search_button]:
+        for button in [
+            self.start_button,
+            self.pause_button,
+            self.stop_button,
+            self.emergency_stop_button,
+            clear_log_button,
+            diagnostics_button,
+            self.search_button,
+        ]:
             button.setFixedHeight(36)
 
         self.start_button.clicked.connect(self.on_start_scan)
         self.pause_button.clicked.connect(self.on_pause_scan)
         self.stop_button.clicked.connect(self.on_stop_scan)
+        self.emergency_stop_button.clicked.connect(self.on_emergency_stop)
         clear_log_button.clicked.connect(self.on_clear_log)
+        diagnostics_button.clicked.connect(self.on_export_diagnostics)
         self.search_button.clicked.connect(self.on_search_instruments)
 
         grid.addWidget(self.start_button, 0, 0)
         grid.addWidget(self.pause_button, 0, 1)
         grid.addWidget(self.stop_button, 0, 2)
-        grid.addWidget(self.search_button, 1, 0, 1, 2)
+        grid.addWidget(self.emergency_stop_button, 1, 0)
+        grid.addWidget(self.search_button, 1, 1)
         grid.addWidget(clear_log_button, 1, 2)
-        grid.addWidget(self.mock_spectrum_checkbox, 2, 0, 1, 3)
+        grid.addWidget(diagnostics_button, 2, 0)
+        grid.addWidget(self.mock_spectrum_checkbox, 2, 1, 1, 2)
 
         self._set_scan_button_states("就绪")
         return group
@@ -386,18 +401,15 @@ class ScanControlLayoutMixin:
 
         row_layout.addWidget(QLabel("结果", content))
         self.result_path_edit = QLineEdit(content)
-        self.result_path_edit.setText("output")
+        self.result_path_edit.setText(str(self.app_paths.data_dir))
         open_button = QPushButton("查看", content)
-        heatmap_button = QPushButton("显示热力图", content)
         open_button.clicked.connect(self.on_open_result_folder)
-        heatmap_button.clicked.connect(self.on_show_heatmap)
 
         row_layout.addWidget(self.result_path_edit, 1)
         row_layout.addWidget(open_button)
-        row_layout.addWidget(heatmap_button)
 
         section = CollapsibleSection("结果区域", body_widget=content, expanded=True, parent=self)
-        section.update_summary_text("结果路径: output")
+        section.update_summary_text(f"结果路径: {self.app_paths.data_dir}")
         self.result_section = section
         return section
 

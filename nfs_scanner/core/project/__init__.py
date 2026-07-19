@@ -1,4 +1,4 @@
-"""Commercial V1 project lifecycle (local JSON project files)."""
+"""Unified project lifecycle for local JSON project files."""
 
 from .create_request import NewProjectRequest
 from .model import ProjectModel, ProjectSession

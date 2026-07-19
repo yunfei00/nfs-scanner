@@ -1,10 +1,10 @@
 """Load device configuration from YAML/JSON files.
 
-Primary config path (recommended):
-    config/devices.local.yaml
+Primary per-user config path (recommended):
+    %APPDATA%/NFSScanner/devices.local.yaml
 
 Fallback (legacy):
-    config/devices.yaml
+    repository-relative config/devices.local.yaml or config/devices.yaml
 
 If neither exists, safe Mock defaults are used.
 """
@@ -17,15 +17,17 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
+from nfs_scanner.application.paths import AppPaths
 from nfs_scanner.devices.motion.limits import PLATFORM_SOFT_LIMITS
 
 DeviceMode = Literal["mock", "dry_run", "real"]
 
-CONFIG_DIR = Path("config")
+CONFIG_DIR = AppPaths.default().config_dir
 DEVICES_CONFIG_YAML = CONFIG_DIR / "devices.yaml"
 DEVICES_CONFIG_LOCAL_YAML = CONFIG_DIR / "devices.local.yaml"
 DEVICES_CONFIG_JSON = CONFIG_DIR / "devices.json"
-DEVICES_CONFIG_EXAMPLE = CONFIG_DIR / "devices.example.yaml"
+DEVICES_CONFIG_EXAMPLE = Path(__file__).resolve().parents[2] / "config" / "devices.example.yaml"
+LEGACY_CONFIG_DIR = Path.cwd() / "config"
 
 
 @dataclass(slots=True)
@@ -176,6 +178,10 @@ def resolve_devices_config_path() -> Path | None:
         return DEVICES_CONFIG_YAML
     if DEVICES_CONFIG_JSON.is_file():
         return DEVICES_CONFIG_JSON
+    for legacy_name in ("devices.local.yaml", "devices.yaml", "devices.json"):
+        legacy_path = LEGACY_CONFIG_DIR / legacy_name
+        if legacy_path.is_file():
+            return legacy_path
     return None
 
 

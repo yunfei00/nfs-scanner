@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 import re
 
+from nfs_scanner.storage.atomic import append_text_durable, atomic_write_text
+
 
 _TRACE_LABEL_PATTERN = re.compile(
     r"^(?P<x>-?\d+(?:\.\d+)?)_(?P<y>-?\d+(?:\.\d+)?)_(?P<z>-?\d+(?:\.\d+)?)_"
@@ -123,14 +125,12 @@ def save_zna_trace_csv(*, raw_text: str, file_path: Path) -> tuple[int, set[str]
 
     frequencies, rows = parse_zna_trace_text(raw_text)
 
-    file_path.parent.mkdir(parents=True, exist_ok=True)
     header = "fre," + ",".join(f"{value:g}" for value in frequencies)
-
-    with file_path.open("w", encoding="utf-8", newline="") as csv_file:
-        csv_file.write(f"{header}\n")
-        for row in rows:
-            value_text = ",".join(f"{value:g}" for value in row.values)
-            csv_file.write(f"{row.label},{value_text}\n")
+    lines = [header]
+    for row in rows:
+        value_text = ",".join(f"{value:g}" for value in row.values)
+        lines.append(f"{row.label},{value_text}")
+    atomic_write_text(file_path, "\n".join(lines) + "\n")
 
     trace_names = {row.trace_name for row in rows}
     return len(rows), trace_names
@@ -144,12 +144,12 @@ def append_zna_trace_csv(*, raw_text: str, file_path: Path) -> tuple[int, set[st
 
     if not file_path.exists():
         header = "fre," + ",".join(f"{value:g}" for value in frequencies)
-        with file_path.open("w", encoding="utf-8", newline="") as csv_file:
-            csv_file.write(f"{header}\n")
-    with file_path.open("a", encoding="utf-8", newline="") as csv_file:
-        for row in rows:
-            value_text = ",".join(f"{value:g}" for value in row.values)
-            csv_file.write(f"{row.label},{value_text}\n")
+        atomic_write_text(file_path, f"{header}\n")
+    payload_lines: list[str] = []
+    for row in rows:
+        value_text = ",".join(f"{value:g}" for value in row.values)
+        payload_lines.append(f"{row.label},{value_text}")
+    append_text_durable(file_path, "\n".join(payload_lines) + "\n")
 
     trace_names = {row.trace_name for row in rows}
     return len(rows), trace_names

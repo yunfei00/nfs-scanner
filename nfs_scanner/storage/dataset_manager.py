@@ -16,6 +16,7 @@ from numpy.typing import NDArray
 from nfs_scanner.core.models import ScanConfig, ScanPointResult
 from nfs_scanner.core.versioning import is_major_compatible, safe_version_str
 from nfs_scanner.version import APP_VERSION, BUILD_VERSION, DATA_FORMAT_VERSION
+from nfs_scanner.storage.atomic import atomic_write_json
 
 
 @dataclass(slots=True)
@@ -59,8 +60,7 @@ class DatasetManager:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         config_path = output_dir / "scan_config.json"
-        with config_path.open("w", encoding="utf-8") as file:
-            json.dump(asdict(dataset.config), file, ensure_ascii=False, indent=2)
+        atomic_write_json(config_path, asdict(dataset.config))
 
         for stale_file in (
             output_dir / "frequencies.npy",
@@ -113,8 +113,7 @@ class DatasetManager:
         images_array = np.asarray(dataset.images, dtype=np.uint8)
 
         config_path = output_dir / "scan_config.json"
-        with config_path.open("w", encoding="utf-8") as file:
-            json.dump(asdict(dataset.config), file, ensure_ascii=False, indent=2)
+        atomic_write_json(config_path, asdict(dataset.config))
 
         np.save(output_dir / "positions.npy", positions_array)
         np.save(output_dir / "spectrum.npy", spectrum_array)
@@ -279,7 +278,7 @@ class DatasetManager:
             "frequency_count": frequency_count,
             "csv_file": csv_path.name,
         }
-        meta_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        atomic_write_json(meta_path, payload)
         self._logger.info("[DATASET] wrote meta sidecar: %s", meta_path)
 
     def _save_zna_row_format(self, output_dir: Path, dataset: ScanDataset) -> None:

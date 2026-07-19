@@ -1,8 +1,4 @@
-"""Single application-facing gateway for motion, spectrum, and camera devices.
-
-Both user interfaces use this module through thin compatibility adapters.  The
-hub owns no Qt widgets and does not open hardware implicitly.
-"""
+"""Single application-facing gateway for motion, spectrum, and camera devices."""
 
 from __future__ import annotations
 
@@ -43,7 +39,7 @@ class ConnectedSpectrumDevice:
 
 
 class DeviceHub:
-    """Canonical device service shared by legacy and commercial workflows."""
+    """Canonical device service behind the single supported desktop workflow."""
 
     def __init__(
         self,
@@ -179,6 +175,19 @@ class DeviceHub:
                 device.analyzer.disconnect()
             except Exception as exc:  # pragma: no cover - cleanup only
                 self._logger.warning("[SPECTRUM] disconnect failed for %s: %s", key, exc)
+
+    def shutdown(self) -> None:
+        """Release every adapter owned by the application device gateway."""
+
+        self.disconnect_spectrum_device()
+        try:
+            self._camera.close()
+        except Exception as exc:  # pragma: no cover - hardware cleanup
+            self._logger.warning("[CAMERA] shutdown failed: %s", exc)
+        try:
+            self._hardware.disconnect_all()
+        except Exception as exc:  # pragma: no cover - hardware cleanup
+            self._logger.warning("[DEVICE] shutdown failed: %s", exc)
 
     def _result(self, success: bool, kind: str, operation: str, message: str) -> DeviceOperationResult:
         return DeviceOperationResult(

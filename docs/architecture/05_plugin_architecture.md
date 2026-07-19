@@ -89,7 +89,7 @@ Rules:
 - plugin errors must be isolated and reported
 - failed plugin load must not stop the whole app
 - plugins must not control UI layout directly
-- plugin metadata must be visible in Device Center
+- plugin metadata must be available to unified device diagnostics and logs
 
 ## 8. Versioning
 
