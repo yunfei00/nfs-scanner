@@ -60,13 +60,8 @@ QSizeGrip#windowSizeGrip {
 
 QLabel#applicationTitle {
     color: #f4f8fc;
-    font-size: 17px;
+    font-size: 16px;
     font-weight: 700;
-}
-
-QLabel#applicationSubtitle {
-    color: #8ea0b5;
-    font-size: 10px;
 }
 
 QGroupBox {

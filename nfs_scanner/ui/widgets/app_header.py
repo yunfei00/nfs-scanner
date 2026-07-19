@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QPoint, QTimer, Qt
 from PySide6.QtGui import QMouseEvent
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QToolButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QToolButton, QWidget
 
 from nfs_scanner.version import APP_NAME, APP_VERSION
 
@@ -19,22 +19,15 @@ class ApplicationHeader(QFrame):
         self._is_maximized = False
         self._pending_maximized_state: bool | None = None
         self.setObjectName("applicationHeader")
-        self.setFixedHeight(44)
+        self.setFixedHeight(36)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(16, 2, 6, 2)
-        layout.setSpacing(8)
+        layout.setContentsMargins(12, 2, 4, 2)
+        layout.setSpacing(6)
 
-        brand = QVBoxLayout()
-        brand.setSpacing(1)
         title = QLabel(f"{APP_NAME}  <span style='color:#718096'>v{APP_VERSION}</span>", self)
         title.setObjectName("applicationTitle")
-        subtitle = QLabel("近场扫描与射频测量工作台", self)
-        subtitle.setObjectName("applicationSubtitle")
         title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        subtitle.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        brand.addWidget(title)
-        brand.addWidget(subtitle)
 
         self.minimize_button = self._create_window_button("—", "最小化", "minimizeWindowButton")
         self.maximize_button = self._create_window_button("□", "最大化", "maximizeWindowButton")
@@ -43,7 +36,7 @@ class ApplicationHeader(QFrame):
         self.maximize_button.clicked.connect(self._toggle_maximize)
         self.close_button.clicked.connect(self._close_window)
 
-        layout.addLayout(brand)
+        layout.addWidget(title)
         layout.addStretch(1)
         layout.addSpacing(4)
         layout.addWidget(self.minimize_button)
@@ -56,7 +49,7 @@ class ApplicationHeader(QFrame):
         button.setText(text)
         button.setToolTip(tooltip)
         button.setAccessibleName(tooltip)
-        button.setFixedSize(38, 30)
+        button.setFixedSize(36, 28)
         button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         return button
 
