@@ -28,7 +28,7 @@ QToolButton#closeWindowButton {
     border: 0;
     border-radius: 5px;
     font-family: "Segoe UI Symbol", "Microsoft YaHei UI";
-    font-size: 17px;
+    font-size: 15px;
     font-weight: 500;
 }
 
@@ -60,13 +60,13 @@ QSizeGrip#windowSizeGrip {
 
 QLabel#applicationTitle {
     color: #f4f8fc;
-    font-size: 20px;
+    font-size: 17px;
     font-weight: 700;
 }
 
 QLabel#applicationSubtitle {
     color: #8ea0b5;
-    font-size: 12px;
+    font-size: 10px;
 }
 
 QGroupBox {

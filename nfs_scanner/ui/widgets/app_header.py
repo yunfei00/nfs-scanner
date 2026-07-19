@@ -19,11 +19,11 @@ class ApplicationHeader(QFrame):
         self._is_maximized = False
         self._pending_maximized_state: bool | None = None
         self.setObjectName("applicationHeader")
-        self.setFixedHeight(54)
+        self.setFixedHeight(44)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(20, 4, 8, 4)
-        layout.setSpacing(12)
+        layout.setContentsMargins(16, 2, 6, 2)
+        layout.setSpacing(8)
 
         brand = QVBoxLayout()
         brand.setSpacing(1)
@@ -56,7 +56,7 @@ class ApplicationHeader(QFrame):
         button.setText(text)
         button.setToolTip(tooltip)
         button.setAccessibleName(tooltip)
-        button.setFixedSize(42, 36)
+        button.setFixedSize(38, 30)
         button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         return button
 

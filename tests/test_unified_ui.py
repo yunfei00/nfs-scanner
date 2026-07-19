@@ -66,7 +66,7 @@ class UnifiedUiTestCase(unittest.TestCase):
         self.assertIsInstance(self.window.size_grip, QSizeGrip)
         self.assertIsNone(self.window.header.findChild(QLabel, "baselineBadge"))
         self.assertIsNone(self.window.header.findChild(QLabel, "safetyBadge"))
-        self.assertEqual(self.window.header.height(), 54)
+        self.assertEqual(self.window.header.height(), 44)
         for object_name in ("minimizeWindowButton", "maximizeWindowButton", "closeWindowButton"):
             self.assertIsNotNone(self.window.header.findChild(QToolButton, object_name))
 
