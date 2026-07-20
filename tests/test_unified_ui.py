@@ -7,7 +7,7 @@ import sys
 import unittest
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QLabel, QScrollArea, QSizeGrip, QToolButton
+from PySide6.QtWidgets import QApplication, QLabel, QScrollArea, QSizeGrip, QSplitter, QToolButton
 
 from nfs_scanner.application import ApplicationContext
 from nfs_scanner.core import DeviceManager, ScanManager
@@ -107,6 +107,36 @@ class UnifiedUiTestCase(unittest.TestCase):
         self.assertIsNotNone(right)
         self.assertTrue(left.widgetResizable())  # type: ignore[union-attr]
         self.assertTrue(right.widgetResizable())  # type: ignore[union-attr]
+
+    def test_left_controls_fit_1920_by_1080_scaled_workspace(self) -> None:
+        """Keep the full control rows visible at common Windows display scaling."""
+
+        self.window.setStyleSheet(load_theme())
+        self.window.resize(1440, 760)
+        self.window.show()
+        self.app.processEvents()
+
+        page = self.window.scan_control_page
+        splitter = page.findChild(QSplitter, "mainWorkspaceSplitter")
+        left = page.findChild(QScrollArea, "controlSidebarScroll")
+        self.assertIsNotNone(splitter)
+        self.assertIsNotNone(left)
+        splitter.setSizes([390, 1000])  # type: ignore[union-attr]
+        self.app.processEvents()
+
+        viewport = left.viewport()  # type: ignore[union-attr]
+        self.assertLessEqual(left.widget().width(), viewport.width())  # type: ignore[union-attr]
+        for control in (
+            page.open_serial_button,
+            page.close_serial_button,
+            page.refresh_ports_button,
+            page.set_start_point_button,
+            page.set_end_point_button,
+        ):
+            top_left = control.mapTo(viewport, control.rect().topLeft())
+            bottom_right = control.mapTo(viewport, control.rect().bottomRight())
+            self.assertGreaterEqual(top_left.x(), 0, control.text())
+            self.assertLess(bottom_right.x(), viewport.width(), control.text())
 
     def test_scan_table_uses_user_facing_chinese_headers(self) -> None:
         page = self.window.scan_control_page

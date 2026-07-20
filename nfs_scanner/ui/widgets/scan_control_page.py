@@ -177,6 +177,8 @@ class ScanControlPage(
         self.emergency_stop_button: QPushButton
         self.search_button: QPushButton
         self.mock_spectrum_checkbox: QCheckBox
+        self.set_start_point_button: QPushButton
+        self.set_end_point_button: QPushButton
 
         self.scan_table: QTableWidget
         self.instrument_tabs: QTabWidget

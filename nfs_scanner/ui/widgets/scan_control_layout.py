@@ -108,9 +108,14 @@ class ScanControlLayoutMixin:
         """创建串口设置区域。"""
 
         group = QGroupBox("串口设置", self)
-        grid = QGridLayout(group)
-        grid.setHorizontalSpacing(6)
-        grid.setVerticalSpacing(6)
+        layout = QVBoxLayout(group)
+        layout.setSpacing(6)
+
+        settings_grid = QGridLayout()
+        settings_grid.setHorizontalSpacing(6)
+        settings_grid.setVerticalSpacing(6)
+        settings_grid.setColumnStretch(1, 1)
+        settings_grid.setColumnStretch(3, 1)
 
         self.port_combo = QComboBox(group)
         self._refresh_available_ports()
@@ -128,40 +133,44 @@ class ScanControlLayoutMixin:
         self.port_combo.currentIndexChanged.connect(self._save_serial_config)
         self.baudrate_combo.currentTextChanged.connect(self._save_serial_config)
 
-        grid.addWidget(QLabel("端口", group), 0, 0)
-        grid.addWidget(self.port_combo, 0, 1)
-        grid.addWidget(QLabel("波特率", group), 0, 2)
-        grid.addWidget(self.baudrate_combo, 0, 3)
-        grid.addWidget(self.open_serial_button, 1, 0, 1, 2)
-        grid.addWidget(self.close_serial_button, 1, 2)
-        grid.addWidget(self.refresh_ports_button, 1, 3)
+        settings_grid.addWidget(QLabel("端口", group), 0, 0)
+        settings_grid.addWidget(self.port_combo, 0, 1)
+        settings_grid.addWidget(QLabel("波特率", group), 0, 2)
+        settings_grid.addWidget(self.baudrate_combo, 0, 3)
+        layout.addLayout(settings_grid)
+
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(6)
+        button_layout.addWidget(self.open_serial_button, 1)
+        button_layout.addWidget(self.close_serial_button, 1)
+        button_layout.addWidget(self.refresh_ports_button, 1)
+        layout.addLayout(button_layout)
 
         self._sync_serial_buttons()
         return group
 
     def _create_motion_control_group(self) -> QGroupBox:
         group = QGroupBox("运动控制", self)
-        grid = QGridLayout(group)
-        grid.setHorizontalSpacing(6)
-        grid.setVerticalSpacing(6)
+        layout = QVBoxLayout(group)
+        layout.setSpacing(6)
 
-        grid.addWidget(QLabel("点动步距", group), 0, 0)
-
-        step_button_container = QWidget(group)
-        step_button_layout = QHBoxLayout(step_button_container)
-        step_button_layout.setContentsMargins(0, 0, 0, 0)
+        step_button_layout = QHBoxLayout()
         step_button_layout.setSpacing(4)
+        step_button_layout.addWidget(QLabel("点动步距", group))
 
         for step_value in (0.01, 0.1, 1.0, 5.0, 10.0, 20.0):
             button = QPushButton(f"{step_value:g}", group)
+            button.setObjectName("compactJogStepButton")
             button.setCheckable(True)
             button.setFixedHeight(30)
+            button.setMinimumWidth(0)
+            button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             button.clicked.connect(lambda _=False, value=step_value: self.on_select_jog_step(value))
             self.jog_step_buttons[step_value] = button
-            step_button_layout.addWidget(button)
+            step_button_layout.addWidget(button, 1)
 
-        grid.addWidget(step_button_container, 0, 1, 1, 5)
-        grid.addWidget(QLabel("mm", group), 0, 6)
+        step_button_layout.addWidget(QLabel("mm", group))
+        layout.addLayout(step_button_layout)
         self.on_select_jog_step(1.0, emit_log=False)
 
         x_plus_button = QPushButton("X+", group)
@@ -188,21 +197,26 @@ class ScanControlLayoutMixin:
         y_minus_button.clicked.connect(lambda: self._move_axis("Y", -self.active_jog_step_mm))
         z_minus_button.clicked.connect(lambda: self._move_axis("Z", -self.active_jog_step_mm))
 
-        grid.addWidget(x_plus_button, 1, 0, 1, 2)
-        grid.addWidget(y_plus_button, 1, 2, 1, 2)
-        grid.addWidget(z_plus_button, 1, 4, 1, 2)
-        grid.addWidget(x_minus_button, 2, 0, 1, 2)
-        grid.addWidget(y_minus_button, 2, 2, 1, 2)
-        grid.addWidget(z_minus_button, 2, 4, 1, 2)
+        axis_grid = QGridLayout()
+        axis_grid.setHorizontalSpacing(6)
+        axis_grid.setVerticalSpacing(6)
+        for column in range(3):
+            axis_grid.setColumnStretch(column, 1)
+        axis_grid.addWidget(x_plus_button, 0, 0)
+        axis_grid.addWidget(y_plus_button, 0, 1)
+        axis_grid.addWidget(z_plus_button, 0, 2)
+        axis_grid.addWidget(x_minus_button, 1, 0)
+        axis_grid.addWidget(y_minus_button, 1, 1)
+        axis_grid.addWidget(z_minus_button, 1, 2)
+        layout.addLayout(axis_grid)
         return group
 
     def _create_motion_command_group(self) -> QGroupBox:
         """创建运动命令区域。"""
 
         group = QGroupBox("运动命令", self)
-        grid = QGridLayout(group)
-        grid.setHorizontalSpacing(6)
-        grid.setVerticalSpacing(6)
+        layout = QVBoxLayout(group)
+        layout.setSpacing(6)
 
         home_button = QPushButton("复位", group)
         query_button = QPushButton("位置查询", group)
@@ -216,10 +230,16 @@ class ScanControlLayoutMixin:
         version_button.clicked.connect(self.on_read_version_command)
         help_button.clicked.connect(self.on_help_command)
 
-        grid.addWidget(home_button, 0, 0)
-        grid.addWidget(query_button, 0, 1)
-        grid.addWidget(version_button, 1, 0)
-        grid.addWidget(help_button, 1, 1)
+        command_grid = QGridLayout()
+        command_grid.setHorizontalSpacing(6)
+        command_grid.setVerticalSpacing(6)
+        command_grid.setColumnStretch(0, 1)
+        command_grid.setColumnStretch(1, 1)
+        command_grid.addWidget(home_button, 0, 0)
+        command_grid.addWidget(query_button, 0, 1)
+        command_grid.addWidget(version_button, 1, 0)
+        command_grid.addWidget(help_button, 1, 1)
+        layout.addLayout(command_grid)
 
         self.abs_x_edit = QLineEdit(group)
         self.abs_y_edit = QLineEdit(group)
@@ -230,17 +250,22 @@ class ScanControlLayoutMixin:
         self.abs_z_edit.setPlaceholderText("Z")
         self.abs_f_edit.setPlaceholderText("F")
         self.abs_f_edit.setText("1000")
+        for edit in [self.abs_x_edit, self.abs_y_edit, self.abs_z_edit, self.abs_f_edit]:
+            edit.setMinimumWidth(0)
 
         execute_button = QPushButton("执行", group)
         execute_button.setFixedHeight(32)
         execute_button.clicked.connect(self.on_execute_absolute_move)
 
-        grid.addWidget(QLabel("绝对坐标", group), 2, 0)
-        grid.addWidget(self.abs_x_edit, 2, 1)
-        grid.addWidget(self.abs_y_edit, 2, 2)
-        grid.addWidget(self.abs_z_edit, 2, 3)
-        grid.addWidget(self.abs_f_edit, 2, 4)
-        grid.addWidget(execute_button, 2, 5)
+        absolute_row = QHBoxLayout()
+        absolute_row.setSpacing(6)
+        absolute_row.addWidget(QLabel("绝对坐标", group))
+        absolute_row.addWidget(self.abs_x_edit, 1)
+        absolute_row.addWidget(self.abs_y_edit, 1)
+        absolute_row.addWidget(self.abs_z_edit, 1)
+        absolute_row.addWidget(self.abs_f_edit, 1)
+        absolute_row.addWidget(execute_button)
+        layout.addLayout(absolute_row)
         return group
 
     def _create_step_config_group(self) -> QGroupBox:
@@ -260,14 +285,16 @@ class ScanControlLayoutMixin:
         self.delay_seconds_edit.setText(f"{self.SPECTRUM_WAIT_SECONDS:.2f}")
         self._add_step_row(grid, 3, "频谱等待", self.delay_seconds_edit, unit_text="秒")
 
-        start_button = QPushButton("设为起点", self)
-        end_button = QPushButton("设为终点", self)
-        start_button.setFixedHeight(32)
-        end_button.setFixedHeight(32)
-        start_button.clicked.connect(self.on_set_start_point)
-        end_button.clicked.connect(self.on_set_end_point)
-        grid.addWidget(start_button, 4, 0, 1, 2)
-        grid.addWidget(end_button, 4, 2, 1, 2)
+        self.set_start_point_button = QPushButton("设为起点", group)
+        self.set_end_point_button = QPushButton("设为终点", group)
+        self.set_start_point_button.setObjectName("setStartPointButton")
+        self.set_end_point_button.setObjectName("setEndPointButton")
+        self.set_start_point_button.setFixedHeight(32)
+        self.set_end_point_button.setFixedHeight(32)
+        self.set_start_point_button.clicked.connect(self.on_set_start_point)
+        self.set_end_point_button.clicked.connect(self.on_set_end_point)
+        grid.addWidget(self.set_start_point_button, 4, 0, 1, 2)
+        grid.addWidget(self.set_end_point_button, 4, 2, 1, 2)
         return group
 
     def _add_step_row(
