@@ -109,14 +109,19 @@ class UnifiedUiTestCase(unittest.TestCase):
         self.assertTrue(right.widgetResizable())  # type: ignore[union-attr]
 
     def test_left_controls_fit_1920_by_1080_scaled_workspace(self) -> None:
-        """Keep the full control rows visible at common Windows display scaling."""
+        """Keep control rows visible even when Windows reports a long port description."""
 
         self.window.setStyleSheet(load_theme())
+        page = self.window.scan_control_page
+        page.port_combo.addItem(
+            "COM123 - USB Serial Port with a very long company driver description " * 8,
+            "COM123",
+        )
+        page.port_combo.setCurrentIndex(page.port_combo.count() - 1)
         self.window.resize(1440, 760)
         self.window.show()
         self.app.processEvents()
 
-        page = self.window.scan_control_page
         splitter = page.findChild(QSplitter, "mainWorkspaceSplitter")
         left = page.findChild(QScrollArea, "controlSidebarScroll")
         self.assertIsNotNone(splitter)
@@ -130,13 +135,43 @@ class UnifiedUiTestCase(unittest.TestCase):
             page.open_serial_button,
             page.close_serial_button,
             page.refresh_ports_button,
+            page.port_combo,
+            *page.jog_step_buttons.values(),
+            page.abs_x_edit,
+            page.abs_y_edit,
+            page.abs_z_edit,
+            page.abs_f_edit,
             page.set_start_point_button,
             page.set_end_point_button,
+            page.project_name_edit,
+            page.test_name_edit,
+            page.start_button,
+            page.pause_button,
+            page.stop_button,
+            page.emergency_stop_button,
+            page.search_button,
         ):
             top_left = control.mapTo(viewport, control.rect().topLeft())
             bottom_right = control.mapTo(viewport, control.rect().bottomRight())
-            self.assertGreaterEqual(top_left.x(), 0, control.text())
-            self.assertLess(bottom_right.x(), viewport.width(), control.text())
+            label = control.text() if hasattr(control, "text") else control.objectName()
+            self.assertGreaterEqual(top_left.x(), 0, label)
+            self.assertLess(bottom_right.x(), viewport.width(), label)
+
+        compact_buttons = (
+            page.open_serial_button,
+            page.close_serial_button,
+            page.refresh_ports_button,
+            *page.jog_step_buttons.values(),
+            page.set_start_point_button,
+            page.set_end_point_button,
+            page.start_button,
+            page.pause_button,
+            page.stop_button,
+            page.emergency_stop_button,
+            page.search_button,
+        )
+        for button in compact_buttons:
+            self.assertLessEqual(button.width(), 100, button.text())
 
     def test_scan_table_uses_user_facing_chinese_headers(self) -> None:
         page = self.window.scan_control_page

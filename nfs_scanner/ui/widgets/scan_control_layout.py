@@ -118,6 +118,11 @@ class ScanControlLayoutMixin:
         settings_grid.setColumnStretch(3, 1)
 
         self.port_combo = QComboBox(group)
+        self.port_combo.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+        )
+        self.port_combo.setMinimumContentsLength(8)
+        self.port_combo.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self._refresh_available_ports()
 
         self.baudrate_combo = QComboBox(group)
@@ -127,11 +132,15 @@ class ScanControlLayoutMixin:
         self.open_serial_button = QPushButton("打开串口", group)
         self.close_serial_button = QPushButton("关闭串口", group)
         self.refresh_ports_button = QPushButton("刷新串口", group)
+        for button in [self.open_serial_button, self.close_serial_button, self.refresh_ports_button]:
+            self._make_sidebar_button_compact(button)
         self.open_serial_button.clicked.connect(self.on_open_serial)
         self.close_serial_button.clicked.connect(self.on_close_serial)
         self.refresh_ports_button.clicked.connect(self.on_refresh_serial_ports)
         self.port_combo.currentIndexChanged.connect(self._save_serial_config)
+        self.port_combo.currentTextChanged.connect(self.port_combo.setToolTip)
         self.baudrate_combo.currentTextChanged.connect(self._save_serial_config)
+        self.port_combo.setToolTip(self.port_combo.currentText())
 
         settings_grid.addWidget(QLabel("端口", group), 0, 0)
         settings_grid.addWidget(self.port_combo, 0, 1)
@@ -141,9 +150,10 @@ class ScanControlLayoutMixin:
 
         button_layout = QHBoxLayout()
         button_layout.setSpacing(6)
-        button_layout.addWidget(self.open_serial_button, 1)
-        button_layout.addWidget(self.close_serial_button, 1)
-        button_layout.addWidget(self.refresh_ports_button, 1)
+        button_layout.addWidget(self.open_serial_button)
+        button_layout.addWidget(self.close_serial_button)
+        button_layout.addWidget(self.refresh_ports_button)
+        button_layout.addStretch(1)
         layout.addLayout(button_layout)
 
         self._sync_serial_buttons()
@@ -162,14 +172,13 @@ class ScanControlLayoutMixin:
             button = QPushButton(f"{step_value:g}", group)
             button.setObjectName("compactJogStepButton")
             button.setCheckable(True)
-            button.setFixedHeight(30)
-            button.setMinimumWidth(0)
-            button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            self._make_sidebar_button_compact(button, height=30)
             button.clicked.connect(lambda _=False, value=step_value: self.on_select_jog_step(value))
             self.jog_step_buttons[step_value] = button
-            step_button_layout.addWidget(button, 1)
+            step_button_layout.addWidget(button)
 
         step_button_layout.addWidget(QLabel("mm", group))
+        step_button_layout.addStretch(1)
         layout.addLayout(step_button_layout)
         self.on_select_jog_step(1.0, emit_log=False)
 
@@ -188,7 +197,7 @@ class ScanControlLayoutMixin:
             y_minus_button,
             z_minus_button,
         ]:
-            button.setFixedHeight(32)
+            self._make_sidebar_button_compact(button)
 
         x_plus_button.clicked.connect(lambda: self._move_axis("X", self.active_jog_step_mm))
         y_plus_button.clicked.connect(lambda: self._move_axis("Y", self.active_jog_step_mm))
@@ -200,8 +209,7 @@ class ScanControlLayoutMixin:
         axis_grid = QGridLayout()
         axis_grid.setHorizontalSpacing(6)
         axis_grid.setVerticalSpacing(6)
-        for column in range(3):
-            axis_grid.setColumnStretch(column, 1)
+        axis_grid.setAlignment(Qt.AlignmentFlag.AlignLeft)
         axis_grid.addWidget(x_plus_button, 0, 0)
         axis_grid.addWidget(y_plus_button, 0, 1)
         axis_grid.addWidget(z_plus_button, 0, 2)
@@ -223,7 +231,7 @@ class ScanControlLayoutMixin:
         version_button = QPushButton("读取版本", group)
         help_button = QPushButton("帮助命令", group)
         for button in [home_button, query_button, version_button, help_button]:
-            button.setFixedHeight(32)
+            self._make_sidebar_button_compact(button)
 
         home_button.clicked.connect(self.on_home_command)
         query_button.clicked.connect(self.on_query_position_command)
@@ -233,8 +241,7 @@ class ScanControlLayoutMixin:
         command_grid = QGridLayout()
         command_grid.setHorizontalSpacing(6)
         command_grid.setVerticalSpacing(6)
-        command_grid.setColumnStretch(0, 1)
-        command_grid.setColumnStretch(1, 1)
+        command_grid.setAlignment(Qt.AlignmentFlag.AlignLeft)
         command_grid.addWidget(home_button, 0, 0)
         command_grid.addWidget(query_button, 0, 1)
         command_grid.addWidget(version_button, 1, 0)
@@ -254,7 +261,7 @@ class ScanControlLayoutMixin:
             edit.setMinimumWidth(0)
 
         execute_button = QPushButton("执行", group)
-        execute_button.setFixedHeight(32)
+        self._make_sidebar_button_compact(execute_button)
         execute_button.clicked.connect(self.on_execute_absolute_move)
 
         absolute_row = QHBoxLayout()
@@ -289,8 +296,8 @@ class ScanControlLayoutMixin:
         self.set_end_point_button = QPushButton("设为终点", group)
         self.set_start_point_button.setObjectName("setStartPointButton")
         self.set_end_point_button.setObjectName("setEndPointButton")
-        self.set_start_point_button.setFixedHeight(32)
-        self.set_end_point_button.setFixedHeight(32)
+        self._make_sidebar_button_compact(self.set_start_point_button)
+        self._make_sidebar_button_compact(self.set_end_point_button)
         self.set_start_point_button.clicked.connect(self.on_set_start_point)
         self.set_end_point_button.clicked.connect(self.on_set_end_point)
         grid.addWidget(self.set_start_point_button, 4, 0, 1, 2)
@@ -334,6 +341,7 @@ class ScanControlLayoutMixin:
         grid = QGridLayout(group)
         grid.setHorizontalSpacing(6)
         grid.setVerticalSpacing(6)
+        grid.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         self.start_button = QPushButton("开始", self)
         self.start_button.setObjectName("primaryButton")
@@ -357,7 +365,7 @@ class ScanControlLayoutMixin:
             diagnostics_button,
             self.search_button,
         ]:
-            button.setFixedHeight(36)
+            self._make_sidebar_button_compact(button, height=36)
 
         self.start_button.clicked.connect(self.on_start_scan)
         self.pause_button.clicked.connect(self.on_pause_scan)
@@ -378,6 +386,13 @@ class ScanControlLayoutMixin:
 
         self._set_scan_button_states("就绪")
         return group
+
+    @staticmethod
+    def _make_sidebar_button_compact(button: QPushButton, *, height: int = 32) -> None:
+        """Keep sidebar buttons readable without stretching them across available rows."""
+
+        button.setFixedHeight(height)
+        button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
     def _create_scan_area_group(self) -> QGroupBox:
         group = QGroupBox("扫描区域", self)

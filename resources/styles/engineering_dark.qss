@@ -157,6 +157,10 @@ QPushButton:checked {
     border-color: #58b5e8;
 }
 
+QWidget#controlSidebar QPushButton {
+    padding: 0 8px;
+}
+
 QPushButton#compactJogStepButton {
     min-width: 0;
     padding: 0 4px;
