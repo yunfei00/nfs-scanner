@@ -40,6 +40,22 @@ class PathPlannerTestCase(unittest.TestCase):
         self.assertEqual(points[3], (10.0, 5.0, 5.0))
         self.assertEqual(points[4], (5.0, 5.0, 5.0))
 
+    def test_decreasing_y_direction_is_preserved(self) -> None:
+        region = ScanRegion(
+            x_start=0.0,
+            x_stop=10.0,
+            y_start=0.0,
+            y_stop=-10.0,
+            z_height=5.0,
+            x_step=5.0,
+            y_step=5.0,
+        )
+        points = generate_snake_points(region, self.config)
+        self.assertEqual(len(points), 9)
+        self.assertEqual(points[0], (0.0, 0.0, 5.0))
+        self.assertEqual(points[3], (10.0, -5.0, 5.0))
+        self.assertEqual(points[6], (0.0, -10.0, 5.0))
+
     def test_preview_stats_include_area_and_time(self) -> None:
         points = generate_preview_points(self.region, self.config)
         stats = calculate_preview_stats(points, self.region, self.config)
