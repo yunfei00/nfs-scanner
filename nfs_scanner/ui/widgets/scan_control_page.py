@@ -121,7 +121,7 @@ class ScanControlPage(
         self.current_x = 0.0
         self.current_y = 0.0
         self.current_z = 0.0
-        self.current_feed_rate = 1000.0
+        self.current_feed_rate = 600.0
         self.active_jog_step_mm = 1.0
         self.scan_manager = scan_manager or ScanManager()
         self.device_manager = device_manager or DeviceManager()
@@ -243,7 +243,7 @@ class ScanControlPage(
             "start_y": "0.00",
             "start_z": "0.00",
             "end_x": "10.00",
-            "end_y": "10.00",
+            "end_y": "-10.00",
             "end_z": "1.00",
             "step_x": "0.50",
             "step_y": "0.50",
@@ -282,9 +282,11 @@ class ScanControlPage(
         is_valid, reason = self._validate_position(target_x, target_y, target_z)
         if not is_valid:
             self.append_log(f"轴移动失败: {reason}")
+            if axis == "Y" and delta > 0 and self.current_y >= self.Y_RANGE[1]:
+                self.append_log("Y 轴提示：平台 Y 行程为 0 → -300 mm；复位点 Y=0 时请使用 Y- 进入有效行程。")
             return
 
-        command = f"G1 X{target_x:.2f} Y{target_y:.2f} Z{target_z:.2f} F{self.current_feed_rate:.0f}"
+        command = f"G90 G1 X{target_x:.2f} Y{target_y:.2f} Z{target_z:.2f} F{self.current_feed_rate:.0f}"
         sent, reason = self._send_serial_command(command)
         if not sent:
             self.append_log(f"轴移动失败: {reason}")
@@ -294,7 +296,8 @@ class ScanControlPage(
         self.current_y = target_y
         self.current_z = target_z
         self.update_position_status(self.current_x, self.current_y, self.current_z)
-        self.append_log(f"轴移动: {axis} {'+' if delta >= 0 else ''}{delta:.2f} mm")
+        self.append_log(f"轴移动目标: {axis} {'+' if delta >= 0 else ''}{delta:.2f} mm | 命令: {command}")
+        QTimer.singleShot(250, self.on_query_position_command)
 
     def _sync_serial_buttons(self) -> None:
         can_edit_serial = self._scan_thread is None
@@ -453,18 +456,19 @@ class ScanControlPage(
         if not sent:
             self.append_log(f"发送命令失败: $H（复位），原因: {reason}")
             return
-        self.current_x = 0.0
-        self.current_y = 0.0
-        self.current_z = 0.0
-        self.update_position_status(self.current_x, self.current_y, self.current_z)
-        self.append_log("发送命令: $H（复位）")
+        self.append_log("发送命令: $H（复位）；界面不再预设坐标，等待控制器实际位置返回")
+        QTimer.singleShot(1000, self.on_query_position_command)
+        QTimer.singleShot(3000, self.on_query_position_command)
 
     def on_query_position_command(self) -> None:
-        sent, reason = self._send_serial_command("?")
-        if not sent:
-            self.append_log(f"发送命令失败: ?，原因: {reason}")
+        if not self.serial_is_open or not self._serial_port.isOpen():
+            self.append_log("发送命令失败: ?，原因: 串口未打开")
             return
-        self.append_log("发送命令: ?（位置查询）")
+        written = self._serial_port.write(b"?")
+        if written <= 0 or not self._serial_port.waitForBytesWritten(200):
+            self.append_log(f"发送命令失败: ?，原因: {self._serial_port.errorString() or '写入失败'}")
+            return
+        self.append_log("发送实时命令: ?（位置查询）")
 
     def on_read_version_command(self) -> None:
         sent, reason = self._send_serial_command("$I")
@@ -485,17 +489,20 @@ class ScanControlPage(
             x = float(self.abs_x_edit.text().strip())
             y = float(self.abs_y_edit.text().strip())
             z = float(self.abs_z_edit.text().strip())
-            f = float(self.abs_f_edit.text().strip() or "1000")
+            f = float(self.abs_f_edit.text().strip() or "600")
         except ValueError:
             self.append_log("绝对坐标运动输入无效，请输入数字")
             return
 
+        if f <= 0:
+            self.append_log("绝对坐标运动发送失败，原因: F 速度必须大于 0")
+            return
         is_valid, reason = self._validate_position(x, y, z)
         if not is_valid:
             self.append_log(f"绝对坐标运动发送失败，原因: {reason}")
             return
 
-        command = f"G1 X{x:.2f} Y{y:.2f} Z{z:.2f} F{f:.0f}"
+        command = f"G90 G1 X{x:.2f} Y{y:.2f} Z{z:.2f} F{f:.0f}"
         sent, reason = self._send_serial_command(command)
         if not sent:
             self.append_log(f"绝对坐标运动发送失败，原因: {reason}")
@@ -507,6 +514,7 @@ class ScanControlPage(
         self.current_feed_rate = f
         self.update_position_status(self.current_x, self.current_y, self.current_z)
         self.append_log(f"发送命令: {command}")
+        QTimer.singleShot(250, self.on_query_position_command)
 
     def on_set_start_point(self) -> None:
         self._update_table_cell("start_x", self.current_x)
@@ -606,9 +614,20 @@ class ScanControlPage(
             return
         self._refresh_clock()
         self._save_scan_plan_snapshot()
+        unique_y_values = list(dict.fromkeys(point[1] for point in self._scan_points))
+        first_point = self._scan_points[0]
+        last_point = self._scan_points[-1]
         self.append_log(
             f"扫描开始：共 {len(self._scan_points)} 点，顺序为 Z 外层（增大）、Y 中层（减小）、X 内层（增大）"
         )
+        self.append_log(
+            "[扫描计划] "
+            f"首点=({first_point[0]:.2f}, {first_point[1]:.2f}, {first_point[2]:.2f}) | "
+            f"末点=({last_point[0]:.2f}, {last_point[1]:.2f}, {last_point[2]:.2f}) | "
+            f"Y行={', '.join(f'{value:.2f}' for value in unique_y_values[:20])}"
+            + (" ..." if len(unique_y_values) > 20 else "")
+        )
+        self.append_log(f"[运动配置] 扫描速度 F={self.current_feed_rate:.0f} mm/min")
         self.append_log(f"扫描点驻留（固定）: {self.FIXED_SCAN_POINT_DWELL_SECONDS:.2f} 秒")
         self.append_log(f"频谱等待时间: {spectrum_wait_seconds:.2f} 秒")
         if mock_spectrum_enabled:
@@ -725,11 +744,7 @@ class ScanControlPage(
         y: float,
         z: float,
     ) -> None:
-        self.current_x = x
-        self.current_y = y
-        self.current_z = z
-        self.update_position_status(x, y, z)
-        self.append_log(f"扫描点 {point_index}/{total_points} 开始: X{x:.2f} Y{y:.2f} Z{z:.2f}")
+        self.append_log(f"扫描点 {point_index}/{total_points} 目标: X{x:.2f} Y{y:.2f} Z{z:.2f}")
 
     def _on_scan_worker_point_completed(
         self,
@@ -741,6 +756,10 @@ class ScanControlPage(
         _measurement: object,
     ) -> None:
         del _measurement
+        self.current_x = x
+        self.current_y = y
+        self.current_z = z
+        self.update_position_status(x, y, z)
         self._executed_scan_points.append((x, y, z))
         self._scan_point_index = point_index
         self.scan_manager.record_completed_point()
