@@ -127,12 +127,11 @@ class SerialMotionController(MotionController):
 
     def stop(self) -> None:
         if self.is_connected():
-            self._transport.write_line(self._config.commands.stop)
+            self._transport.write_raw(self._config.commands.stop.encode("ascii"))
 
     def emergency_stop(self) -> None:
         if self.is_connected():
             self._transport.write_raw(b"\x18")
-            self._transport.write_line(self._config.commands.stop)
 
     def get_position(self) -> tuple[float, float, float]:
         status_line = self._query_status_line()
@@ -221,7 +220,7 @@ class SerialMotionController(MotionController):
         }
 
     def _query_status_line(self) -> str | None:
-        self._transport.write_line(self._config.commands.status)
+        self._transport.write_raw(self._config.commands.status.encode("ascii"))
         text = self._transport.read_available_text(wait_s=0.35)
         latest, self._rx_buffer = extract_latest_status_line(text, buffer=self._rx_buffer)
         return latest
