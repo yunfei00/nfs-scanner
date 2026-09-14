@@ -85,12 +85,14 @@ class ScanWorker(QObject):
     log_message = Signal(str)
     finished = Signal(str, str)
 
-    STATUS_QUERY_COMMAND = "?"
+    STATUS_QUERY_COMMAND = b"?"
     STATUS_POLL_INTERVAL_SECONDS = 0.1
+    STATUS_LOG_INTERVAL_SECONDS = 0.5
     POSITION_TOLERANCE_MM = 0.2
     READY_CHECK_TIMEOUT_SECONDS = 2.0
     MOTION_BLOCKING_STATES = frozenset({"Alarm", "Door", "Check", "Sleep"})
     MOTION_ACTIVE_STATES = frozenset({"Run", "Busy", "Hold", "Jog", "Home"})
+    MOTION_DIAGNOSTIC_KEYS = ("$110", "$111", "$112", "$120", "$121", "$122")
 
     def __init__(
         self,
@@ -156,6 +158,17 @@ class ScanWorker(QObject):
                 self.finished.emit("error", reason)
                 return
 
+            # Always establish the coordinate mode explicitly. A previous manual/tool command
+            # may have left the controller in G91 (relative) mode; scan points are absolute.
+            ok, reason = self._send_command(self._serial_port, "G90")
+            if not ok:
+                self.finished.emit("error", f"设置绝对坐标模式失败: {reason}")
+                return
+            self._emit_log_message("[运动配置] 已设置 G90 绝对坐标模式")
+            self._log_controller_motion_settings(self._serial_port)
+            self._reset_serial_rx_state(self._serial_port)
+
+            previous_target: tuple[float, float, float] | None = None
             for point_index, (x, y, z) in enumerate(self._scan_points, start=1):
                 if self._stop_is_requested():
                     self._send_stop(self._serial_port)
@@ -168,6 +181,7 @@ class ScanWorker(QObject):
 
                 self.point_started.emit(point_index, len(self._scan_points), x, y, z)
                 command = f"G1 X{x:.2f} Y{y:.2f} Z{z:.2f} F{self._feed_rate:.0f}"
+                motion_started_at = time.monotonic()
                 ok, reason = self._send_command(self._serial_port, command)
                 if not ok:
                     self.finished.emit("error", f"发送运动命令失败: {reason}")
@@ -186,6 +200,21 @@ class ScanWorker(QObject):
                         return
                     self.finished.emit("error", reason)
                     return
+
+                elapsed_ms = (time.monotonic() - motion_started_at) * 1000.0
+                if previous_target is None:
+                    segment_text = "首点"
+                else:
+                    dx = x - previous_target[0]
+                    dy = y - previous_target[1]
+                    dz = z - previous_target[2]
+                    distance_mm = (dx * dx + dy * dy + dz * dz) ** 0.5
+                    segment_text = f"段长={distance_mm:.3f} mm"
+                self._emit_log_message(
+                    f"[运动完成] 点 {point_index}/{len(self._scan_points)} | {segment_text} "
+                    f"| 耗时={elapsed_ms:.1f} ms | F={self._feed_rate:.0f} mm/min"
+                )
+                previous_target = (x, y, z)
 
                 if not self._wait_with_stop_check(self._dwell_seconds):
                     self._send_stop(self._serial_port)
@@ -261,6 +290,8 @@ class ScanWorker(QObject):
         deadline = time.monotonic() + timeout_seconds
         latest_state = ""
         latest_status_line = ""
+        last_logged_at = 0.0
+        last_logged_state = ""
         while time.monotonic() < deadline:
             if self._stop_is_requested():
                 return False, "扫描已停止"
@@ -271,18 +302,27 @@ class ScanWorker(QObject):
             latest_status_line = status_line
             state, current_pos = self._parse_motion_status(status_line)
             latest_state = state
-            if current_pos is None:
-                self._emit_log_message(
-                    "[运动状态] 实际位置=未知 "
-                    f"| 目标位置=({target[0]:.3f}, {target[1]:.3f}, {target[2]:.3f}) "
-                    f"| 控制器状态={state or '未知'}"
-                )
-            else:
-                self._emit_log_message(
-                    f"[运动状态] 实际位置=({current_pos[0]:.3f}, {current_pos[1]:.3f}, {current_pos[2]:.3f}) "
-                    f"| 目标位置=({target[0]:.3f}, {target[1]:.3f}, {target[2]:.3f}) "
-                    f"| 控制器状态={state or '未知'}"
-                )
+            now = time.monotonic()
+            should_log = (
+                state == "Idle"
+                or state != last_logged_state
+                or now - last_logged_at >= self.STATUS_LOG_INTERVAL_SECONDS
+            )
+            if should_log:
+                if current_pos is None:
+                    self._emit_log_message(
+                        "[运动状态] 实际位置=未知 "
+                        f"| 目标位置=({target[0]:.3f}, {target[1]:.3f}, {target[2]:.3f}) "
+                        f"| 控制器状态={state or '未知'}"
+                    )
+                else:
+                    self._emit_log_message(
+                        f"[运动状态] 实际位置=({current_pos[0]:.3f}, {current_pos[1]:.3f}, {current_pos[2]:.3f}) "
+                        f"| 目标位置=({target[0]:.3f}, {target[1]:.3f}, {target[2]:.3f}) "
+                        f"| 控制器状态={state or '未知'}"
+                    )
+                last_logged_at = now
+                last_logged_state = state
             if state in {"Run", "Busy", "Hold"}:
                 time.sleep(self.STATUS_POLL_INTERVAL_SECONDS)
                 continue
@@ -355,10 +395,43 @@ class ScanWorker(QObject):
         return True
 
     def _query_motion_status(self, serial_port: QSerialPort) -> str | None:
-        ok, _ = self._send_command(serial_port, self.STATUS_QUERY_COMMAND)
-        if not ok:
+        """Send GRBL-style realtime status query without CR/LF framing."""
+
+        written = serial_port.write(self.STATUS_QUERY_COMMAND)
+        if written <= 0:
+            return None
+        if not serial_port.waitForBytesWritten(200):
             return None
         return self._read_serial_response_line(serial_port, timeout_ms=300)
+
+    def _log_controller_motion_settings(self, serial_port: QSerialPort) -> None:
+        """Best-effort capture of GRBL speed/acceleration settings for field diagnostics."""
+
+        ok, reason = self._send_command(serial_port, "$$")
+        if not ok:
+            self._emit_log_message(f"[运动诊断] 无法查询 $$ 参数: {reason}")
+            return
+        if not serial_port.waitForReadyRead(300):
+            self._emit_log_message("[运动诊断] 控制器未返回 $$ 参数；继续扫描，不视为故障")
+            return
+
+        chunks = [bytes(serial_port.readAll()).decode("utf-8", errors="replace")]
+        while serial_port.waitForReadyRead(40):
+            chunks.append(bytes(serial_port.readAll()).decode("utf-8", errors="replace"))
+        text = "".join(chunks).replace("\r", "\n")
+        settings: dict[str, str] = {}
+        for raw_line in text.split("\n"):
+            line = raw_line.strip()
+            if not line.startswith("$") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            settings[key.strip()] = value.strip()
+
+        selected = [f"{key}={settings[key]}" for key in self.MOTION_DIAGNOSTIC_KEYS if key in settings]
+        if selected:
+            self._emit_log_message("[运动诊断] GRBL速度/加速度: " + ", ".join(selected))
+        else:
+            self._emit_log_message("[运动诊断] 未识别到标准 $110~$122 参数；继续使用当前控制器配置")
 
     def _reset_serial_rx_state(self, serial_port: QSerialPort) -> None:
         """清空串口残留输入，避免上一轮扫描响应干扰状态轮询。"""
