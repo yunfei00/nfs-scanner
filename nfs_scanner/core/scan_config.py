@@ -10,7 +10,7 @@ ScanMode = Literal["snake", "raster"]
 DEFAULT_X_START = 0.0
 DEFAULT_X_STOP = 100.0
 DEFAULT_Y_START = 0.0
-DEFAULT_Y_STOP = 100.0
+DEFAULT_Y_STOP = -100.0
 DEFAULT_Z_HEIGHT = 5.0
 DEFAULT_X_STEP = 5.0
 DEFAULT_Y_STEP = 5.0
@@ -63,7 +63,7 @@ class ScanRegion:
         if x_start == x_stop:
             x_stop = x_start + DEFAULT_X_STEP
         if y_start == y_stop:
-            y_stop = y_start + DEFAULT_Y_STEP
+            y_stop = y_start - DEFAULT_Y_STEP
         return ScanRegion(
             x_start=x_start,
             x_stop=x_stop,
@@ -108,7 +108,7 @@ class ScanPathConfig:
 
 @dataclass(slots=True)
 class ScanPreviewStats:
-    """Derived preview metrics for UI display."""
+    """Derived preview metrics from generated points."""
 
     point_count: int
     area_mm2: float
