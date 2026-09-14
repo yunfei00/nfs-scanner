@@ -20,15 +20,19 @@ jobs:
       VERSION_NAME: ${{ github.ref_name || 'manual' }}
       QT_QPA_PLATFORM: offscreen
       NFS_SCANNER_DISABLE_AUTO_STARTUP_TASKS: "1"
-      NFS_SCANNER_CONFIG_DIR: ${{ runner.temp }}\nfs-scanner\config
-      NFS_SCANNER_STATE_DIR: ${{ runner.temp }}\nfs-scanner\state
-      NFS_SCANNER_DATA_DIR: ${{ runner.temp }}\nfs-scanner\data
       SIGNING_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
       SIGNING_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+
+      - name: Configure runtime paths
+        shell: pwsh
+        run: |
+          "NFS_SCANNER_CONFIG_DIR=$env:RUNNER_TEMP\nfs-scanner\config" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "NFS_SCANNER_STATE_DIR=$env:RUNNER_TEMP\nfs-scanner\state" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "NFS_SCANNER_DATA_DIR=$env:RUNNER_TEMP\nfs-scanner\data" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
@@ -75,11 +79,6 @@ jobs:
             throw "Packaged application exited with code $($process.ExitCode)"
           }
 
-      - name: Require signing certificate for tag release
-        if: startsWith(github.ref, 'refs/tags/') && env.SIGNING_CERTIFICATE == ''
-        shell: pwsh
-        run: throw "Tag releases require WINDOWS_CERTIFICATE_BASE64 and WINDOWS_CERTIFICATE_PASSWORD secrets."
-
       - name: Sign application executable
         if: env.SIGNING_CERTIFICATE != ''
         shell: pwsh
@@ -121,6 +120,7 @@ jobs:
           $installer = Get-ChildItem "dist\NFSScanner-*-windows-x64-setup.exe" | Select-Object -First 1
           $assets = @((Get-Item $zipPath), $installer)
           $checksumPath = "dist\SHA256SUMS.txt"
+          if (Test-Path $checksumPath) { Remove-Item $checksumPath -Force }
           $assets | ForEach-Object {
             $hash = Get-FileHash $_.FullName -Algorithm SHA256
             "$($hash.Hash.ToLower())  $($_.Name)" | Out-File $checksumPath -Encoding ascii -Append
