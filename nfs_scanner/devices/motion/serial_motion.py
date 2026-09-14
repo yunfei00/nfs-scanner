@@ -21,8 +21,8 @@ class SerialMotionCommands:
     stop: str = "!"
     unlock: str = "$X"
     status: str = "?"
-    move_absolute: str = "G90 G0 X{x:.3f} Y{y:.3f} Z{z:.3f}"
-    move_xy_absolute: str = "G90 G0 X{x:.3f} Y{y:.3f}"
+    move_absolute: str = "G90 G1 X{x:.3f} Y{y:.3f} Z{z:.3f} F{feed_rate:.0f}"
+    move_xy_absolute: str = "G90 G1 X{x:.3f} Y{y:.3f} F{feed_rate:.0f}"
 
 
 @dataclass(slots=True)
@@ -108,7 +108,12 @@ class SerialMotionController(MotionController):
         ok, reason = self.validate_target_position(x, y, target_z)
         if not ok:
             raise ValueError(reason)
-        command = self._config.commands.move_absolute.format(x=x, y=y, z=target_z)
+        command = self._config.commands.move_absolute.format(
+            x=x,
+            y=y,
+            z=target_z,
+            feed_rate=self._config.feed_rate,
+        )
         self._transport.write_line(command)
         self.wait_until_idle(target=(x, y, target_z), timeout_s=max(self._config.timeout_s, 30.0))
 
