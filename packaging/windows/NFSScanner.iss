@@ -1,5 +1,5 @@
 #define MyAppName "NFS Scanner"
-#define MyAppVersion GetFileVersion("..\..\dist\NFSScanner\NFSScanner.exe")
+#define MyAppVersion GetVersionNumbersString("..\..\dist\NFSScanner\NFSScanner.exe")
 #define MyAppPublisher "NFS Scanner"
 #define MyAppExeName "NFSScanner.exe"
 
@@ -21,8 +21,9 @@ ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
 UninstallDisplayIcon={app}\{#MyAppExeName}
 
-[Languages]
-Name: "chinesesimp"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+; Use Inno Setup's built-in default language instead of depending on an
+; optional ChineseSimplified.isl file that is not present on all CI runners.
+; Application/task text below remains Chinese where explicitly defined.
 
 [Files]
 Source: "..\..\dist\NFSScanner\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
