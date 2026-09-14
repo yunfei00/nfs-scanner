@@ -75,19 +75,35 @@ def calculate_preview_stats(
 
 
 def _axis_values(start: float, stop: float, step: float) -> list[float]:
-    if step <= 0:
+    """Generate inclusive axis values while preserving increasing/decreasing direction."""
+
+    step_value = abs(float(step))
+    if step_value <= 0:
         return [start]
+    if math.isclose(start, stop, abs_tol=1e-12):
+        return [round(start, 6)]
+
+    direction = 1.0 if stop > start else -1.0
+    signed_step = step_value * direction
+    epsilon = max(step_value * 1e-6, 1e-9)
 
     values: list[float] = []
-    value = start
-    epsilon = max(abs(step) * 1e-6, 1e-9)
-    while value <= stop + epsilon:
-        values.append(round(value, 6))
-        value += step
-    if values and values[-1] > stop + epsilon:
-        values.pop()
+    value = float(start)
+    if direction > 0:
+        while value <= stop + epsilon:
+            values.append(round(value, 6))
+            value += signed_step
+        if values and values[-1] > stop + epsilon:
+            values.pop()
+    else:
+        while value >= stop - epsilon:
+            values.append(round(value, 6))
+            value += signed_step
+        if values and values[-1] < stop - epsilon:
+            values.pop()
+
     if not values:
-        values = [start]
+        values = [round(start, 6)]
     return values
 
 
