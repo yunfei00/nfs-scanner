@@ -256,7 +256,7 @@ class ScanControlLayoutMixin:
         self.abs_y_edit.setPlaceholderText("Y")
         self.abs_z_edit.setPlaceholderText("Z")
         self.abs_f_edit.setPlaceholderText("F")
-        self.abs_f_edit.setText("1000")
+        self.abs_f_edit.setText("600")
         for edit in [self.abs_x_edit, self.abs_y_edit, self.abs_z_edit, self.abs_f_edit]:
             edit.setMinimumWidth(0)
 
