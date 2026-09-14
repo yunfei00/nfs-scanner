@@ -41,8 +41,10 @@ class ScanRegion:
             errors.append("Y 步长必须大于 0")
         if self.x_start >= self.x_stop:
             errors.append("起始 X 必须小于终止 X")
-        if self.y_start >= self.y_stop:
-            errors.append("起始 Y 必须小于终止 Y")
+        # The real platform uses a decreasing Y coordinate (0 -> -300 mm),
+        # so Y is valid in either direction as long as it spans a non-zero range.
+        if self.y_start == self.y_stop:
+            errors.append("起始 Y 与终止 Y 不能相同")
         if self.z_height < 0:
             errors.append("Z 高度不能为负数")
         return errors
@@ -52,12 +54,12 @@ class ScanRegion:
         return not self.validate()
 
     def clamped(self) -> ScanRegion:
-        """Return a safe copy with basic bounds applied."""
+        """Return a safe copy while preserving the requested Y travel direction."""
 
         x_start = min(self.x_start, self.x_stop)
         x_stop = max(self.x_start, self.x_stop)
-        y_start = min(self.y_start, self.y_stop)
-        y_stop = max(self.y_start, self.y_stop)
+        y_start = self.y_start
+        y_stop = self.y_stop
         if x_start == x_stop:
             x_stop = x_start + DEFAULT_X_STEP
         if y_start == y_stop:
@@ -68,8 +70,8 @@ class ScanRegion:
             y_start=y_start,
             y_stop=y_stop,
             z_height=max(self.z_height, 0.0),
-            x_step=max(self.x_step, DEFAULT_X_STEP / 10),
-            y_step=max(self.y_step, DEFAULT_Y_STEP / 10),
+            x_step=max(abs(self.x_step), DEFAULT_X_STEP / 10),
+            y_step=max(abs(self.y_step), DEFAULT_Y_STEP / 10),
         )
 
 
