@@ -19,6 +19,7 @@ from nfs_scanner.ui.widgets.scan_control_page import ScanControlPage, ScanWorker
 from nfs_scanner.ui.widgets.scan_control_support import ScanControlSupportMixin
 from nfs_scanner.ui.widgets.instrument_operations import InstrumentOperationsMixin
 from nfs_scanner.ui.widgets.scan_workers import ScanWorker as ExtractedScanWorker
+from nfs_scanner.version import APP_VERSION
 
 
 def _skip_gui() -> bool:
@@ -63,7 +64,7 @@ class UnifiedUiTestCase(unittest.TestCase):
 
     def test_window_uses_native_title_bar(self) -> None:
         self.assertFalse(self.window.windowFlags() & Qt.WindowType.FramelessWindowHint)
-        self.assertIn("NFS Scanner v1.0.4", self.window.windowTitle())
+        self.assertIn(f"NFS Scanner v{APP_VERSION}", self.window.windowTitle())
 
     def test_both_workspace_columns_are_scrollable(self) -> None:
         page = self.window.scan_control_page
@@ -88,20 +89,7 @@ class UnifiedUiTestCase(unittest.TestCase):
         splitter.setSizes([410, 1000])  # type: ignore[union-attr]
         self.app.processEvents()
         viewport = left.viewport()  # type: ignore[union-attr]
-        for control in (
-            page.open_serial_button,
-            page.close_serial_button,
-            page.refresh_ports_button,
-            page.port_combo,
-            *page.jog_step_buttons.values(),
-            page.abs_x_edit,
-            page.abs_y_edit,
-            page.abs_z_edit,
-            page.abs_f_edit,
-            page.scan_speed_edit,
-            page.set_start_point_button,
-            page.set_end_point_button,
-        ):
+        for control in (page.open_serial_button,page.close_serial_button,page.refresh_ports_button,page.port_combo,*page.jog_step_buttons.values(),page.abs_x_edit,page.abs_y_edit,page.abs_z_edit,page.abs_f_edit,page.scan_speed_edit,page.set_start_point_button,page.set_end_point_button):
             top_left = control.mapTo(viewport, control.rect().topLeft())
             bottom_right = control.mapTo(viewport, control.rect().bottomRight())
             label = control.text() if hasattr(control, "text") else control.objectName()
@@ -111,26 +99,17 @@ class UnifiedUiTestCase(unittest.TestCase):
     def test_scan_table_uses_user_facing_chinese_headers(self) -> None:
         page = self.window.scan_control_page
         headers = [page.scan_table.horizontalHeaderItem(index).text() for index in range(page.scan_table.columnCount())]
-        self.assertEqual(headers[0], "起点 X")
-        self.assertEqual(headers[-1], "步距 Z")
-        self.assertNotIn("start_x", headers)
-        self.assertEqual(page.scan_table.horizontalScrollBarPolicy(), Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.assertEqual(headers[0], "起点 X"); self.assertEqual(headers[-1], "步距 Z"); self.assertNotIn("start_x", headers); self.assertEqual(page.scan_table.horizontalScrollBarPolicy(), Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
     def test_instrument_panels_scroll_only_when_needed(self) -> None:
         page = self.window.scan_control_page
-        self.assertEqual(page.instrument_tabs.objectName(), "instrumentTabs")
-        self.assertEqual(page.instrument_section.body_frame.objectName(), "compactSectionBody")
+        self.assertEqual(page.instrument_tabs.objectName(), "instrumentTabs"); self.assertEqual(page.instrument_section.body_frame.objectName(), "compactSectionBody")
         for panel in page.instrument_panels:
-            self.assertEqual(panel.scroll_area.verticalScrollBarPolicy(), Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-            self.assertEqual(panel.scroll_area.horizontalScrollBarPolicy(), Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            self.assertEqual(panel.scroll_area.verticalScrollBarPolicy(), Qt.ScrollBarPolicy.ScrollBarAsNeeded); self.assertEqual(panel.scroll_area.horizontalScrollBarPolicy(), Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
     def test_refactored_page_preserves_public_handlers(self) -> None:
         page = self.window.scan_control_page
-        self.assertIsInstance(page, ScanControlLayoutMixin)
-        self.assertIsInstance(page, ScanControlLifecycleMixin)
-        self.assertIsInstance(page, ScanControlSupportMixin)
-        self.assertIsInstance(page, InstrumentOperationsMixin)
-        self.assertIs(ScanWorker, ExtractedScanWorker)
+        self.assertIsInstance(page, ScanControlLayoutMixin); self.assertIsInstance(page, ScanControlLifecycleMixin); self.assertIsInstance(page, ScanControlSupportMixin); self.assertIsInstance(page, InstrumentOperationsMixin); self.assertIs(ScanWorker, ExtractedScanWorker)
         for handler_name in ("on_open_serial", "on_close_serial", "on_start_scan", "on_pause_scan", "on_stop_scan", "on_search_instruments"):
             self.assertTrue(callable(getattr(page, handler_name)))
 
