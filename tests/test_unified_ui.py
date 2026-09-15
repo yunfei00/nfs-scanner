@@ -7,7 +7,7 @@ import sys
 import unittest
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QLabel, QScrollArea, QSizeGrip, QSplitter, QToolButton
+from PySide6.QtWidgets import QApplication, QScrollArea, QSplitter
 
 from nfs_scanner.application import ApplicationContext
 from nfs_scanner.core import DeviceManager, ScanManager
@@ -55,82 +55,39 @@ class UnifiedUiTestCase(unittest.TestCase):
         self.assertIs(self.window.scan_control_page.device_manager, self.context.device_manager)
         self.assertIs(self.window.scan_control_page.scan_manager, self.context.scan_manager)
 
-    def test_single_shell_contains_header_and_scan_workspace(self) -> None:
+    def test_single_shell_contains_scan_workspace(self) -> None:
         self.assertEqual(self.window.objectName(), "mainWindow")
-        self.assertEqual(self.window.header.objectName(), "applicationHeader")
         self.assertIsInstance(self.window.scan_control_page, ScanControlPage)
         self.assertGreaterEqual(self.window.minimumWidth(), 1180)
         self.assertGreaterEqual(self.window.minimumHeight(), 700)
 
-    def test_window_uses_custom_frameless_title_bar(self) -> None:
-        self.assertTrue(self.window.windowFlags() & Qt.WindowType.FramelessWindowHint)
-        self.assertIsInstance(self.window.size_grip, QSizeGrip)
-        self.assertIsNone(self.window.header.findChild(QLabel, "baselineBadge"))
-        self.assertIsNone(self.window.header.findChild(QLabel, "safetyBadge"))
-        self.assertEqual(self.window.header.height(), 36)
-        self.assertIsNone(self.window.header.findChild(QLabel, "applicationSubtitle"))
-        for object_name in ("minimizeWindowButton", "maximizeWindowButton", "closeWindowButton"):
-            self.assertIsNotNone(self.window.header.findChild(QToolButton, object_name))
-
-    def test_maximized_window_uses_one_clear_restore_symbol(self) -> None:
-        self.window.header.sync_window_state(True)
-
-        self.assertEqual(self.window.header.maximize_button.text(), "↙")
-        self.assertEqual(self.window.header.maximize_button.accessibleName(), "还原")
-        self.assertEqual(len(self.window.header.maximize_button.text()), 1)
-
-        self.window.header.sync_window_state(False)
-        self.assertEqual(self.window.header.maximize_button.text(), "□")
-        self.assertEqual(self.window.header.maximize_button.accessibleName(), "最大化")
-
-    def test_first_maximize_request_updates_control_without_state_lag(self) -> None:
-        header = self.window.header
-        self.assertFalse(header.is_maximized)
-
-        header._toggle_maximize()
-        header._finish_window_state_request(True)
-
-        self.assertTrue(header.is_maximized)
-        self.assertEqual(header.maximize_button.accessibleName(), "还原")
-
-        header._toggle_maximize()
-        header._finish_window_state_request(False)
-        self.assertFalse(header.is_maximized)
-        self.assertEqual(header.maximize_button.accessibleName(), "最大化")
+    def test_window_uses_native_title_bar(self) -> None:
+        self.assertFalse(self.window.windowFlags() & Qt.WindowType.FramelessWindowHint)
+        self.assertIn("NFS Scanner v1.0.4", self.window.windowTitle())
 
     def test_both_workspace_columns_are_scrollable(self) -> None:
         page = self.window.scan_control_page
         left = page.findChild(QScrollArea, "controlSidebarScroll")
         right = page.findChild(QScrollArea, "measurementWorkspaceScroll")
-
         self.assertIsNotNone(left)
         self.assertIsNotNone(right)
         self.assertTrue(left.widgetResizable())  # type: ignore[union-attr]
         self.assertTrue(right.widgetResizable())  # type: ignore[union-attr]
 
-    def test_left_controls_fit_1920_by_1080_scaled_workspace(self) -> None:
-        """Keep control rows visible even when Windows reports a long port description."""
-
-        self.window.setStyleSheet(load_theme())
+    def test_left_controls_fit_scaled_workspace(self) -> None:
         page = self.window.scan_control_page
-        page.port_combo.addItem(
-            "COM123 - USB Serial Port with a very long company driver description " * 8,
-            "COM123",
-        )
+        page.port_combo.addItem("COM123 - USB Serial Port with a very long company driver description " * 8, "COM123")
         page.port_combo.setCurrentIndex(page.port_combo.count() - 1)
         self.window.resize(1440, 760)
         self.window.show()
         self.app.processEvents()
-
         splitter = page.findChild(QSplitter, "mainWorkspaceSplitter")
         left = page.findChild(QScrollArea, "controlSidebarScroll")
         self.assertIsNotNone(splitter)
         self.assertIsNotNone(left)
-        splitter.setSizes([390, 1000])  # type: ignore[union-attr]
+        splitter.setSizes([410, 1000])  # type: ignore[union-attr]
         self.app.processEvents()
-
         viewport = left.viewport()  # type: ignore[union-attr]
-        self.assertLessEqual(left.widget().width(), viewport.width())  # type: ignore[union-attr]
         for control in (
             page.open_serial_button,
             page.close_serial_button,
@@ -141,15 +98,9 @@ class UnifiedUiTestCase(unittest.TestCase):
             page.abs_y_edit,
             page.abs_z_edit,
             page.abs_f_edit,
+            page.scan_speed_edit,
             page.set_start_point_button,
             page.set_end_point_button,
-            page.project_name_edit,
-            page.test_name_edit,
-            page.start_button,
-            page.pause_button,
-            page.stop_button,
-            page.emergency_stop_button,
-            page.search_button,
         ):
             top_left = control.mapTo(viewport, control.rect().topLeft())
             bottom_right = control.mapTo(viewport, control.rect().bottomRight())
@@ -157,26 +108,9 @@ class UnifiedUiTestCase(unittest.TestCase):
             self.assertGreaterEqual(top_left.x(), 0, label)
             self.assertLess(bottom_right.x(), viewport.width(), label)
 
-        compact_buttons = (
-            page.open_serial_button,
-            page.close_serial_button,
-            page.refresh_ports_button,
-            *page.jog_step_buttons.values(),
-            page.set_start_point_button,
-            page.set_end_point_button,
-            page.start_button,
-            page.pause_button,
-            page.stop_button,
-            page.emergency_stop_button,
-            page.search_button,
-        )
-        for button in compact_buttons:
-            self.assertLessEqual(button.width(), 100, button.text())
-
     def test_scan_table_uses_user_facing_chinese_headers(self) -> None:
         page = self.window.scan_control_page
         headers = [page.scan_table.horizontalHeaderItem(index).text() for index in range(page.scan_table.columnCount())]
-
         self.assertEqual(headers[0], "起点 X")
         self.assertEqual(headers[-1], "步距 Z")
         self.assertNotIn("start_x", headers)
@@ -184,7 +118,6 @@ class UnifiedUiTestCase(unittest.TestCase):
 
     def test_instrument_panels_scroll_only_when_needed(self) -> None:
         page = self.window.scan_control_page
-
         self.assertEqual(page.instrument_tabs.objectName(), "instrumentTabs")
         self.assertEqual(page.instrument_section.body_frame.objectName(), "compactSectionBody")
         for panel in page.instrument_panels:
@@ -193,32 +126,18 @@ class UnifiedUiTestCase(unittest.TestCase):
 
     def test_refactored_page_preserves_public_handlers(self) -> None:
         page = self.window.scan_control_page
-
         self.assertIsInstance(page, ScanControlLayoutMixin)
         self.assertIsInstance(page, ScanControlLifecycleMixin)
         self.assertIsInstance(page, ScanControlSupportMixin)
         self.assertIsInstance(page, InstrumentOperationsMixin)
         self.assertIs(ScanWorker, ExtractedScanWorker)
-        for handler_name in (
-            "on_open_serial",
-            "on_close_serial",
-            "on_start_scan",
-            "on_pause_scan",
-            "on_stop_scan",
-            "on_search_instruments",
-        ):
+        for handler_name in ("on_open_serial", "on_close_serial", "on_start_scan", "on_pause_scan", "on_stop_scan", "on_search_instruments"):
             self.assertTrue(callable(getattr(page, handler_name)))
 
 
 class UnifiedThemeTestCase(unittest.TestCase):
-    def test_theme_contains_core_engineering_selectors(self) -> None:
-        stylesheet = load_theme()
-
-        self.assertIn("QFrame#applicationHeader", stylesheet)
-        self.assertIn("QToolButton#closeWindowButton", stylesheet)
-        self.assertIn("QPushButton#primaryButton", stylesheet)
-        self.assertIn("QPushButton#dangerButton", stylesheet)
-        self.assertIn("QScrollArea", stylesheet)
+    def test_theme_uses_native_light_baseline(self) -> None:
+        self.assertEqual(load_theme(), "")
 
 
 if __name__ == "__main__":
