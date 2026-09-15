@@ -24,9 +24,6 @@ def create_application(argv: Sequence[str] | None = None) -> QApplication:
     app = QApplication(arguments)
     app.setApplicationName(f"{APP_NAME} v{APP_VERSION}")
     app.setOrganizationName("nfs-scanner")
-    # v1.0.3 used the native Qt/Windows light appearance and was verified by
-    # users on the production workstation.  Keep the v1.0.4 layout/features,
-    # but do not force the later engineering dark stylesheet.
     apply_theme(app)
     return app
 
@@ -53,7 +50,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     context = create_application_context(paths=paths)
     window = MainWindow(context=context)
     app.aboutToQuit.connect(window.shutdown)
-    window.show()
+    # Default to a maximized native window. This fills the usable desktop while
+    # preserving the standard OS title bar/taskbar and its native controls.
+    window.showMaximized()
 
     auto_close_ms = os.getenv("NFS_SCANNER_AUTOCLOSE_MS")
     if auto_close_ms:
