@@ -33,6 +33,10 @@ extend-exclude = [".venv", "output", "outputs"]
 # Standalone repository scripts adjust sys.path before importing the package.
 "scripts/*.py" = ["E402"]
 "tools/*.py" = ["E402"]
+# These two UI compatibility files intentionally keep compact statement layout;
+# behavior is locked by regression tests and will be reformatted separately.
+"nfs_scanner/ui/widgets/scan_control_layout.py" = ["E701", "E702"]
+"nfs_scanner/ui/widgets/scan_control_v103_motion.py" = ["E701", "E702"]
 
 [tool.setuptools.packages.find]
 include = ["nfs_scanner*"]
