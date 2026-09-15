@@ -5,7 +5,7 @@ from __future__ import annotations
 APP_NAME = "NFS Scanner"
 # Single source of truth for the application, window title, package metadata,
 # installer and UI. Bump this value together with each release/tag.
-APP_VERSION = "1.0.4"
+APP_VERSION = "1.0.5"
 BUILD_VERSION = "2026.09.15"
 DATA_FORMAT_VERSION = "1.0"
 CONFIG_VERSION = "1.0"
