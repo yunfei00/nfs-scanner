@@ -24,6 +24,9 @@ def create_application(argv: Sequence[str] | None = None) -> QApplication:
     app = QApplication(arguments)
     app.setApplicationName(f"{APP_NAME} v{APP_VERSION}")
     app.setOrganizationName("nfs-scanner")
+    # v1.0.3 used the native Qt/Windows light appearance and was verified by
+    # users on the production workstation.  Keep the v1.0.4 layout/features,
+    # but do not force the later engineering dark stylesheet.
     apply_theme(app)
     return app
 
