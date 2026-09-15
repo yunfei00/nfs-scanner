@@ -1,30 +1,29 @@
-"""v1.0.3-compatible manual motion behavior for the commercial scan page.
+"""v1.0.3-compatible motion behavior for the commercial scan page.
 
-The v1.0.3 release is the real-hardware verified motion baseline.  Keep the
-newer UI/application architecture, but deliberately preserve the manual
-motion command semantics that were used by that release until the newer
-protocol changes have been re-qualified on the physical platform.
+The v1.0.3 release is the real-hardware verified motion baseline. Keep the
+newer UI/application architecture, but preserve both manual and formal scan
+motion command semantics until newer protocol changes are re-qualified on the
+physical platform.
 """
 
 from __future__ import annotations
 
+from . import scan_control_page as _scan_control_page_module
 from .scan_control_page import ScanControlPage as _CurrentScanControlPage
+from .scan_worker_v103_compat import ScanWorker as _V103ScanWorker
 
 
 class ScanControlPage(_CurrentScanControlPage):
-    """Scan page with the v1.0.3 real-hardware manual-motion contract."""
+    """Scan page with the v1.0.3 real-hardware motion contract."""
 
     VERIFIED_MANUAL_FEED_RATE = 1000.0
 
     def __init__(self, *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
-        # v1.0.3 initialized manual/jog motion at F1000 and showed the same
-        # value in the absolute-motion field.  Do not silently change the
-        # verified hardware feed rate in a UI-only release.
         self.current_feed_rate = self.VERIFIED_MANUAL_FEED_RATE
         if hasattr(self, "abs_f_edit"):
             self.abs_f_edit.setText("1000")
-        self.append_log("运动兼容模式：手动运动行为已恢复到 v1.0.3 真机验证基线")
+        self.append_log("运动兼容模式：手动及正式扫描运动已恢复到 v1.0.3 真机验证基线")
 
     def _move_axis(self, axis: str, delta: float) -> None:
         """Execute one jog exactly as the v1.0.3 verified implementation did."""
@@ -110,3 +109,13 @@ class ScanControlPage(_CurrentScanControlPage):
         self.current_feed_rate = feed_rate
         self.update_position_status(self.current_x, self.current_y, self.current_z)
         self.append_log(f"发送命令: {command}")
+
+    def on_start_scan(self) -> None:
+        """Start a formal scan with the v1.0.3-compatible wire protocol."""
+
+        original_worker = _scan_control_page_module.ScanWorker
+        _scan_control_page_module.ScanWorker = _V103ScanWorker
+        try:
+            super().on_start_scan()
+        finally:
+            _scan_control_page_module.ScanWorker = original_worker
