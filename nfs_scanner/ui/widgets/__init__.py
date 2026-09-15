@@ -2,6 +2,6 @@
 
 from .collapsible_section import CollapsibleSection
 from .instrument_panel import InstrumentPanel
-from .scan_control_page import ScanControlPage
+from .scan_control_v103_motion import ScanControlPage
 
 __all__ = ["CollapsibleSection", "InstrumentPanel", "ScanControlPage"]
